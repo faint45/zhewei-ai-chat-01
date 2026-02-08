@@ -1,0 +1,114 @@
+# 築未科技七階段系統 - Docker Compose 配置
+
+version: '3.8'
+
+services:
+  # 總指揮官 - Gemini Pro 服務
+  commander:
+    build:
+      context: .
+      dockerfile: Dockerfile.commander
+    container_name: zhewei-commander
+    volumes:
+      - ./D:/brain_workspace:/workspace
+      - ./logs:/logs
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - WORKSPACE=/workspace
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    networks:
+      - zhewei-network
+    restart: unless-stopped
+
+  # 首席開發官 - Claude Pro 服務
+  lead-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.lead-dev
+    container_name: zhewei-lead-dev
+    volumes:
+      - ./D:/brain_workspace:/workspace
+      - ./logs:/logs
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-3-5-sonnet-20241022}
+      - WORKSPACE=/workspace
+    networks:
+      - zhewei-network
+    depends_on:
+      - commander
+    restart: unless-stopped
+
+  # 地端勤務兵 - Ollama 服務
+  local-guard:
+    image: ollama/ollama:latest
+    container_name: zhewei-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./D:/brain_workspace:/workspace
+    ports:
+      - "11461:11434"
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:latest}
+    networks:
+      - zhewei-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # 基礎設施 - 統一API服務器
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: zhewei-api
+    volumes:
+      - ./D:/brain_workspace:/workspace
+      - ./logs:/logs
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8005:8005"
+    environment:
+      - WORKSPACE=/workspace
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    networks:
+      - zhewei-network
+    depends_on:
+      - commander
+      - lead-dev
+      - local-guard
+    restart: unless-stopped
+
+  # 監控服務
+  monitoring:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitoring
+    container_name: zhewei-monitoring
+    volumes:
+      - ./logs:/logs
+      - ./api_monitoring.db:/data/api_monitoring.db
+    ports:
+      - "8002:8001"
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    networks:
+      - zhewei-network
+    depends_on:
+      - api-server
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+    driver: local
+
+networks:
+  zhewei-network:
+    driver: bridge

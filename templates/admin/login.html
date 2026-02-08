@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理員登錄 - 築未科技</title>
+    <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body class="admin-login">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1>🏢 築未科技</h1>
+                <h2>管理員登錄</h2>
+            </div>
+            
+            {% if request.query_params.get('error') %}
+            <div class="alert alert-error">
+                ❌ 用戶名或密碼錯誤，請重新輸入
+            </div>
+            {% endif %}
+            
+            <form method="post" action="/admin/login" class="login-form">
+                <div class="form-group">
+                    <label for="username">用戶名</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">密碼</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">登錄</button>
+            </form>
+            
+            <div class="login-footer">
+                <p>默認管理員帳號: admin / admin123</p>
+                <p><a href="/">← 返回網站首頁</a></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>遠程控制 - 築未科技</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #1f2937;
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+
+        .header p {
+            color: #6b7280;
+            font-size: 1.1rem;
+        }
+
+        .status-section {
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            color: #6b7280;
+            font-weight: 600;
+        }
+
+        .status-value {
+            color: #1f2937;
+        }
+
+        .status-online {
+            color: #10b981;
+            font-weight: bold;
+        }
+
+        .status-offline {
+            color: #ef4444;
+            font-weight: bold;
+        }
+
+        .control-section {
+            margin-bottom: 30px;
+        }
+
+        .control-section h2 {
+            color: #1f2937;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .command-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .command-input input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .command-input input:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+
+        .command-input button {
+            padding: 12px 24px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .command-input button:hover {
+            background: #1d4ed8;
+        }
+
+        .output-section {
+            background: #1f2937;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            color: #10b981;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .quick-commands {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .quick-command-btn {
+            padding: 10px;
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .quick-command-btn:hover {
+            background: #e5e7eb;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .quick-commands {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 築未科技遠程控制</h1>
+            <p>遠程控制本地 AI 模型執行指令</p>
+        </div>
+
+        <div class="status-section">
+            <h2>系統狀態</h2>
+            <div class="status-card">
+                <div class="status-item">
+                    <span class="status-label">服務狀態</span>
+                    <span class="status-value status-online" id="serviceStatus">運行中</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">服務端口</span>
+                    <span class="status-value">8005</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">連接時間</span>
+                    <span class="status-value" id="connectTime">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h2>快速指令</h2>
+            <div class="quick-commands">
+                <button class="quick-command-btn" onclick="executeQuickCommand('dir')">列出文件</button>
+                <button class="quick-command-btn" onclick="executeQuickCommand('ipconfig')">查看網絡</button>
+                <button class="quick-command-btn" onclick="executeQuickCommand('hostname')">主機名稱</button>
+                <button class="quick-command-btn" onclick="executeQuickCommand('python --version')">Python版本</button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h2>指令輸入</h2>
+            <div class="command-input">
+                <input type="text" id="commandInput" placeholder="輸入指令..." onkeypress="handleKeyPress(event)">
+                <button onclick="executeCommand()">執行</button>
+            </div>
+
+            <h3>執行輸出</h3>
+            <div class="output-section" id="output">
+                <div>等待指令輸入...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const output = document.getElementById('output');
+        const commandInput = document.getElementById('commandInput');
+        const connectTimeEl = document.getElementById('connectTime');
+
+        // 設置連接時間
+        connectTimeEl.textContent = new Date().toLocaleString();
+
+        function appendOutput(text) {
+            const line = document.createElement('div');
+            line.textContent = text;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                executeCommand();
+            }
+        }
+
+        function executeQuickCommand(command) {
+            commandInput.value = command;
+            executeCommand();
+        }
+
+        async function executeCommand() {
+            const command = commandInput.value.trim();
+            if (!command) return;
+
+            appendOutput(`> ${command}`);
+            commandInput.value = '';
+
+            try {
+                const response = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ command: command })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    if (result.output) {
+                        appendOutput(result.output);
+                    } else {
+                        appendOutput('指令執行成功，無輸出');
+                    }
+                } else {
+                    appendOutput('錯誤: ' + (result.error || '執行失敗'));
+                }
+            } catch (error) {
+                appendOutput('網絡錯誤: ' + error.message);
+            }
+
+            appendOutput('---');
+        }
+
+        // 頁面加載時聚焦輸入框
+        window.onload = function() {
+            commandInput.focus();
+        };
+    </script>
+</body>
+</html>

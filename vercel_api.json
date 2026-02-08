@@ -1,0 +1,56 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "remote_control_server.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "runtime": "python3.9"
+      }
+    },
+    {
+      "src": "unified_api_dashboard.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "runtime": "python3.9"
+      }
+    },
+    {
+      "src": "static/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/v1/execute",
+      "dest": "/remote_control_server.py"
+    },
+    {
+      "src": "/dashboard",
+      "dest": "/unified_api_dashboard.py"
+    },
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/remote_control_server.py"
+    }
+  ],
+  "env": {
+    "PYTHONPATH": ".",
+    "CLOUD_PORT": "8006",
+    "CLOUD_DEPLOYMENT": "true"
+  },
+  "functions": {
+    "remote_control_server.py": {
+      "maxDuration": 60
+    },
+    "unified_api_dashboard.py": {
+      "maxDuration": 30
+    }
+  }
+}

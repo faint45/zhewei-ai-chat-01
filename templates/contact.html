@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聯繫我們 - 築未科技</title>
+    <meta name="description" content="聯繫築未科技，獲取專業技術諮詢和服務支持">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .contact-page {
+            max-width: 1200px;
+            margin: 100px auto 30px;
+            padding: 20px;
+        }
+
+        .contact-page-header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .contact-page-header h1 {
+            color: #2563eb;
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+
+        .contact-page-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+        }
+
+        .contact-info-section {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .contact-info-section h2 {
+            color: #1f2937;
+            margin-bottom: 30px;
+            font-size: 1.8rem;
+        }
+
+        .contact-item {
+            margin-bottom: 30px;
+        }
+
+        .contact-item h3 {
+            color: #2563eb;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        .contact-item p {
+            color: #6b7280;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .contact-form-section {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .contact-form-section h2 {
+            color: #1f2937;
+            margin-bottom: 30px;
+            font-size: 1.8rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #374151;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+
+        .form-group textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .submit-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #34d399;
+        }
+
+        .alert.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #f87171;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .contact-page-content {
+                grid-template-columns: 1fr;
+            }
+
+            .contact-page-header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 導航欄 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>🏢 築未科技</h2>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item"><a href="/" class="nav-link">首頁</a></li>
+                <li class="nav-item"><a href="#about" class="nav-link">關於我們</a></li>
+                <li class="nav-item"><a href="#services" class="nav-link">服務項目</a></li>
+                <li class="nav-item"><a href="/chat" class="nav-link">AI大腦</a></li>
+                <li class="nav-item"><a href="/contact" class="nav-link active">聯繫我們</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 聯繫頁面 -->
+    <div class="contact-page">
+        <div class="contact-page-header">
+            <h1>聯繫我們</h1>
+            <p>我們隨時準備為您提供專業的技術諮詢和服務支持</p>
+        </div>
+
+        <div class="contact-page-content">
+            <div class="contact-info-section">
+                <h2>聯繫方式</h2>
+
+                <div class="contact-item">
+                    <h3>📍 公司地址</h3>
+                    <p>台北市信義區信義路五段7號</p>
+                </div>
+
+                <div class="contact-item">
+                    <h3>📞 聯繫電話</h3>
+                    <p>02-1234-5678</p>
+                </div>
+
+                <div class="contact-item">
+                    <h3>📧 電子郵箱</h3>
+                    <p>contact@zhuwei-tech.com</p>
+                </div>
+
+                <div class="contact-item">
+                    <h3>🕒 營業時間</h3>
+                    <p>週一至週五 9:00-18:00</p>
+                </div>
+
+                <div class="contact-item">
+                    <h3>💬 在線諮詢</h3>
+                    <p>使用我們的AI大腦獲得即時回應</p>
+                    <a href="/chat" style="color: #2563eb; text-decoration: underline;">前往AI大腦</a>
+                </div>
+            </div>
+
+            <div class="contact-form-section">
+                <h2>在線諮詢表單</h2>
+
+                <div id="alert" class="alert"></div>
+
+                <form id="contactForm" onsubmit="submitForm(event)">
+                    <div class="form-group">
+                        <label for="name">姓名 *</label>
+                        <input type="text" id="name" name="name" required placeholder="請輸入您的姓名">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">郵箱 *</label>
+                        <input type="email" id="email" name="email" required placeholder="請輸入您的郵箱">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phone">電話</label>
+                        <input type="tel" id="phone" name="phone" placeholder="請輸入您的電話">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="message">需求描述 *</label>
+                        <textarea id="message" name="message" required placeholder="請詳細描述您的需求..."></textarea>
+                    </div>
+
+                    <button type="submit" class="submit-btn">提交諮詢</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function submitForm(event) {
+            event.preventDefault();
+
+            const form = document.getElementById('contactForm');
+            const alert = document.getElementById('alert');
+            const submitBtn = form.querySelector('button[type="submit"]');
+
+            const formData = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                message: document.getElementById('message').value
+            };
+
+            // 禁用提交按鈕
+            submitBtn.disabled = true;
+            submitBtn.textContent = '提交中...';
+
+            try {
+                const response = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert.className = 'alert success show';
+                    alert.textContent = '✅ 提交成功！我們將盡快回覆您。';
+                    form.reset();
+                } else {
+                    alert.className = 'alert error show';
+                    alert.textContent = '❌ 提交失敗：' + (result.detail || '請稍後再試');
+                }
+            } catch (error) {
+                alert.className = 'alert error show';
+                alert.textContent = '❌ 網絡錯誤，請檢查您的網絡連接';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '提交諮詢';
+            }
+
+            // 3秒後隱藏提示
+            setTimeout(() => {
+                alert.className = 'alert';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
