@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="theme-color" content="#111827">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>築未 AI 對話</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+        .msg-box { overflow-anchor: auto; }
+        .msg-box > div:last-child { overflow-anchor: auto; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 antialiased safe-area-pb">
+    <div id="app" class="h-screen flex flex-col max-w-lg mx-auto">
+        <header class="shrink-0 px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+            <h1 class="text-lg font-bold text-blue-400">築未 AI</h1>
+            <span :class="wsConnected ? 'text-green-400 text-xs' : 'text-red-400 text-xs'">[[ wsConnected ? '已連線' : '連線中…' ]]</span>
+        </header>
+
+        <main class="flex-1 overflow-y-auto px-4 py-3 msg-box" ref="msgBox">
+            <div v-for="(log, i) in logs" :key="i" :class="log.type === 'error' ? 'text-red-400' : 'text-green-400'" class="py-2 text-sm break-words border-b border-gray-800 last:border-0">
+                <span class="text-gray-500 text-xs">[[ log.time ]]</span><br>
+                [[ log.content || log.result || '' ]]
+            </div>
+        </main>
+
+        <footer class="shrink-0 p-4 pt-2 pb-[env(safe-area-inset-bottom)] bg-gray-900 border-t border-gray-700">
+            <div class="flex gap-2">
+                <input v-model="userInput" @keyup.enter="sendRequest" type="text" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-base" placeholder="輸入指令..." enterkeyhint="send">
+                <button @click="sendRequest" class="bg-blue-600 text-white px-5 py-3 rounded-lg font-medium active:bg-blue-500 min-w-[72px]">發送</button>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted, nextTick } = Vue;
+        createApp({
+            setup() {
+                const logs = ref([]);
+                const userInput = ref("");
+                const wsConnected = ref(false);
+                const msgBox = ref(null);
+                let socket;
+
+                const origin = () => window.location.origin || (window.location.protocol + '//' + window.location.host);
+                const scrollBottom = () => {
+                    nextTick(() => {
+                        if (msgBox.value) msgBox.value.scrollTop = msgBox.value.scrollHeight;
+                    });
+                };
+                const connectWs = () => {
+                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
+                    socket.onopen = () => { wsConnected.value = true; };
+                    socket.onclose = () => { wsConnected.value = false; setTimeout(connectWs, 3000); };
+                    socket.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        logs.value.push({ time: new Date().toLocaleTimeString(), ...data });
+                        scrollBottom();
+                    };
+                };
+                onMounted(() => { connectWs(); });
+
+                const sendRequest = () => {
+                    if (!userInput.value) return;
+                    if (!socket || socket.readyState !== WebSocket.OPEN) {
+                        logs.value.push({ time: new Date().toLocaleTimeString(), type: "error", content: "WebSocket 未連線" });
+                        return;
+                    }
+                    socket.send(JSON.stringify({ text: userInput.value }));
+                    logs.value.push({ time: new Date().toLocaleTimeString(), type: "info", content: "發送: " + userInput.value });
+                    userInput.value = "";
+                    scrollBottom();
+                };
+
+                return { logs, userInput, wsConnected, sendRequest, msgBox };
+            },
+            delimiters: ['[[', ']]']
+        }).mount('#app');
+    </script>
+</body>
+</html>

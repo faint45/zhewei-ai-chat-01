@@ -129,6 +129,17 @@ async def get_admin():
     return PlainTextResponse("index.html not found", status_code=404)
 
 
+@app.get("/chat")
+async def get_chat():
+    """手機版對話頁：/static/chat.html。"""
+    for d in (STATIC_DIR, FALLBACK_STATIC):
+        p = d / "chat.html"
+        if p.exists():
+            return FileResponse(str(p))
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse("chat.html not found", status_code=404)
+
+
 @app.get("/health")
 def health_check():
     """健康檢查：含依賴狀態（Ollama、venv_vision、靜態目錄）。"""

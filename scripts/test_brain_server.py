@@ -62,6 +62,13 @@ def main():
         ok("管理介面含 Vue", "vue" in body.lower() or "Vue" in body, "有 Vue 引用")
         ok("管理介面含 WebSocket", "ws" in body or "WebSocket" in body, "有 WS")
 
+    code, body = req("GET", "/chat")
+    if code != 200:
+        code, body = req("GET", "/static/chat.html")
+    ok("/chat 或 /static/chat.html", code == 200, f"status={code}")
+    if code == 200:
+        ok("對話頁含 WebSocket", "ws" in body or "WebSocket" in body, "有 WS")
+
     print()
     if FAILED:
         print(f"  失敗：{', '.join(FAILED)}")

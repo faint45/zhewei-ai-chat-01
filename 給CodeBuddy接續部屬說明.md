@@ -16,8 +16,9 @@
 | **核心代碼** | 就緒（brain_server.py, agent_logic.py, ai_service.py 等）；架構鎖定，禁止修改指定區域。 |
 | **D 槽部署** | 已完成（D:\brain_workspace 目錄結構就緒）；通過 deploy_to_d_drive.ps1 執行。 |
 | **環境變數** | .env 配置完成（含 BRAIN_WORKSPACE, ZHEWEI_MEMORY_ROOT）；需確認 CLOUDFLARE_TOKEN 是否填寫。 |
-| **本地服務** | 可啟動（python brain_server.py）；管理介面：http://localhost:8000/static/index.html 或 http://localhost:8000/admin。 |
+| **本地服務** | 可啟動（python brain_server.py 或 啟動完整跑.bat）；管理介面：/admin、/static/index.html；手機對話頁：/chat。 |
 | **外網訪問** | 未啟用；需 docker compose up -d 且 .env 有 CLOUDFLARE_TOKEN；網址：https://brain.zhe-wei.net。 |
+| **Railway 生產** | https://zhewei-ai-chat-01-production.up.railway.app（/admin、/health）；內網：zhewei-ai-chat-01.railway.internal。 |
 | **架構鎖定** | 嚴禁修改 agent_tools.py 第 213–234 行 run_vision_engine；嚴禁更動 report_generator.py 影像/語音報表分流路徑；所有產出路徑限 **D 槽或 Z 槽**；進度數值用 **LaTeX**（如 `$100\%$`）。 |
 
 ---
@@ -49,10 +50,11 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy_to_d_drive.ps1
 
 1. **診斷**（可選）：`python startup_diagnostics.py`  
    - 若無 Z 槽，診斷可能因 Z 槽未掛載而部分失敗；可改為資料都放 D 槽（.env 已設 ZHEWEI_MEMORY_ROOT=D:\brain_workspace）。
-2. **啟動主腦**：`python brain_server.py`（確認端口 8000 僅一進程）  
-   - 管理介面：http://localhost:8000/static/index.html 或 http://localhost:8000/admin  
-   - 健康檢查：http://localhost:8000/health（含 ollama、venv_vision、static_dir、progress_dir）
-3. **測試**：另開終端執行 `python scripts/test_brain_server.py`，驗證 /health、/、/static/index.html 或 /admin。
+2. **啟動主腦**：雙擊 **啟動完整跑.bat** 或 `python brain_server.py`（確認端口 8000 僅一進程）。  
+   - 管理介面（桌面＋手機響應式）：http://localhost:8000/admin  
+   - 手機版對話頁：http://localhost:8000/chat  
+   - 健康檢查：http://localhost:8000/health
+3. **測試**：另開終端執行 `python scripts/test_brain_server.py`，驗證 /health、/、/admin 或 /chat。
 
 ### 步驟 4：接線與營運（高優先、程式已留介面）
 
