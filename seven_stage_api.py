@@ -33,15 +33,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 靜態文件服務
-static_dir = Path(__file__).parent
-if (static_dir / "index.html").exists():
-    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+# 靜態文件服務 - 嘗試多個可能的目錄
+possible_dirs = [
+    Path(__file__).parent,  # 本地開發目錄
+    Path("/app"),  # Railway 容器目錄
+    Path("/workspace"),  # Railway 工作目錄
+    Path.cwd()  # 當前工作目錄
+]
+
+static_dir = None
+for directory in possible_dirs:
+    if (directory / "index.html").exists():
+        static_dir = directory
+        print(f"[靜態文件] 找到目錄: {static_dir}")
+        break
+
+if static_dir:
+    # 掛載整個目錄，讓 index.html 在根路徑可訪問
+    try:
+        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+        print(f"[靜態文件] 已掛載: {static_dir}")
+    except Exception as e:
+        print(f"[靜態文件] 掛載失敗: {e}")
 else:
-    # Railway 部署時的靜態文件目錄
-    static_dir = Path("/app")
-    if (static_dir / "index.html").exists():
-        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    print("[靜態文件] 警告: 未找到 index.html")
 
 # 全局系統實例
 workspace_path = os.getenv("WORKSPACE", "/tmp/brain_workspace")
@@ -71,27 +86,19 @@ class TaskResponse(BaseModel):
     created_at: str
 
 
-@app.get("/", summary="首頁")
-async def root():
-    """返回首頁 HTML"""
-    index_path = Path(__file__).parent / "index.html"
-    if index_path.exists():
-        return FileResponse(str(index_path), media_type="text/html")
-    else:
-        # Railway 部署路徑
-        index_path = Path("/app/index.html")
-        if index_path.exists():
-            return FileResponse(str(index_path), media_type="text/html")
-        return {
-            "name": "七階段指揮作戰系統",
-            "version": "1.0.0",
-            "status": "running",
-            "endpoints": {
-                "health": "/health",
-                "execute": "/execute",
-                "status": "/status"
-            }
+@app.get("/api", summary="API 根路徑")
+async def api_root():
+    """API 根路徑"""
+    return {
+        "name": "七階段指揮作戰系統",
+        "version": "1.0.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "execute": "/execute",
+            "status": "/status"
         }
+    }
 
 
 @app.get("/health", response_model=HealthResponse, summary="健康檢查")
