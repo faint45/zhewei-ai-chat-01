@@ -32,7 +32,8 @@ app.add_middleware(
 )
 
 # 全局系統實例
-system = SevenStageSystem(workspace="D:/brain_workspace")
+workspace_path = os.getenv("WORKSPACE", "/tmp/brain_workspace")
+system = SevenStageSystem(workspace=workspace_path)
 
 # 請求模型
 class TaskRequest(BaseModel):

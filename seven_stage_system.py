@@ -267,7 +267,11 @@ class LeadDevAgent:
     def __init__(self, workspace: str):
         self.workspace = Path(workspace)
         self.api_key = os.getenv("ANTHROPIC_API_KEY")
-        self.client = anthropic.Anthropic(api_key=self.api_key)
+        try:
+            self.client = anthropic.Anthropic(api_key=self.api_key)
+        except Exception as e:
+            print(f"[首席開發官] 初始化警告: {e}")
+            self.client = None
         print("[首席開發官] 已初始化 (Claude Pro)")
 
     async def execute(self, task: Task) -> Dict[str, Any]:
