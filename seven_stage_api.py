@@ -15,6 +15,8 @@ from typing import Dict, Any
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -30,6 +32,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 靜態文件服務
+static_dir = Path(__file__).parent
+if (static_dir / "index.html").exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+else:
+    # Railway 部署時的靜態文件目錄
+    static_dir = Path("/app")
+    if (static_dir / "index.html").exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # 全局系統實例
 workspace_path = os.getenv("WORKSPACE", "/tmp/brain_workspace")
@@ -59,19 +71,27 @@ class TaskResponse(BaseModel):
     created_at: str
 
 
-@app.get("/", summary="API 根路徑")
+@app.get("/", summary="首頁")
 async def root():
-    """API 根路徑"""
-    return {
-        "name": "七階段指揮作戰系統",
-        "version": "1.0.0",
-        "status": "running",
-        "endpoints": {
-            "health": "/health",
-            "execute": "/execute",
-            "status": "/status"
+    """返回首頁 HTML"""
+    index_path = Path(__file__).parent / "index.html"
+    if index_path.exists():
+        return FileResponse(str(index_path), media_type="text/html")
+    else:
+        # Railway 部署路徑
+        index_path = Path("/app/index.html")
+        if index_path.exists():
+            return FileResponse(str(index_path), media_type="text/html")
+        return {
+            "name": "七階段指揮作戰系統",
+            "version": "1.0.0",
+            "status": "running",
+            "endpoints": {
+                "health": "/health",
+                "execute": "/execute",
+                "status": "/status"
+            }
         }
-    }
 
 
 @app.get("/health", response_model=HealthResponse, summary="健康檢查")
