@@ -48,10 +48,14 @@ app.add_middleware(
 )
 
 # 靜態文件目錄
-app.mount("/static", StaticFiles(directory="static"), name="static")
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # 模板目錄
-templates = Jinja2Templates(directory="templates")
+if os.path.exists("templates"):
+    templates = Jinja2Templates(directory="templates")
+else:
+    templates = None
 
 # 指令執行隊列
 task_queue = queue.Queue()
