@@ -7,7 +7,7 @@
 
 import os
 import requests
-from typing import Dict, Optional
+from typing import Dict, Any, Optional
 from pathlib import Path
 
 class CursorClient:
