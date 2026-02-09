@@ -5,4 +5,4 @@ port = 8006
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "python remote_control_server.py --port 8006"
+startCommand = "uvicorn seven_stage_api:app --host 0.0.0.0 --port $PORT"
