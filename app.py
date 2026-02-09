@@ -19,6 +19,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pydantic_core import ValidationError
 import uvicorn
+import json
+import requests
+try:
+    import google.genai as genai  # 新的 Google AI SDK
+    GOOGLE_AI_AVAILABLE = True
+except ImportError:
+    try:
+        import google.generativeai as genai  # 旧版 SDK
+        GOOGLE_AI_AVAILABLE = True
+    except ImportError:
+        GOOGLE_AI_AVAILABLE = False
+        print("警告: Google AI SDK 不可用，Gemini 功能将使用演示模式")
+from config_ai import AIConfig, AIModelType
 
 # ========== 內嵌 HTML 內容 ==========
 INDEX_HTML = '''<!DOCTYPE html>
@@ -980,22 +993,26 @@ INDEX_HTML = '''<!DOCTYPE html>
             addMessage(message, 'user');
             input.value = '';
             
-            const response = await simulateAIResponse(message);
-            addMessage(response, 'bot');
-        }
-
-        async function simulateAIResponse(message) {
-            const responses = [
-                `這是對「${message}」的智能回應。系統已安全部署到 Railway 平台！`,
-                `已收到您的訊息：「${message}」。您的任務進度和費用會即時更新。`,
-                `感謝您的輸入！「${message}」這個主題很有趣，我可以為您提供更多資訊。`,
-                `關於「${message}」，讓我為您詳細解答。您的資料已加密保護。`,
-                `「${message}」是一個很好的問題！系統運行正常，請隨時查看任務追蹤頁面。`
-            ];
-            
-            await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
-            
-            return responses[Math.floor(Math.random() * responses.length)];
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP 錯誤! 狀態: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                addMessage(data.response, 'bot');
+                
+            } catch (error) {
+                console.error('API 調用失敗:', error);
+                addMessage('抱歉，AI 服務暫時不可用。請稍後再試。', 'bot');
+            }
         }
 
         function addMessage(content, sender) {
@@ -1032,6 +1049,280 @@ INDEX_HTML = '''<!DOCTYPE html>
 </body>
 </html>'''
 
+# ========== Unified AI Service ==========
+class UnifiedAIService:
+    """統一 AI 服務類 - 支持多種 AI 模型"""
+    
+    def __init__(self):
+        self.config = AIConfig.load_from_env()
+        self.conversation_history = []
+        
+    async def generate_response(self, message: str) -> str:
+        """生成 AI 回應"""
+        try:
+            if self.config.MODEL_TYPE == AIModelType.DEMO:
+                return await self._demo_response(message)
+            elif self.config.MODEL_TYPE == AIModelType.OPENAI:
+                return await self._openai_response(message)
+            elif self.config.MODEL_TYPE == AIModelType.OLLAMA:
+                return await self._ollama_response(message)
+            elif self.config.MODEL_TYPE == AIModelType.GEMINI:
+                return await self._gemini_response(message)
+            elif self.config.MODEL_TYPE == AIModelType.QWEN:
+                return await self._qwen_response(message)
+            else:
+                return await self._demo_response(message)
+        except Exception as e:
+            print(f"AI 服務錯誤: {e}")
+            return await self._demo_response(message)
+    
+    async def _openai_response(self, message: str) -> str:
+        """OpenAI 模型回應"""
+        import openai
+        
+        client = openai.AsyncOpenAI(
+            api_key=self.config.OPENAI_API_KEY,
+            base_url=self.config.OPENAI_API_BASE
+        )
+        
+        messages = self._build_messages(message)
+        
+        response = await client.chat.completions.create(
+            model=self.config.OPENAI_MODEL,
+            messages=messages,
+            max_tokens=self.config.MAX_TOKENS,
+            temperature=self.config.TEMPERATURE
+        )
+        
+        return response.choices[0].message.content
+    
+    async def _ollama_response(self, message: str) -> str:
+        """Ollama 模型回應"""
+        import openai
+        
+        client = openai.AsyncOpenAI(
+            base_url=self.config.OLLAMA_API_BASE
+        )
+        
+        messages = self._build_messages(message)
+        
+        response = await client.chat.completions.create(
+            model=self.config.OLLAMA_MODEL,
+            messages=messages,
+            max_tokens=self.config.MAX_TOKENS,
+            temperature=self.config.TEMPERATURE
+        )
+        
+        return response.choices[0].message.content
+    
+    async def _gemini_response(self, message: str) -> str:
+        """Gemini 模型回應"""
+        if not GOOGLE_AI_AVAILABLE:
+            return await self._demo_response(message)
+            
+        try:
+            genai.configure(api_key=self.config.GEMINI_API_KEY)
+            
+            model = genai.GenerativeModel(self.config.GEMINI_MODEL)
+            
+            prompt = self._build_gemini_prompt(message)
+            
+            response = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: model.generate_content(prompt)
+            )
+            
+            return response.text
+        except Exception as e:
+            print(f"Gemini API 錯誤: {e}")
+            return await self._demo_response(message)
+    
+    async def _qwen_response(self, message: str) -> str:
+        """通義千問模型回應"""
+        headers = {
+            "Authorization": f"Bearer {self.config.DASHSCOPE_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.config.QWEN_MODEL,
+            "messages": self._build_qwen_messages(message),
+            "temperature": self.config.TEMPERATURE
+        }
+        
+        response = requests.post(
+            f"{self.config.get_api_base()}/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result["choices"][0]["message"]["content"]
+        else:
+            raise Exception(f"Qwen API 錯誤: {response.status_code}")
+    
+    def _build_messages(self, user_message: str) -> list:
+        """構建對話消息列表"""
+        from datetime import datetime
+        
+        system_prompt = f"""你是築未科技大腦，一個智慧、專業的電腦代理人。
+
+你的角色和任務：
+• 提供智能、友好的對話服務
+• 回答用戶關於時間、系統狀態、一般知識的問題
+• 協助用戶執行各種任務
+• 維護專業、有禮貌的語氣
+
+回答風格：
+• 使用台灣繁體中文
+• 語氣友好、專業
+• 回應簡潔明了
+• 適時使用表情符號讓對話更生動
+
+當前時間: {datetime.now().strftime('%Y年%m月%d日 %H:%M')}"""
+        
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # 添加對話歷史
+        if len(self.conversation_history) > 0:
+            recent_history = self.conversation_history[-self.config.CONTEXT_MESSAGES:]
+            messages.extend(recent_history)
+        
+        # 添加當前用戶消息
+        messages.append({"role": "user", "content": user_message})
+        
+        return messages
+    
+    def _build_gemini_prompt(self, user_message: str) -> str:
+        """構建 Gemini 提示詞"""
+        from datetime import datetime
+        
+        system_prompt = f"""你是築未科技大腦，一個智慧、專業的電腦代理人。
+
+你的角色和任務：
+• 提供智能、友好的對話服務
+• 回答用戶關於時間、系統狀態、一般知識的問題
+• 協助用戶執行各種任務
+• 維護專業、有禮貌的語氣
+
+回答風格：
+• 使用台灣繁體中文
+• 語氣友好、專業
+• 回應簡潔明了
+• 適時使用表情符號讓對話更生動
+
+當前時間: {datetime.now().strftime('%Y年%m月%d日 %H:%M')}"""
+        
+        # 構建對話歷史
+        history_text = ""
+        if len(self.conversation_history) > 0:
+            recent_history = self.conversation_history[-self.config.CONTEXT_MESSAGES:]
+            for msg in recent_history:
+                role = "用戶" if msg["role"] == "user" else "助手"
+                history_text += f"{role}: {msg['content']}\n"
+        
+        prompt = f"""{system_prompt}
+
+{history_text}
+
+用戶: {user_message}
+
+助手: """
+        
+        return prompt
+    
+    def _build_qwen_messages(self, user_message: str) -> list:
+        """構建 Qwen 消息列表"""
+        from datetime import datetime
+        
+        system_prompt = f"""你是築未科技大腦，一個智慧、專業的電腦代理人。
+
+你的角色和任務：
+• 提供智能、友好的對話服務
+• 回答用戶關於時間、系統狀態、一般知識的問題
+• 協助用戶執行各種任務
+• 維護專業、有禮貌的語氣
+
+回答風格：
+• 使用台灣繁體中文
+• 語氣友好、專業
+• 回應簡潔明了
+• 適時使用表情符號讓對話更生動
+
+當前時間: {datetime.now().strftime('%Y年%m月%d日 %H:%M')}"""
+        
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # 添加對話歷史
+        if len(self.conversation_history) > 0:
+            recent_history = self.conversation_history[-self.config.CONTEXT_MESSAGES:]
+            messages.extend(recent_history)
+        
+        # 添加當前用戶消息
+        messages.append({"role": "user", "content": user_message})
+        
+        return messages
+    
+    async def _demo_response(self, message: str) -> str:
+        """演示模式回應"""
+        message_lower = message.lower()
+        
+        if any(word in message_lower for word in ['你好', 'hello', 'hi', '嗨']):
+            return f"您好！我是築未科技大腦。\n\n" \
+                   f"🤖 當前模式: {self.config.MODEL_TYPE.value.upper()}\n" \
+                   f"📋 可用功能：\n" \
+                   f"• 智能對話\n" \
+                   f"• 系統監控\n" \
+                   f"• 文件管理\n" \
+                   f"\n💡 提示：可以設置環境變量切換到 OpenAI、Ollama、Gemini 或 Qwen 模式\n" \
+                   f"有什麼可以幫您的嗎？"
+        
+        elif '時間' in message_lower or 'date' in message_lower:
+            from datetime import datetime
+            return f"現在時間是：{datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')}"
+        
+        elif '狀態' in message_lower or 'status' in message_lower:
+            return f"🤖 築未科技大腦狀態：\n" \
+                   f"• 模式: {self.config.MODEL_TYPE.value.upper()}\n" \
+                   f"• 模型: {self.config.get_model_name()}\n" \
+                   f"• 對話歷史: {len(self.conversation_history)} 條\n" \
+                   f"• 系統運行正常"
+        
+        else:
+            return f"我收到了您的訊息：「{message}」\n\n" \
+                   f"🤖 築未科技大腦正在為您服務。\n" \
+                   f"💡 當前使用 {self.config.MODEL_TYPE.value} 模式\n" \
+                   f"📋 可以詢問我：\n" \
+                   f"• 系統狀態\n" \
+                   f"• 當前時間\n" \
+                   f"• 如何連接 AI 模型\n" \
+                   f"• 其他問題"
+    
+    def _update_history(self, user_message: str, assistant_message: str):
+        """更新對話歷史"""
+        from datetime import datetime
+        
+        self.conversation_history.append({
+            "role": "user",
+            "content": user_message,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        self.conversation_history.append({
+            "role": "assistant",
+            "content": assistant_message,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        # 限制歷史記錄長度
+        max_history = self.config.CONTEXT_MESSAGES * 2
+        if len(self.conversation_history) > max_history:
+            self.conversation_history = self.conversation_history[-max_history:]
+
+# 初始化 AI 服務
+ai_service = UnifiedAIService()
+
 # ========== FastAPI App ==========
 app = FastAPI(title="築未科技 AI 對話系統", version="1.0.0")
 
@@ -1067,11 +1358,43 @@ async def api_info():
         "name": "築未科技 AI 對話系統",
         "version": "1.0.0",
         "status": "running",
+        "ai_model": ai_service.config.MODEL_TYPE.value,
+        "ai_model_name": ai_service.config.get_model_name(),
         "endpoints": {
             "health": "/health",
-            "api_info": "/api/info"
+            "api_info": "/api/info",
+            "chat": "/api/chat"
         }
     }
+
+# ========== AI 聊天 API ==========
+class ChatRequest(BaseModel):
+    """聊天請求模型"""
+    message: str
+    session_id: str = None
+
+class ChatResponse(BaseModel):
+    """聊天回應模型"""
+    response: str
+    model: str
+    model_type: str
+
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat_endpoint(request: ChatRequest):
+    """AI 聊天端點"""
+    try:
+        response = await ai_service.generate_response(request.message)
+        
+        # 更新對話歷史
+        ai_service._update_history(request.message, response)
+        
+        return ChatResponse(
+            response=response,
+            model=ai_service.config.get_model_name(),
+            model_type=ai_service.config.MODEL_TYPE.value
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI 服務錯誤: {str(e)}")
 
 # ========== 啟動 ==========
 if __name__ == "__main__":
