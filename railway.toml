@@ -5,4 +5,4 @@ port = 8080
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "python app.py"
+startCommand = "python seven_stage_api.py"
