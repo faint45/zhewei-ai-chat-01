@@ -239,6 +239,12 @@ def start_server(host: str = "0.0.0.0", port: int = 8006):
 if __name__ == "__main__":
     # 從環境變量讀取配置
     host = os.getenv("API_HOST", "0.0.0.0")
-    port = int(os.getenv("API_PORT", "8006"))
+
+    # Railway會設置PORT環境變量，默認值為8006
+    port_env = os.getenv("PORT", "8006")
+    try:
+        port = int(port_env)
+    except ValueError:
+        port = 8006
 
     start_server(host, port)
