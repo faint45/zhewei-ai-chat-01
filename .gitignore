@@ -1,0 +1,100 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+
+# Python virtual environments
+venv/
+venv38/
+venv312/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Large models / binaries (依需求還原)
+vosk-model-small-cn/
+vosk-model-small-cn.zip
+yolov8n.pt
+ffmpeg-8.0.1.tar.xz
+
+# 執行紀錄（可含敏感路徑）
+zhewei_remote_master.csv
+search_log.csv
+ai_brain_log.txt
+storage_config.json
+
+# 部署壓縮檔
+deploy.zip
+
+# Chat history (may contain sensitive data)
+chat_history.json
+
+# Brain learning data
+brain_learn.json
+ai_discoveries.json
+ai_cost_log.json
+brain_knowledge.json
+dev_output.py
+creative_output/
+vision_output/
+piper_models/
+brain_chroma_db/
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
+# Build outputs
+dist
+dist-ssr
+release
+桌面版輸出
+
+# OS files
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Temporary files
+*.local
+*.tmp
+*.temp
+
+# Raw data archive (contains sensitive files)
+raw_data_archive/*
+!raw_data_archive/.gitkeep
+
+# Rclone 配置（含敏感憑證，勿提交）
+.config/
+rclone.conf
+
+# Cache
+.cache
+.parcel-cache
+.vite
+
+.vercel
+.env*.local
+
+# 自檢報告（含歷史）
+reports/

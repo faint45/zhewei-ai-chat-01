@@ -1,0 +1,11 @@
+# 築未科技 — Cloudflare Tunnel 設定範例（config 檔方式）
+# 使用：先建立 tunnel 並取得 credentials，再複製為 cloudflared-config.yml 並填入 tunnel ID 與 credentials-file 路徑
+# 執行：cloudflared tunnel --config cloudflared-config.yml run
+
+# tunnel: <你的隧道 ID，於 Cloudflare Zero Trust 建立隧道後取得>
+# credentials-file: /path/to/<tunnel-id>.json
+
+ingress:
+  - hostname: brain.zhe-wei.net
+    service: http://localhost:8000
+  - service: http_status:404

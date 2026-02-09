@@ -1,0 +1,42 @@
+# 🏗️ ZHUWEI TECH - MANIFEST v1.0 (2026-02-06)
+
+## 👤 核心背景 (Context)
+
+- **主理人**: 阿凱 (30 歲, 最年輕高公局工地主任)
+- **地點**: 嘉義民雄 (工地現場運作) [cite: 2026-02-02]
+- **專案**: 築未科技 — 官網 (The Face) & 營建自動化系統 (The Brain)
+- **資源**: 9TB 工程資料庫 [cite: 2026-01-31]
+
+## 💻 硬體規格 (Hardware)
+
+- **CPU**: Intel i7-14700 [cite: 2026-01-30]
+- **GPU**: RTX 4060 Ti 16GB (Local AI 推理) [cite: 2026-01-30]
+- **AI**: Ollama (DeepSeek-R1-14B) @ 127.0.0.1:11434 [cite: 2026-02-05]
+
+## 📂 儲存合規 (Storage Compliance) [cite: 2026-02-06]
+
+- **C:\ (System)**: 絕對禁止寫入專案檔案或數據。
+- **D:\ (Core)**: `D:\Projects\zhuwei-center\` — 核心源碼、執行檔、node_modules。
+- **Z:\ (Cloud/Temp)**: `Z:\Temp\` — 暫存、快取、日誌、日報 JSON。
+
+## 🛠️ 技術棧 (Tech Stack)
+
+- **Frontend**: Next.js 15 (App Router), Tailwind CSS, Framer Motion
+- **UI**: Shadcn/UI (Style: Glassmorphism, Color: Emerald-500) [cite: 2026-02-05]
+- **Backend**: tRPC, Node.js, Python (Edge Monitoring)
+- **Logic**: 營造 SOP、混凝土損耗計算 (5% 預設) [cite: 2026-01-08]
+
+## 📝 回報協定 (Reporting Protocol)
+
+- 完成後**必須**回報 JSON 至 **`brain_workspace/reports`**：
+  ```json
+  { "aiName": "", "taskName": "", "status": "completed", "summary": "", "changes": [], "nextSteps": "" }
+  ```
+
+## ⚡ 短指令碼 (Shortcodes)
+
+| 指令 | 說明 |
+|------|------|
+| **[ZW-UI]** | 產出最簡 React 組件，嚴禁贅詞。 |
+| **[ZW-API]** | 產出 tRPC 路由，路徑必須符合 D/Z 規範。 |
+| **[ZW-FIX]** | 僅提供修正後完整代碼，絕不修改非相關區域。 |

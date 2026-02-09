@@ -1,0 +1,13 @@
+{
+  "template_id": "const_photo_record_001",
+  "title": "工程拍照記錄表",
+  "columns": [
+    { "id": "item", "label": "工程項目", "type": "text" },
+    { "id": "location", "label": "拍攝位置", "type": "text" },
+    { "id": "photo", "label": "照片 (URL)", "type": "image" },
+    { "id": "note", "label": "說明", "type": "textarea" }
+  ],
+  "default_rows": [
+    { "item": "範例項目", "location": "一樓大廳", "photo": "https://via.placeholder.com/150", "note": "初步勘查記錄" }
+  ]
+}

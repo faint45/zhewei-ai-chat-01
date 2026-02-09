@@ -1,0 +1,9 @@
+# 築未科技大腦 — Agent + WebSocket 服務依賴
+# 執行：pip install -r requirements-brain.txt
+
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+python-dotenv>=1.0.0
+google-generativeai>=0.3.0
+httpx>=0.24.0
+anthropic>=0.39.0

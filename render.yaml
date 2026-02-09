@@ -1,0 +1,24 @@
+# Render.com Blueprint - 築未科技大腦 Brain Bridge API
+# 使用方式：Render Dashboard → New → Blueprint → 連 GitHub 選此專案
+# 部署後在 Environment 設定 GEMINI_API_KEY、AUTH_USERS 等
+
+services:
+  - type: web
+    name: zhewei-brain-bridge
+    runtime: python
+    region: singapore
+
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn brain_bridge_fastapi:app --host 0.0.0.0 --port $PORT
+
+    envVars:
+      - key: BRAIN_BRIDGE_PORT
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AUTH_USERS
+        sync: false
+      - key: BRAIN_BRIDGE_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11"

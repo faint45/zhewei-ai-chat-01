@@ -1,0 +1,16 @@
+{
+  "system_name": "Zhewei_Brain_Core",
+  "version": "1.0.0",
+  "owner": "Ah-Kai",
+  "lock_date": "2026-02-05",
+  "immutable_files": [
+    "brain_server.py",
+    "agent_logic.py",
+    "ai_service.py",
+    "startup_diagnostics.py"
+  ],
+  "environment_mapping": {
+    "primary": "Python 3.14",
+    "vision": "Python 3.12 (venv_vision)"
+  }
+}

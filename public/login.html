@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>築未科技大腦 — 登入</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #1e1e2e; color: #cdd6f4; }
+    .card { max-width: 360px; margin: 4rem auto; padding: 2rem; background: #313244; border-radius: 12px; }
+    h1 { font-size: 1.25rem; margin: 0 0 1.5rem; }
+    input { width: 100%; padding: 0.75rem; margin-bottom: 1rem; border: 1px solid #45475a; border-radius: 8px; background: #1e1e2e; color: #cdd6f4; }
+    button { width: 100%; padding: 0.75rem; background: #89b4fa; color: #1e1e2e; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    button:hover { background: #74a6f9; }
+    .err { color: #f38ba8; font-size: 0.9rem; margin-top: 0.5rem; }
+    .api { font-size: 0.85rem; color: #6c7086; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>築未科技大腦 — 登入</h1>
+    <p class="api">API：<input id="apiUrl" placeholder="http://127.0.0.1:5100" style="width:100%;margin:0" /></p>
+    <input id="username" type="text" placeholder="帳號" autocomplete="username" />
+    <input id="password" type="password" placeholder="密碼" autocomplete="current-password" />
+    <button onclick="doLogin()">登入</button>
+    <p id="err" class="err"></p>
+  </div>
+  <script>
+    document.getElementById('apiUrl').value = window.location.origin || 'http://127.0.0.1:5100';
+    async function doLogin() {
+      const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const err = document.getElementById('err');
+      err.textContent = '';
+      if (!username || !password) {
+        err.textContent = '請輸入帳號與密碼';
+        return;
+      }
+      try {
+        const res = await fetch(url + '/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          err.textContent = data.detail || '登入失敗';
+          return;
+        }
+        localStorage.setItem('brain_api_url', url);
+        localStorage.setItem('session_token', data.session_token);
+        localStorage.setItem('user_id', data.user_id || username);
+        window.location.href = url + '/demo';
+      } catch (e) {
+        err.textContent = '連線失敗: ' + e.message;
+      }
+    }
+  </script>
+</body>
+</html>

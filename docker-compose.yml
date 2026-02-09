@@ -1,0 +1,30 @@
+# 築未科技大腦 — Docker Compose
+# 啟動：docker compose up -d
+# 需 .env 內 CLOUDFLARE_TOKEN（tunnel 用）
+
+services:
+  # 築未大腦核心服務
+  brain_server:
+    build: .
+    container_name: zhewei_brain
+    environment:
+      BRAIN_WORKSPACE: /app
+      ZHEWEI_MEMORY_ROOT: /memory
+      BRAIN_WS_PORT: "8000"
+    volumes:
+      # 使用專案目錄為 /app（本機無 D 槽時相容）；有 D 槽且已複製專案到 D:\brain_workspace 時可改為：D:/brain_workspace:/app
+      - .:/app
+      # 本機無 Z 槽時使用專案內 zhewei_memory；有 Z 槽時可改為：Z:/Zhewei_Brain:/memory
+      - ./zhewei_memory:/memory
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  # Cloudflare 加密隧道通道
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: always
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TOKEN}
+    depends_on:
+      - brain_server
+

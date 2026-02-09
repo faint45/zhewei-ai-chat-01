@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "python",
+      "args": ["-m", "uv", "tool", "run", "windows-mcp"],
+      "env": {}
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "env": {}
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {}
+    }
+  }
+}

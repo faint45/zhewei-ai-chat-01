@@ -1,0 +1,31 @@
+# 築未科技 - 開發者 SOP (2026-02-06 版)
+
+## ⚠️ 三項路徑原則
+
+1. **C 槽禁令**：嚴禁任何檔案操作涉及 `C:\`。
+2. **D 槽核心**：所有產出必須位於 `D:\Projects\zhuwei-center`。
+3. **Z 槽暫存**：日誌與快取導向 `Z:\Temp`。
+
+## 任務結束強制回報
+
+完成任何代碼修改或邏輯設計後，**必須**產出以下 JSON，並**請求寫入** `brain_workspace/reports`：
+
+```json
+{
+  "aiName": "你的名字",
+  "taskName": "任務簡稱",
+  "status": "completed",
+  "summary": "一句話描述成果",
+  "changes": ["修改檔案1", "修改檔案2"],
+  "nextSteps": "給總顧問的下一步建議"
+}
+```
+
+- **aiName**：執行者名稱（如 Cursor、Claude、Windsurf、Qianxun）
+- **taskName**：任務簡稱
+- **status**：`"completed"` | `"blocked"` | `"warning"`
+- **summary**：一句話描述本次成果
+- **changes**：本次修改的檔案路徑清單
+- **nextSteps**：給總顧問的下一步建議
+
+寫入路徑以 `ZHUWEI_CONFIG.PATHS.BRAIN_REPORTS` 為準（即 `D:\Projects\zhuwei-center\brain_workspace\reports`）。

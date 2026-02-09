@@ -1,0 +1,42 @@
+# 築未科技 - 儲存規範 (2026-02-06)
+
+## 開發守則：儲存路徑合規
+
+1. **禁止在 C:\ 建立任何專案或存放數據。**
+2. **核心路徑必須以 `D:\Projects\zhuwei-center` 為根目錄。**
+3. **暫存檔案、日誌、快取必須導向 `Z:\Temp`。**
+4. **任何檔案操作必須調用 `src/config/zhuwei.ts` 中的 `PATHS` 變數。**
+5. **嚴禁硬編碼 (Hardcoding) C 槽路徑。**
+
+---
+
+## 專案目錄結構 (D:\Projects\zhuwei-center\)
+
+```
+D:\Projects\zhuwei-center\
+├── brain_workspace\          # 築未科技數位大腦
+│   ├── history\               # 歷次對話紀錄 (.md)
+│   ├── arch_decisions\        # 架構決策紀錄 (ADR)
+│   ├── code_snippets\        # 核心程式碼備份
+│   └── reports\              # AI 任務回報 (JSON)
+```
+
+---
+
+## 路徑常數對照
+
+| 用途 | 變數 | 路徑 |
+|------|------|------|
+| 核心專案根目錄 | PROJECT_ROOT | D:/Projects/zhuwei-center |
+| 建置產出 | EXECUTIVE_FILES | D:/Projects/zhuwei-center/dist |
+| 數位大腦根目錄 | BRAIN_WORKSPACE | D:/Projects/zhuwei-center/brain_workspace |
+| 對話紀錄 | BRAIN_HISTORY | .../brain_workspace/history |
+| 架構決策 (ADR) | BRAIN_ARCH_DECISIONS | .../brain_workspace/arch_decisions |
+| 程式碼備份 | BRAIN_CODE_SNIPPETS | .../brain_workspace/code_snippets |
+| AI 任務回報 | BRAIN_REPORTS | .../brain_workspace/reports |
+| 暫存根目錄 | TEMP_ROOT | Z:/Temp |
+| 快取 | CACHE_DIR | Z:/Temp/cache |
+| 日誌 | LOG_DIR | Z:/Temp/logs |
+| 系統警戒（僅限 OS，禁止寫入） | SYSTEM_ROOT | C:/ |
+
+程式參照：一律使用 `ZHUWEI_CONFIG.PATHS.*`，不得手寫 C 槽或專案路徑字串。

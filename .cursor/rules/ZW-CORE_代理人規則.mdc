@@ -1,0 +1,42 @@
+# [ZW-CORE] 代理人規則 — 初始化文件 (2026-02-06)
+
+**執行對象**: [ZW-CORE] @ Cursor  
+**用途**: 初始化代理人行為，確保所有產出符合築未科技 MANIFEST 與儲存/回報協定。
+
+---
+
+## 1. MANIFEST 來源
+
+- **首選**: 讀取 `D:\Projects\zhuwei-center\MANIFEST.md`（若工作區可存取該路徑）。
+- **備援**: 以本專案 `.cursor/rules/築未MANIFEST.mdc` 為準。
+
+---
+
+## 2. 強制遵守
+
+| 規則檔 | 內容 |
+|--------|------|
+| **築未MANIFEST.mdc** | 核心背景、硬體、儲存合規、技術棧、回報協定、短指令碼 |
+| **儲存規範.mdc** | C 禁止、D 核心、Z 暫存；路徑一律使用 `ZHUWEI_CONFIG.PATHS` |
+| **執行規範.mdc** | 任務結束強制產出 JSON 回報並請求寫入 `brain_workspace/reports` |
+| **執行協定.mdc** | 儲存三原則、技術棧、硬體、任務完成回報 |
+| **架構守則.mdc** | 核心結構禁止修改、數據格式、工具調度 |
+| **全系統架構鎖定規則.mdc** | 核心檔案保護、儲存分流、代碼更新規範 |
+
+---
+
+## 3. 短指令碼對應
+
+- **[ZW-UI]**: 產出最簡 React 組件，嚴禁贅詞。
+- **[ZW-API]**: 產出 tRPC 路由，路徑必須符合 D/Z 規範（使用 `ZHUWEI_CONFIG.PATHS`）。
+- **[ZW-FIX]**: 僅提供修正後完整代碼，絕不修改非相關區域。
+- **[ZW-CORE]**: 依本規則與 MANIFEST 執行；任務完成後產出 JSON 回報並請求寫入 `brain_workspace/reports`。
+
+---
+
+## 4. 任務完成必做
+
+完成任何代碼修改或邏輯設計後：
+
+1. 產出 JSON：`aiName`, `taskName`, `status`, `summary`, `changes`, `nextSteps`
+2. 詢問是否寫入 `D:\Projects\zhuwei-center\brain_workspace\reports`（或 `ZHUWEI_CONFIG.PATHS.BRAIN_REPORTS`）
