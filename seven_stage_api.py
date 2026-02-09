@@ -16,7 +16,7 @@ from typing import Dict, Any
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -42,16 +42,24 @@ possible_dirs = [
 ]
 
 static_dir = None
+index_content = None
+
 for directory in possible_dirs:
     if (directory / "index.html").exists():
         static_dir = directory
         print(f"[靜態文件] 找到目錄: {static_dir}")
+        try:
+            with open(directory / "index.html", "r", encoding="utf-8") as f:
+                index_content = f.read()
+            print(f"[靜態文件] 已讀取 index.html ({len(index_content)} 字符)")
+        except Exception as e:
+            print(f"[靜態文件] 讀取失敗: {e}")
         break
 
 if static_dir:
     # 掛載整個目錄，讓 index.html 在根路徑可訪問
     try:
-        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
         print(f"[靜態文件] 已掛載: {static_dir}")
     except Exception as e:
         print(f"[靜態文件] 掛載失敗: {e}")
@@ -84,6 +92,18 @@ class TaskResponse(BaseModel):
     status: str
     result: Dict[str, Any]
     created_at: str
+
+
+@app.get("/", summary="首頁")
+async def root():
+    """返回首頁 HTML"""
+    if index_content:
+        return HTMLResponse(content=index_content, status_code=200)
+    elif static_dir:
+        index_path = static_dir / "index.html"
+        if index_path.exists():
+            return FileResponse(str(index_path), media_type="text/html")
+    return HTMLResponse(content="404 - 頁面未找到", status_code=404)
 
 
 @app.get("/api", summary="API 根路徑")
