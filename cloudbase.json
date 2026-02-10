@@ -1,0 +1,28 @@
+{
+  "cloudbase": {
+    "envId": "zhewei-ai-system",
+    "framework": {
+      "name": "zhewei-unified-api",
+      "plugins": {
+        "server": {
+          "use": "@cloudbase/framework-plugin-node",
+          "inputs": {
+            "entry": "./remote_control_server.py",
+            "path": "/api",
+            "name": "zhewei-api",
+            "wrapExpress": true
+          }
+        },
+        "dashboard": {
+          "use": "@cloudbase/framework-plugin-node",
+          "inputs": {
+            "entry": "./unified_api_dashboard.py",
+            "path": "/dashboard",
+            "name": "zhewei-dashboard",
+            "wrapExpress": true
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>築未科技大腦 - 遠端對話</title>
+    <meta name="description" content="築未科技大腦 - 您的遠端電腦代理人">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .status-bar {
+            background: #f8f9fa;
+            padding: 10px 20px;
+            border-top: 1px solid #e9ecef;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+            transition: background 0.3s;
+        }
+        
+        .status-indicator.connected {
+            background: #28a745;
+            box-shadow: 0 0 10px #28a745;
+        }
+        
+        .status-indicator.connecting {
+            background: #ffc107;
+            animation: pulse 1s infinite;
+        }
+        
+        .status-indicator.disconnected {
+            background: #dc3545;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .chat-container {
+            height: 500px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+            animation: fadeInUp 0.3s ease-out;
+        }
+        
+        .user {
+            justify-content: flex-end;
+        }
+        
+        .bot {
+            justify-content: flex-start;
+        }
+        
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .user .message-content {
+            background: #007bff;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .bot .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e9ecef;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .timestamp {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 4px;
+            text-align: right;
+        }
+        
+        .input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #messageInput {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        #messageInput:focus {
+            border-color: #007bff;
+        }
+        
+        #messageInput:disabled {
+            background: #f8f9fa;
+            cursor: not-allowed;
+        }
+        
+        #sendButton {
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        #sendButton:hover:not(:disabled) {
+            background: #0056b3;
+        }
+        
+        #sendButton:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .typing-indicator {
+            padding: 8px 16px;
+            color: #666;
+            font-style: italic;
+            display: none;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .container { border-radius: 15px; }
+            .chat-container { height: 400px; padding: 15px; }
+            .message-content { max-width: 85%; font-size: 16px; }
+            .input-group { flex-direction: column; }
+            #sendButton { width: 100%; }
+        }
+        
+        .system-message {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 築未科技大腦</h1>
+            <p>遠端對話系統 - 您的電腦代理人</p>
+        </div>
+        
+        <div class="status-bar">
+            <div class="connection-status">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <span id="connectionStatus">連接中...</span>
+            </div>
+            <span id="serverTime"></span>
+        </div>
+        
+        <div class="chat-container" id="chatMessages"></div>
+
+        <div class="typing-indicator" id="typingIndicator">
+            築未科技大腦正在思考中...
+        </div>
+
+        <div class="input-container">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="messageInput" 
+                    placeholder="輸入您的訊息..." 
+                    autocomplete="off"
+                    disabled
+                >
+                <button id="sendButton" onclick="sendMessage()" disabled>發送</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 配置
+        const CONFIG = {
+            wsUrl: 'ws://localhost:8000/ws/chat',  // WebSocket 連接地址
+            apiUrl: 'http://localhost:8000/api',     // REST API 地址
+            reconnectInterval: 3000,                   // 重連間隔（毫秒）
+        };
+        
+        // 全局變量
+        let websocket = null;
+        let isConnected = false;
+        let reconnectTimer = null;
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            connectWebSocket();
+            updateServerTime();
+        });
+        
+        // WebSocket 連接
+        function connectWebSocket() {
+            updateConnectionStatus('connecting');
+            
+            try {
+                websocket = new WebSocket(CONFIG.wsUrl);
+                
+                websocket.onopen = () => {
+                    isConnected = true;
+                    updateConnectionStatus('connected');
+                    enableInput(true);
+                    addSystemMessage('🔗 已連接到築未科技大腦');
+                    
+                    if (reconnectTimer) {
+                        clearTimeout(reconnectTimer);
+                        reconnectTimer = null;
+                    }
+                };
+                
+                websocket.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    addMessage(data.content, 'bot');
+                    hideTypingIndicator();
+                };
+                
+                websocket.onerror = (error) => {
+                    console.error('WebSocket 錯誤:', error);
+                    updateConnectionStatus('disconnected');
+                    addSystemMessage('❌ 連接發生錯誤');
+                };
+                
+                websocket.onclose = () => {
+                    isConnected = false;
+                    updateConnectionStatus('disconnected');
+                    enableInput(false);
+                    addSystemMessage('🔌 連接已斷開');
+                    
+                    // 自動重連
+                    reconnectTimer = setTimeout(() => {
+                        addSystemMessage('🔄 正在重新連接...');
+                        connectWebSocket();
+                    }, CONFIG.reconnectInterval);
+                };
+                
+            } catch (error) {
+                console.error('WebSocket 連接失敗:', error);
+                updateConnectionStatus('disconnected');
+                addSystemMessage('❌ 無法連接到服務器');
+            }
+        }
+        
+        // 發送消息
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message || !isConnected) return;
+            
+            // 顯示用戶消息
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // 顯示輸入指示器
+            showTypingIndicator();
+            
+            // 發送到 WebSocket
+            try {
+                websocket.send(JSON.stringify({
+                    message: message,
+                    timestamp: new Date().toISOString()
+                }));
+            } catch (error) {
+                console.error('發送消息失敗:', error);
+                addSystemMessage('❌ 發送消息失敗');
+                hideTypingIndicator();
+            }
+        }
+        
+        // 添加消息到聊天界面
+        function addMessage(content, sender) {
+            const chatContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const icon = sender === 'bot' ? '🤖' : '👤';
+            const messageContent = `${icon} ${content}`;
+            
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    ${messageContent}
+                    <div class="timestamp">${new Date().toLocaleString('zh-TW')}</div>
+                </div>
+            `;
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // 添加系統消息
+        function addSystemMessage(content) {
+            const chatContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'system-message';
+            messageDiv.textContent = content;
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // 更新連接狀態
+        function updateConnectionStatus(status) {
+            const indicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('connectionStatus');
+            
+            indicator.className = 'status-indicator';
+            
+            switch(status) {
+                case 'connected':
+                    indicator.classList.add('connected');
+                    statusText.textContent = '✓ 已連接';
+                    break;
+                case 'connecting':
+                    indicator.classList.add('connecting');
+                    statusText.textContent = '連接中...';
+                    break;
+                case 'disconnected':
+                    indicator.classList.add('disconnected');
+                    statusText.textContent = '✗ 未連接';
+                    break;
+            }
+        }
+        
+        // 顯示/隱藏輸入指示器
+        function showTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'block';
+        }
+        
+        function hideTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'none';
+        }
+        
+        // 啟用/禁用輸入
+        function enableInput(enabled) {
+            const input = document.getElementById('messageInput');
+            const button = document.getElementById('sendButton');
+            
+            input.disabled = !enabled;
+            button.disabled = !enabled;
+            
+            if (enabled) {
+                input.focus();
+            }
+        }
+        
+        // 更新服務器時間
+        async function updateServerTime() {
+            try {
+                const response = await fetch(`${CONFIG.apiUrl}/status`);
+                const data = await response.json();
+                document.getElementById('serverTime').textContent = 
+                    `服務器: ${data.timestamp}`;
+            } catch (error) {
+                console.error('獲取服務器狀態失敗:', error);
+            }
+        }
+        
+        // 鍵盤事件
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && isConnected) {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

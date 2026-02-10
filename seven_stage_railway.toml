@@ -1,0 +1,13 @@
+# Railway 部署配置 - 七階段系統
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "uvicorn seven_stage_api:app --host 0.0.0.0 --port $PORT"
+
+[[services]]
+http_port = 8006
+
+[env]
+API_PORT = "8006"
+PYTHONUNBUFFERED = "1"

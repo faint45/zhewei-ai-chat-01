@@ -1,0 +1,15 @@
+# 築未科技AI远程控制测试指令
+
+## AI指令测试
+ai:请帮我分析这个Python代码
+ai:解释什么是机器学习
+
+## 系统指令测试
+sys:ping google.com
+sys:python --version
+
+## 混合指令测试
+sys:dir
+ai:用中文解释一下神经网络
+sys:ipconfig
+ai:帮我写一个简单的Python爬虫

@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>築未科技 - 遠程控制本地AI模型</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .panel h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .status-panel {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+        }
+        
+        .status-panel h2 {
+            border-color: white;
+            color: white;
+        }
+        
+        .status-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+        }
+        
+        .status-item label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .command-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .command-input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+        
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result-area {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .command-examples {
+            margin-top: 20px;
+        }
+        
+        .example {
+            background: #e8f4fd;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .example:hover {
+            background: #d4edff;
+        }
+        
+        .connection-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        
+        .connected {
+            background: #2ecc71;
+        }
+        
+        .disconnected {
+            background: #e74c3c;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .command-history {
+            margin-top: 20px;
+        }
+        
+        .history-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 築未科技遠程控制中心</h1>
+            <p>遠程控制本地AI模型執行指令 - 類似OpenClaw功能</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="panel">
+                <h2>📊 系統狀態</h2>
+                <div id="statusPanel">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>正在連接系統...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h2>🚀 遠程指令控制</h2>
+                
+                <div class="connection-status">
+                    <span class="connection-status disconnected" id="connectionIndicator"></span>
+                    <span id="connectionText">未連接</span>
+                </div>
+                
+                <textarea 
+                    id="commandInput" 
+                    class="command-input" 
+                    placeholder="輸入要執行的指令...
+例如：
+ai:請幫我分析這個程式碼\n或\nsys:dir C:\\"
+                ></textarea>
+                
+                <button id="executeBtn" class="btn" disabled>執行指令</button>
+                
+                <div class="command-examples">
+                    <h3>💡 指令示例：</h3>
+                    <div class="example" onclick="setExample('ai:請幫我寫一個Python函數計算圓面積')">AI: 寫程式碼</div>
+                    <div class="example" onclick="setExample('ai:解釋什麼是機器學習')">AI: 解釋概念</div>
+                    <div class="example" onclick="setExample('sys:ping google.com')">系統: 網絡測試</div>
+                    <div class="example" onclick="setExample('sys:python --version')">系統: 檢查版本</div>
+                </div>
+                
+                <div id="resultArea" class="result-area" style="display: none;">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>指令執行中...</p>
+                    </div>
+                </div>
+                
+                <div class="command-history" id="commandHistory" style="display: none;">
+                    <h3>📝 指令歷史</h3>
+                    <div id="historyList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let websocket = null;
+        let commandHistory = [];
+        
+        // 連接WebSocket
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/control`;
+            
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onopen = function() {
+                updateConnectionStatus(true);
+                console.log('WebSocket連接成功');
+            };
+            
+            websocket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+            
+            websocket.onclose = function() {
+                updateConnectionStatus(false);
+                console.log('WebSocket連接關閉');
+                // 5秒後重連
+                setTimeout(connectWebSocket, 5000);
+            };
+            
+            websocket.onerror = function(error) {
+                console.error('WebSocket錯誤:', error);
+                updateConnectionStatus(false);
+            };
+        }
+        
+        // 更新連接狀態
+        function updateConnectionStatus(connected) {
+            const indicator = document.getElementById('connectionIndicator');
+            const text = document.getElementById('connectionText');
+            const button = document.getElementById('executeBtn');
+            
+            if (connected) {
+                indicator.className = 'connection-status connected';
+                text.textContent = '已連接';
+                button.disabled = false;
+            } else {
+                indicator.className = 'connection-status disconnected';
+                text.textContent = '未連接';
+                button.disabled = true;
+            }
+        }
+        
+        // 處理WebSocket消息
+        function handleWebSocketMessage(data) {
+            console.log('收到消息:', data);
+            
+            switch (data.type) {
+                case 'status':
+                    updateStatusPanel(data.data);
+                    break;
+                case 'queued':
+                    showMessage('指令已加入隊列，等待執行...');
+                    break;
+                case 'result':
+                    showResult(data.data);
+                    break;
+            }
+        }
+        
+        // 更新狀態面板
+        function updateStatusPanel(status) {
+            const panel = document.getElementById('statusPanel');
+            
+            panel.innerHTML = `
+                <div class="status-item">
+                    <label>🔄 服務狀態</label>
+                    <span>${status.service}</span>
+                </div>
+                <div class="status-item">
+                    <label>🤖 Ollama狀態</label>
+                    <span style="color: ${status.ollama_status ? '#2ecc71' : '#e74c3c'}">
+                        ${status.ollama_message}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <label>📚 可用模型</label>
+                    <span>${status.available_models.join(', ') || '無'}</span>
+                </div>
+                <div class="status-item">
+                    <label>⚙️ 當前模型</label>
+                    <span>${status.current_model}</span>
+                </div>
+                <div class="status-item">
+                    <label>📊 隊列長度</label>
+                    <span>${status.queue_size} 個指令</span>
+                </div>
+                <div class="status-item">
+                    <label>👥 活躍連接</label>
+                    <span>${status.active_connections} 個</span>
+                </div>
+                <div class="status-item">
+                    <label>🕒 最後更新</label>
+                    <span>${new Date(status.timestamp).toLocaleString()}</span>
+                </div>
+            `;
+        }
+        
+        // 執行指令
+        function executeCommand() {
+            const command = document.getElementById('commandInput').value.trim();
+            if (!command) {
+                alert('請輸入指令');
+                return;
+            }
+            
+            if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                alert('請等待連接建立');
+                return;
+            }
+            
+            // 顯示執行中狀態
+            const resultArea = document.getElementById('resultArea');
+            resultArea.style.display = 'block';
+            resultArea.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>指令執行中...</p>
+                </div>
+            `;
+            
+            // 發送指令
+            websocket.send(JSON.stringify({
+                type: 'execute',
+                command: command
+            }));
+            
+            // 添加到歷史記錄
+            addToHistory(command);
+        }
+        
+        // 顯示執行結果
+        function showResult(result) {
+            const resultArea = document.getElementById('resultArea');
+            
+            if (result.status === 'completed') {
+                resultArea.innerHTML = `
+                    <div style="color: #2ecc71; margin-bottom: 10px;">
+                        ✅ 指令執行成功
+                    </div>
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px;">
+                        ${result.result}
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                        執行時間: ${new Date(result.timestamp).toLocaleString()}
+                    </div>
+                `;
+            } else {
+                resultArea.innerHTML = `
+                    <div style="color: #e74c3c; margin-bottom: 10px;">
+                        ❌ 指令執行失敗
+                    </div>
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px;">
+                        ${result.error}
+                    </div>
+                `;
+            }
+        }
+        
+        // 顯示消息
+        function showMessage(message) {
+            const resultArea = document.getElementById('resultArea');
+            resultArea.innerHTML = `<div style="text-align: center; padding: 20px;">${message}</div>`;
+        }
+        
+        // 設置示例指令
+        function setExample(example) {
+            document.getElementById('commandInput').value = example;
+        }
+        
+        // 添加到歷史記錄
+        function addToHistory(command) {
+            commandHistory.unshift({
+                command: command,
+                timestamp: new Date().toLocaleString()
+            });
+            
+            // 限制歷史記錄數量
+            if (commandHistory.length > 10) {
+                commandHistory = commandHistory.slice(0, 10);
+            }
+            
+            updateHistoryDisplay();
+        }
+        
+        // 更新歷史記錄顯示
+        function updateHistoryDisplay() {
+            const historyList = document.getElementById('historyList');
+            const historyPanel = document.getElementById('commandHistory');
+            
+            if (commandHistory.length > 0) {
+                historyPanel.style.display = 'block';
+                historyList.innerHTML = commandHistory.map(item => `
+                    <div class="history-item">
+                        <div style="font-weight: bold;">${item.command}</div>
+                        <div style="font-size: 0.8em; color: #666;">${item.timestamp}</div>
+                    </div>
+                `).join('');
+            } else {
+                historyPanel.style.display = 'none';
+            }
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 連接WebSocket
+            connectWebSocket();
+            
+            // 綁定執行按鈕
+            document.getElementById('executeBtn').addEventListener('click', executeCommand);
+            
+            // 回車快捷鍵
+            document.getElementById('commandInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    executeCommand();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Railway部署配置
+port = 8080
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "python seven_stage_api.py"

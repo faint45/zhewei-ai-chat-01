@@ -1,0 +1,68 @@
+<!--pages/index/index.wxml-->
+<view class="container">
+  <!-- 头部状态 -->
+  <view class="header">
+    <view class="status-card">
+      <view class="status-item">
+        <text class="status-label">服务器状态</text>
+        <view class="status-value {{serverStatus === 'healthy' ? 'healthy' : 'unhealthy'}}">
+          {{serverStatus === 'healthy' ? '正常' : '异常'}}
+        </view>
+      </view>
+      <view class="status-item">
+        <text class="status-label">连接数</text>
+        <text class="status-value">{{connectionCount}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 用户信息 -->
+  <view class="user-section" wx:if="{{hasUserInfo}}">
+    <image class="user-avatar" src="{{userInfo.avatarUrl}}" mode="aspectFill"></image>
+    <text class="user-name">{{userInfo.nickName}}</text>
+  </view>
+  <view class="user-section" wx:else>
+    <button wx:if="{{canIUseGetUserProfile}}" bindtap="getUserProfile" class="user-info-btn">获取用户信息</button>
+    <view wx:else>请升级微信版本</view>
+  </view>
+
+  <!-- 功能卡片 -->
+  <view class="function-cards">
+    <view class="card" bindtap="gotoChat">
+      <view class="card-icon">💬</view>
+      <text class="card-title">AI对话</text>
+      <text class="card-desc">与本地AI模型智能对话</text>
+    </view>
+    
+    <view class="card" bindtap="gotoCommands">
+      <view class="card-icon">⚙️</view>
+      <text class="card-title">指令控制</text>
+      <text class="card-desc">远程控制本地系统</text>
+    </view>
+  </view>
+
+  <!-- 快速指令 -->
+  <view class="quick-commands">
+    <text class="section-title">快速指令</text>
+    <view class="command-grid">
+      <view class="command-btn" bindtap="quickCommand" data-command="sys:python --version">
+        <text>Python版本</text>
+      </view>
+      <view class="command-btn" bindtap="quickCommand" data-command="sys:ping google.com">
+        <text>网络测试</text>
+      </view>
+      <view class="command-btn" bindtap="quickCommand" data-command="ai:解释什么是机器学习">
+        <text>机器学习</text>
+      </view>
+      <view class="command-btn" bindtap="quickCommand" data-command="ai:帮我写一个Python函数">
+        <text>代码生成</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部操作 -->
+  <view class="footer">
+    <button class="refresh-btn" bindtap="checkServerStatus">刷新状态</button>
+    <button class="settings-btn" bindtap="gotoSettings">设置</button>
+  </view>
+</view>

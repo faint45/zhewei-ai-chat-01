@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Logs
 logs
 *.log
@@ -98,3 +99,58 @@ rclone.conf
 
 # 自檢報告（含歷史）
 reports/
+=======
+# 環境變量和密鑰
+.env*
+*.env
+.env.cloud
+.env.seven_stage
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# 資料庫
+*.db
+*.sqlite
+*.sqlite3
+api_monitoring.db
+website.db
+
+# 日誌
+*.log
+logs/
+.waylog/
+system_health_report.json
+
+# IDE
+.vscode/
+.idea/
+.cursorrules
+
+# Docker
+.dockerignore
+
+# 系統文件
+.DS_Store
+Thumbs.db
+
+# 部署臨時文件
+deploy_temp/
+cloudrun_deploy/
+
+# 依賴
+*.pyc
+
+# 測試文件
+test.html
+>>>>>>> bd6537def53debaba0c16f279817e4a317eed98c

@@ -1,0 +1,56 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/chat/chat",
+    "pages/commands/commands",
+    "pages/settings/settings"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#1890ff",
+    "navigationBarTitleText": "築未科技AI助手",
+    "navigationBarTextStyle": "white",
+    "enablePullDownRefresh": true
+  },
+  "tabBar": {
+    "color": "#7A7E83",
+    "selectedColor": "#1890ff",
+    "backgroundColor": "#ffffff",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "iconPath": "images/home.png",
+        "selectedIconPath": "images/home-active.png",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/chat/chat",
+        "iconPath": "images/chat.png",
+        "selectedIconPath": "images/chat-active.png",
+        "text": "AI对话"
+      },
+      {
+        "pagePath": "pages/commands/commands",
+        "iconPath": "images/command.png",
+        "selectedIconPath": "images/command-active.png",
+        "text": "指令控制"
+      },
+      {
+        "pagePath": "pages/settings/settings",
+        "iconPath": "images/settings.png",
+        "selectedIconPath": "images/settings-active.png",
+        "text": "设置"
+      }
+    ]
+  },
+  "networkTimeout": {
+    "request": 10000,
+    "downloadFile": 10000
+  },
+  "debug": true,
+  "permission": {
+    "scope.userLocation": {
+      "desc": "你的位置信息将用于定位服务"
+    }
+  }
+}

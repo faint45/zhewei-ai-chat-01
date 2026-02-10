@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理後台 - 築未科技</title>
+    <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body class="admin-dashboard">
+    <!-- 側邊欄 -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏢 築未科技</h2>
+            <p>管理後台</p>
+        </div>
+        
+        <ul class="sidebar-menu">
+            <li class="menu-item active">
+                <a href="/admin/dashboard">📊 儀表板</a>
+            </li>
+            <li class="menu-item">
+                <a href="/admin/contacts">📝 聯繫表單</a>
+            </li>
+            <li class="menu-item">
+                <a href="/admin/analytics">📈 網站分析</a>
+            </li>
+            <li class="menu-item">
+                <a href="/admin/users">👥 用戶管理</a>
+            </li>
+            <li class="menu-item">
+                <a href="/admin/settings">⚙️ 系統設置</a>
+            </li>
+        </ul>
+        
+        <div class="sidebar-footer">
+            <p>歡迎, {{ current_user.username }}</p>
+            <form method="post" action="/admin/logout" style="margin-top: 10px;">
+                <button type="submit" class="btn btn-outline btn-small">登出</button>
+            </form>
+        </div>
+    </nav>
+    
+    <!-- 主內容區 -->
+    <main class="main-content">
+        <header class="content-header">
+            <h1>儀表板</h1>
+            <div class="header-actions">
+                <span class="current-time" id="currentTime"></span>
+            </div>
+        </header>
+        
+        <!-- 統計卡片 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-content">
+                    <h3>{{ user_count }}</h3>
+                    <p>總用戶數</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-content">
+                    <h3 id="totalVisits">0</h3>
+                    <p>總訪問量</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">📝</div>
+                <div class="stat-content">
+                    <h3 id="totalSubmissions">0</h3>
+                    <p>聯繫提交</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">🤖</div>
+                <div class="stat-content">
+                    <h3 id="todayVisits">0</h3>
+                    <p>今日訪問</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 最近聯繫表單 -->
+        <section class="section">
+            <h2>最近聯繫表單</h2>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>姓名</th>
+                            <th>郵箱</th>
+                            <th>電話</th>
+                            <th>提交時間</th>
+                            <th>狀態</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for submission in submissions %}
+                        <tr>
+                            <td>{{ submission[1] }}</td>
+                            <td>{{ submission[2] }}</td>
+                            <td>{{ submission[3] or '未提供' }}</td>
+                            <td>{{ submission[5][:16] }}</td>
+                            <td>
+                                <span class="status-badge status-{{ submission[6] }}">
+                                    {{ submission[6] }}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-small" onclick="viewSubmission({{ submission[0] }})">查看</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        
+        <!-- 網站統計圖表 -->
+        <section class="section">
+            <h2>最近7天訪問統計</h2>
+            <div class="chart-container">
+                <canvas id="visitsChart" width="400" height="200"></canvas>
+            </div>
+        </section>
+        
+        <!-- 快速操作 -->
+        <section class="section">
+            <h2>快速操作</h2>
+            <div class="quick-actions">
+                <a href="/admin/contacts" class="action-card">
+                    <div class="action-icon">📝</div>
+                    <h3>管理聯繫表單</h3>
+                    <p>查看和處理用戶提交的表單</p>
+                </a>
+                
+                <a href="/admin/analytics" class="action-card">
+                    <div class="action-icon">📈</div>
+                    <h3>網站分析</h3>
+                    <p>查看詳細的訪問統計數據</p>
+                </a>
+                
+                <a href="/admin/settings" class="action-card">
+                    <div class="action-icon">⚙️</div>
+                    <h3>系統設置</h3>
+                    <p>配置網站和系統參數</p>
+                </a>
+            </div>
+        </section>
+    </main>
+    
+    <!-- 模態框 -->
+    <div id="submissionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>聯繫表單詳情</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- 內容將由JavaScript動態填充 -->
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/admin.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // 實時更新時間
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = 
+                now.toLocaleString('zh-TW');
+        }
+        
+        setInterval(updateTime, 1000);
+        updateTime();
+        
+        // 加載統計數據
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                document.getElementById('totalVisits').textContent = data.total_visits;
+                document.getElementById('totalSubmissions').textContent = data.total_submissions;
+                document.getElementById('todayVisits').textContent = data.today.visits;
+                
+                // 更新圖表
+                updateChart(data);
+                
+            } catch (error) {
+                console.error('加載統計數據失敗:', error);
+            }
+        }
+        
+        // 更新圖表
+        function updateChart(data) {
+            const ctx = document.getElementById('visitsChart').getContext('2d');
+            
+            // 這裡應該從服務器獲取真實的7天數據
+            // 暫時使用示例數據
+            const chartData = {
+                labels: ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Today'],
+                datasets: [{
+                    label: '訪問量',
+                    data: [120, 150, 180, 90, 200, 160, data.today.visits],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4
+                }]
+            };
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 查看表單詳情
+        function viewSubmission(id) {
+            // 這裡應該從服務器獲取詳細信息
+            // 暫時顯示示例內容
+            document.getElementById('modalBody').innerHTML = `
+                <p><strong>表單ID:</strong> ${id}</p>
+                <p><strong>詳細信息加載中...</strong></p>
+                <p>實際開發中應該從服務器獲取完整的表單數據。</p>
+            `;
+            document.getElementById('submissionModal').style.display = 'block';
+        }
+        
+        // 關閉模態框
+        function closeModal() {
+            document.getElementById('submissionModal').style.display = 'none';
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            
+            // 點擊模態框外部關閉
+            window.onclick = function(event) {
+                const modal = document.getElementById('submissionModal');
+                if (event.target === modal) {
+                    closeModal();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
