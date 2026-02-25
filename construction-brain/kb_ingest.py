@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 築未科技 Construction Brain
 kb_ingest.py
@@ -63,7 +63,7 @@ def _get_chroma_collection():
         )
         return collection
     except ImportError:
-        print("[kb_ingest] ⚠️ chromadb 未安裝：pip install chromadb")
+        print("[kb_ingest] [WARN] chromadb 未安裝：pip install chromadb")
         return None
 
 
@@ -88,7 +88,7 @@ def _extract_text(file_path: Path) -> str:
                         parts.append(t)
             return "\n".join(parts)
         except ImportError:
-            print("[kb_ingest] ⚠️ pdfplumber 未安裝：pip install pdfplumber")
+            print("[kb_ingest] [WARN] pdfplumber 未安裝：pip install pdfplumber")
             return ""
         except Exception as e:
             print(f"[kb_ingest] PDF 讀取失敗：{e}")
@@ -109,7 +109,7 @@ def _extract_text(file_path: Path) -> str:
                         parts.append(row_text)
             return "\n".join(parts)
         except ImportError:
-            print("[kb_ingest] ⚠️ python-docx 未安裝：pip install python-docx")
+            print("[kb_ingest] [WARN] python-docx 未安裝：pip install python-docx")
             return ""
         except Exception as e:
             print(f"[kb_ingest] DOCX 讀取失敗：{e}")
@@ -207,7 +207,7 @@ def ingest_file(file_path: Path, category: str = "其他", force: bool = False) 
     print(f"[kb_ingest] 處理：{file_path.name} ({category})")
     text = _extract_text(file_path)
     if not text:
-        print(f"[kb_ingest] ❌ 無法讀取文字：{file_path.name}")
+        print(f"[kb_ingest] [ERR] 無法讀取文字：{file_path.name}")
         return {"status": "error", "reason": "empty text"}
 
     chunks = _chunk_text(text)
@@ -215,7 +215,7 @@ def ingest_file(file_path: Path, category: str = "其他", force: bool = False) 
 
     collection = _get_chroma_collection()
     if collection is None:
-        print("[kb_ingest] ❌ ChromaDB 不可用，無法建立向量索引")
+        print("[kb_ingest] [ERR] ChromaDB 不可用，無法建立向量索引")
         return {"status": "error", "reason": "chromadb not available"}
 
     doc_id = str(uuid.uuid4())
@@ -254,7 +254,7 @@ def ingest_file(file_path: Path, category: str = "其他", force: bool = False) 
     conn.commit()
     conn.close()
 
-    print(f"[kb_ingest] ✅ 完成：{file_path.name} → {len(chunks)} 段落")
+    print(f"[kb_ingest] [OK] 完成：{file_path.name} → {len(chunks)} 段落")
     return {"status": "ok", "doc_id": doc_id, "chunks": len(chunks), "chars": len(text)}
 
 
@@ -262,7 +262,7 @@ def ingest_folder(folder_path: Path, category: str = "其他", force: bool = Fal
     """批次餵入整個資料夾"""
     folder_path = Path(folder_path)
     if not folder_path.exists():
-        print(f"[kb_ingest] ❌ 資料夾不存在：{folder_path}")
+        print(f"[kb_ingest] [ERR] 資料夾不存在：{folder_path}")
         return {}
 
     files = [
@@ -276,7 +276,7 @@ def ingest_folder(folder_path: Path, category: str = "其他", force: bool = Fal
         result = ingest_file(f, category=category, force=force)
         results[result.get("status", "error")] = results.get(result.get("status", "error"), 0) + 1
 
-    print(f"\n[kb_ingest] 批次完成：✅ {results['ok']} 個｜重複略過 {results['duplicate']} 個｜錯誤 {results['error']} 個")
+    print(f"\n[kb_ingest] 批次完成：[OK] {results['ok']} 個｜重複略過 {results['duplicate']} 個｜錯誤 {results['error']} 個")
     return results
 
 

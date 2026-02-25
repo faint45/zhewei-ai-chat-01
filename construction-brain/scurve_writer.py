@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 築未科技 Construction Brain
 scurve_writer.py
@@ -134,7 +134,7 @@ def _load_actual_progress(project_id: str) -> dict[str, float]:
                 if d:
                     daily[d] = max(daily[d], pct)
     except Exception as e:
-        print(f"[scurve] ⚠️ 讀取實際進度失敗：{e}")
+        print(f"[scurve] [WARN] 讀取實際進度失敗：{e}")
 
     return dict(daily)
 
@@ -172,7 +172,7 @@ def generate_scurve_csv(records: list[dict], out_path: Path):
                 "planned_pct": rec["planned_pct"],
                 "actual_pct": rec.get("actual_pct", ""),
             })
-    print(f"[scurve] ✅ SCurve.csv → {out_path}")
+    print(f"[scurve] [OK] SCurve.csv → {out_path}")
 
 
 def generate_scurve_html(records: list[dict], out_path: Path, project_name: str = ""):
@@ -232,7 +232,7 @@ def generate_scurve_html(records: list[dict], out_path: Path, project_name: str 
         )
 
         fig.write_html(str(out_path), include_plotlyjs="cdn")
-        print(f"[scurve] ✅ SCurve.html → {out_path}")
+        print(f"[scurve] [OK] SCurve.html → {out_path}")
 
     except ImportError:
         _write_scurve_fallback_html(dates, planned, actual_dates, actual_vals, out_path, project_name)
@@ -249,12 +249,12 @@ def _write_scurve_fallback_html(dates, planned, actual_dates, actual_vals, out_p
 <style>body{{font-family:Arial;padding:20px}}table{{border-collapse:collapse}}
 th,td{{border:1px solid #ddd;padding:6px 12px}}th{{background:#2C3E50;color:white}}</style>
 </head><body>
-<h2>🏗️ {project_name}　工程進度 S 曲線（數據表）</h2>
+<h2>[SITE] {project_name}　工程進度 S 曲線（數據表）</h2>
 <p>安裝 plotly 可獲得互動式圖表：<code>pip install plotly</code></p>
 <table><tr><th>日期</th><th>計畫進度</th><th>實際進度</th></tr>{rows_html}</table>
 <p style='color:#888'>由「築未科技 Construction Brain」產生</p></body></html>"""
     out_path.write_text(html, encoding="utf-8")
-    print(f"[scurve] ✅ SCurve.html（簡易版）→ {out_path}")
+    print(f"[scurve] [OK] SCurve.html（簡易版）→ {out_path}")
 
 
 def run(project_id: str, freq: str = "week"):
@@ -269,7 +269,7 @@ def run(project_id: str, freq: str = "week"):
 
     records = _calc_planned_scurve(work_items, cpm, freq)
     if not records:
-        print("[scurve] ❌ 無法計算 S 曲線，請確認 schedule.json 與 cpm_result.json 正確")
+        print("[scurve] [ERR] 無法計算 S 曲線，請確認 schedule.json 與 cpm_result.json 正確")
         return
 
     actual_daily = _load_actual_progress(project_id)

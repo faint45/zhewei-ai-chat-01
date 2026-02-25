@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 築未科技 Construction Brain
 init_project.py
@@ -45,7 +45,7 @@ def init_project(
 ):
     project_dir = BASE_DIR / "projects" / project_id
     if project_dir.exists():
-        print(f"[init] ⚠️ 專案目錄已存在：{project_dir}")
+        print(f"[init] [WARN] 專案目錄已存在：{project_dir}")
     else:
         print(f"[init] 建立專案目錄：{project_dir}")
 
@@ -70,7 +70,7 @@ def init_project(
     }
     config_path = BASE_DIR / "config" / f"{project_id}.json"
     config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"[init] ✅ 專案設定 → {config_path}")
+    print(f"[init] [OK] 專案設定 → {config_path}")
 
     group_map_path = BASE_DIR / "config" / "group_project_map.json"
     if not group_map_path.exists():

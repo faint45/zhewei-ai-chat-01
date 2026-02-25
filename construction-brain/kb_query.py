@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 築未科技 Construction Brain
 kb_query.py
@@ -61,10 +61,10 @@ def _get_collection():
             embedding_function=ef,
         )
     except ImportError:
-        print("[kb_query] ⚠️ chromadb 未安裝：pip install chromadb")
+        print("[kb_query] [WARN] chromadb 未安裝：pip install chromadb")
         return None
     except Exception as e:
-        print(f"[kb_query] ⚠️ ChromaDB 連線失敗：{e}")
+        print(f"[kb_query] [WARN] ChromaDB 連線失敗：{e}")
         return None
 
 
@@ -138,7 +138,7 @@ def answer(question: str, top_k: int = 5, category: str = None) -> str:
         for i, chunk in enumerate(chunks, 1):
             print(f"  [{i}] {chunk['filename']} (相似度: {chunk['score']:.3f})")
     else:
-        print("[kb_query] ⚠️ 知識庫無相關資料，以模型本身知識回答")
+        print("[kb_query] [WARN] 知識庫無相關資料，以模型本身知識回答")
 
     context = _build_context(chunks)
     user_prompt = f"""以下是從知識庫找到的相關參考資料：
@@ -166,7 +166,7 @@ def answer(question: str, top_k: int = 5, category: str = None) -> str:
             r.raise_for_status()
             return r.json()["message"]["content"].strip()
     except Exception as e:
-        return f"[kb_query] ❌ Ollama 呼叫失敗：{e}"
+        return f"[kb_query] [ERR] Ollama 呼叫失敗：{e}"
 
 
 def interactive_mode(category: str = None):
@@ -183,11 +183,11 @@ def interactive_mode(category: str = None):
     if collection:
         print(f"  知識庫段落數：{collection.count():,}\n")
     else:
-        print("  ⚠️ 知識庫尚未建立，請先執行 kb_ingest.py\n")
+        print("  [WARN] 知識庫尚未建立，請先執行 kb_ingest.py\n")
 
     while True:
         try:
-            question = input("🔍 你的問題：").strip()
+            question = input("[SEARCH] 你的問題：").strip()
         except (EOFError, KeyboardInterrupt):
             print("\n再見！")
             break

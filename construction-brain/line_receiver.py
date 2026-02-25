@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 築未科技 Construction Brain
 line_receiver.py
@@ -107,7 +107,7 @@ def _handle_audio(event: dict, project_id: str):
     if _download_line_content(message_id, dest):
         process_voice(dest, project_id=project_id, message_id=message_id, event_date=event_date)
     else:
-        print(f"[line_receiver] ⚠️ 語音下載失敗 {message_id}")
+        print(f"[line_receiver] [WARN] 語音下載失敗 {message_id}")
 
 
 def _handle_image(event: dict, project_id: str):
@@ -122,7 +122,7 @@ def _handle_image(event: dict, project_id: str):
     if _download_line_content(message_id, dest):
         process_photo(dest, project_id=project_id, message_id=message_id, event_date=event_date)
     else:
-        print(f"[line_receiver] ⚠️ 圖片下載失敗 {message_id}")
+        print(f"[line_receiver] [WARN] 圖片下載失敗 {message_id}")
 
 
 @app.post("/webhook")

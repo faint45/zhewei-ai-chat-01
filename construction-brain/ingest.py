@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 築未科技 Construction Brain
 ingest.py
@@ -239,7 +239,7 @@ def process_photo(photo_path: Path, project_id: str = "default",
     }
 
     if classify_result.get("safety_issues"):
-        print(f"[ingest] ⚠️ 發現工安缺失 {len(classify_result['safety_issues'])} 項，將寫入工安模組")
+        print(f"[ingest] [WARN] 發現工安缺失 {len(classify_result['safety_issues'])} 項，將寫入工安模組")
 
     return result
 

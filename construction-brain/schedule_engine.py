@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 築未科技 Construction Brain
 schedule_engine.py
@@ -142,7 +142,7 @@ def generate_gantt_html(work_items: list[dict], cpm: dict, out_path: Path, proje
     try:
         import plotly.graph_objects as go
     except ImportError:
-        print("[schedule_engine] ⚠️ plotly 未安裝：pip install plotly")
+        print("[schedule_engine] [WARN] plotly 未安裝：pip install plotly")
         _write_gantt_fallback_html(work_items, cpm, out_path, project_name)
         return
 
@@ -171,7 +171,7 @@ def generate_gantt_html(work_items: list[dict], cpm: dict, out_path: Path, proje
             f"完成：{vals['end_date']}<br>"
             f"工種：{trade}<br>"
             f"浮時：{vals['TF']} 天<br>"
-            f"{'🔴 要徑工項' if vals['is_critical'] else ''}"
+            f"{'[CRIT] 要徑工項' if vals['is_critical'] else ''}"
         )
         fig.add_trace(go.Bar(
             x=[vals["dur"]],
@@ -200,10 +200,10 @@ def generate_gantt_html(work_items: list[dict], cpm: dict, out_path: Path, proje
         fig.add_trace(go.Bar(x=[None], y=[None], orientation="h",
                              marker_color=color, name=trade, showlegend=True))
     fig.add_trace(go.Bar(x=[None], y=[None], orientation="h",
-                         marker_color="#C0392B", name="🔴 要徑", showlegend=True))
+                         marker_color="#C0392B", name="[CRIT] 要徑", showlegend=True))
 
     fig.write_html(str(out_path), include_plotlyjs="cdn")
-    print(f"[schedule_engine] ✅ Gantt.html → {out_path}")
+    print(f"[schedule_engine] [OK] Gantt.html → {out_path}")
 
 
 def _write_gantt_fallback_html(work_items, cpm, out_path, project_name):
@@ -214,7 +214,7 @@ def _write_gantt_fallback_html(work_items, cpm, out_path, project_name):
         if nid not in cpm:
             continue
         vals = cpm[nid]
-        critical = "🔴" if vals["is_critical"] else ""
+        critical = "[CRIT]" if vals["is_critical"] else ""
         rows.append(
             f"<tr style='background:{'#fde8e8' if vals['is_critical'] else 'white'}'>"
             f"<td>{critical}{nid}</td><td>{item['name']}</td>"
@@ -229,10 +229,10 @@ th,td{{border:1px solid #ddd;padding:8px;text-align:left}}th{{background:#2C3E50
 </head><body><h2>{project_name} 工程進度甘特表</h2>
 <table><tr><th>ID</th><th>工項</th><th>工種</th><th>工期(天)</th>
 <th>開始日</th><th>完成日</th><th>浮時</th></tr>{''.join(rows)}</table>
-<p style='color:#888'>🔴 要徑工項（浮時=0）｜由「築未科技 Construction Brain」產生</p>
+<p style='color:#888'>[CRIT] 要徑工項（浮時=0）｜由「築未科技 Construction Brain」產生</p>
 </body></html>"""
     out_path.write_text(html, encoding="utf-8")
-    print(f"[schedule_engine] ✅ Gantt.html（簡易版）→ {out_path}")
+    print(f"[schedule_engine] [OK] Gantt.html（簡易版）→ {out_path}")
 
 
 # ─── AON 網圖 HTML ──────────────────────────────────────────────────────────
@@ -279,7 +279,7 @@ def generate_network_html(work_items: list[dict], cpm: dict, out_path: Path, pro
   #network{{width:100%;height:calc(100vh - 100px);background:white}}
 </style>
 </head><body>
-<div id="title">🏗️ {project_name}　進度網圖（AON Network Diagram）</div>
+<div id="title">[SITE] {project_name}　進度網圖（AON Network Diagram）</div>
 <div id="legend">
   <span style="color:#C0392B;font-weight:bold">■ 要徑工項（Critical Path）</span>　　
   <span style="color:#2980B9">■ 非要徑工項</span>　　
@@ -303,7 +303,7 @@ new vis.Network(container,data,options);
 </script></body></html>"""
 
     out_path.write_text(html, encoding="utf-8")
-    print(f"[schedule_engine] ✅ Network.html → {out_path}")
+    print(f"[schedule_engine] [OK] Network.html → {out_path}")
 
 
 # ─── 甘特 CSV ───────────────────────────────────────────────────────────────
@@ -339,7 +339,7 @@ def generate_gantt_csv(work_items: list[dict], cpm: dict, out_path: Path):
                 "weight_pct": item.get("weight_pct", ""),
             }
             writer.writerow(row)
-    print(f"[schedule_engine] ✅ gantt.csv → {out_path}")
+    print(f"[schedule_engine] [OK] gantt.csv → {out_path}")
 
 
 # ─── 主流程 ─────────────────────────────────────────────────────────────────
@@ -352,7 +352,7 @@ def run(project_id: str, start_date_str: str):
 
     schedule_path = BASE_DIR / "projects" / project_id / "02_Output" / "Schedule" / "schedule.json"
     if not schedule_path.exists():
-        print(f"[schedule_engine] ❌ 找不到 schedule.json，請先執行 schedule_extractor.py")
+        print(f"[schedule_engine] [ERR] 找不到 schedule.json，請先執行 schedule_extractor.py")
         return
 
     schedule = json.loads(schedule_path.read_text(encoding="utf-8"))
@@ -360,7 +360,7 @@ def run(project_id: str, start_date_str: str):
     project_name = schedule.get("project_name") or project_id
 
     if not work_items:
-        print("[schedule_engine] ❌ 工項清單為空")
+        print("[schedule_engine] [ERR] 工項清單為空")
         return
 
     print(f"[schedule_engine] 載入工項：{len(work_items)} 項")
@@ -368,7 +368,7 @@ def run(project_id: str, start_date_str: str):
     try:
         start_date = date.fromisoformat(start_date_str)
     except ValueError:
-        print(f"[schedule_engine] ⚠️ 日期格式錯誤，使用今天")
+        print(f"[schedule_engine] [WARN] 日期格式錯誤，使用今天")
         start_date = date.today()
 
     cpm = calculate_cpm(work_items, start_date)

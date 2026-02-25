@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 築未科技 Construction Brain
 schedule_extractor.py
@@ -91,7 +91,7 @@ def _extract_text_from_pdf(path: Path) -> str:
                     text_parts.append(t)
         return "\n".join(text_parts)
     except ImportError:
-        print("[schedule_extractor] ⚠️ pdfplumber 未安裝：pip install pdfplumber")
+        print("[schedule_extractor] [WARN] pdfplumber 未安裝：pip install pdfplumber")
         return ""
     except Exception as e:
         print(f"[schedule_extractor] PDF 讀取失敗：{e}")
@@ -113,7 +113,7 @@ def _extract_text_from_docx(path: Path) -> str:
                     parts.append(row_text)
         return "\n".join(parts)
     except ImportError:
-        print("[schedule_extractor] ⚠️ python-docx 未安裝：pip install python-docx")
+        print("[schedule_extractor] [WARN] python-docx 未安裝：pip install python-docx")
         return ""
     except Exception as e:
         print(f"[schedule_extractor] DOCX 讀取失敗：{e}")
@@ -218,7 +218,7 @@ def extract_schedule(
 
     text = extract_text(file_path)
     if not text:
-        print("[schedule_extractor] ❌ 文件內容為空，無法抽取")
+        print("[schedule_extractor] [ERR] 文件內容為空，無法抽取")
         return {}
 
     print(f"[schedule_extractor] 呼叫 AI 抽取工項（可能需要 30-120 秒）...")
@@ -226,7 +226,7 @@ def extract_schedule(
         raw = _call_ollama_schedule(text)
         schedule = _parse_json_response(raw)
     except Exception as e:
-        print(f"[schedule_extractor] ❌ AI 抽取失敗：{e}")
+        print(f"[schedule_extractor] [ERR] AI 抽取失敗：{e}")
         return {"error": str(e), "raw": raw if "raw" in dir() else ""}
 
     work_items = schedule.get("work_items", [])
@@ -248,7 +248,7 @@ def extract_schedule(
         print(f"[schedule_extractor] 合併模式：新增 {len(new_items)} 個工項")
 
     schedule_path.write_text(json.dumps(schedule, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"[schedule_extractor] ✅ schedule.json → {schedule_path}")
+    print(f"[schedule_extractor] [OK] schedule.json → {schedule_path}")
     print(f"[schedule_extractor]    工項數：{len(schedule['work_items'])}　信心度：{schedule.get('parse_confidence','?')}")
 
     schedule_id = str(uuid.uuid4())
@@ -281,7 +281,7 @@ def _write_schedule_csv(work_items: list, csv_path: Path):
             row = dict(item)
             row["predecessors"] = ",".join(item.get("predecessors", []))
             writer.writerow(row)
-    print(f"[schedule_extractor] ✅ schedule.csv → {csv_path}")
+    print(f"[schedule_extractor] [OK] schedule.csv → {csv_path}")
 
 
 if __name__ == "__main__":

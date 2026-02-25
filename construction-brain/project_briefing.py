@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 築未科技 Construction Brain
 project_briefing.py
@@ -179,7 +179,7 @@ def _render_briefing_md(data: dict, project_id: str) -> str:
 
     lines.append("## 一句話說明")
     lines.append("")
-    lines.append(f"> 📌 **{data.get('one_line_summary', '')}**")
+    lines.append(f"> [NOTE] **{data.get('one_line_summary', '')}**")
     lines.append("")
 
     lines.append("---")
@@ -210,7 +210,7 @@ def _render_briefing_md(data: dict, project_id: str) -> str:
 
     lines.append("---")
     lines.append("")
-    lines.append("## ⚠️ 主要風險與對策")
+    lines.append("## [WARN] 主要風險與對策")
     lines.append("")
     risks = data.get("key_risks", [])
     if risks:
@@ -242,7 +242,7 @@ def _render_briefing_md(data: dict, project_id: str) -> str:
 
     lines.append("---")
     lines.append("")
-    lines.append("## 🆕 新進人員注意事項")
+    lines.append("## [NEW] 新進人員注意事項")
     lines.append("")
     for i, tip in enumerate(data.get("newcomer_tips", []), 1):
         lines.append(f"{i}. {tip}")
@@ -283,21 +283,21 @@ def generate_briefing(project_id: str, file_path: Path = None) -> Path:
         print(f"[briefing] 讀取文件：{Path(file_path).name}")
         input_text = _extract_text_from_file(Path(file_path))
         if not input_text:
-            print("[briefing] ⚠️ 文件讀取失敗，改用 schedule.json")
+            print("[briefing] [WARN] 文件讀取失敗，改用 schedule.json")
             input_text = _load_schedule_summary(project_id)
     else:
         print("[briefing] 從 schedule.json 讀取工項清單")
         input_text = _load_schedule_summary(project_id)
 
     if not input_text:
-        print("[briefing] ❌ 無輸入資料，請先執行 schedule_extractor.py 或提供文件")
+        print("[briefing] [ERR] 無輸入資料，請先執行 schedule_extractor.py 或提供文件")
         return None
 
     print("[briefing] 呼叫 AI 產生簡介（可能需要 30-60 秒）...")
     try:
         data = _call_ollama_briefing(input_text)
     except Exception as e:
-        print(f"[briefing] ❌ AI 產生失敗：{e}")
+        print(f"[briefing] [ERR] AI 產生失敗：{e}")
         return None
 
     md_content = _render_briefing_md(data, project_id)
@@ -310,7 +310,7 @@ def generate_briefing(project_id: str, file_path: Path = None) -> Path:
     json_path = out_dir / "ProjectBriefing.json"
     json_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"[briefing] ✅ ProjectBriefing.md → {out_path}")
+    print(f"[briefing] [OK] ProjectBriefing.md → {out_path}")
     print(f"\n工程類型：{data.get('project_type', '')}")
     print(f"一句話摘要：{data.get('one_line_summary', '')}")
     print(f"主要工項數：{len(data.get('key_work_items', []))} 項")

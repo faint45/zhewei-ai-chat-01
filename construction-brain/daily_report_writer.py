@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 築未科技 Construction Brain
 daily_report_writer.py
@@ -222,7 +222,7 @@ def generate_daily_report(project_id: str, event_date: str) -> Path:
     if safety_issues:
         lines.append("| 缺失描述 | 位置 | 嚴重度 | 建議改善 |")
         lines.append("|---------|------|-------|---------|")
-        severity_map = {"high": "🔴 高", "medium": "🟡 中", "low": "🟢 低"}
+        severity_map = {"high": "[CRIT] 高", "medium": "🟡 中", "low": "🟢 低"}
         for si in safety_issues:
             desc = si.get("description") or ""
             loc = si.get("location") or ""
@@ -297,7 +297,7 @@ def generate_daily_report(project_id: str, event_date: str) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "DailyReport.md"
     out_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"[daily_report] ✅ DailyReport.md → {out_path}")
+    print(f"[daily_report] [OK] DailyReport.md → {out_path}")
     return out_path
 
 
@@ -366,8 +366,8 @@ def generate_progress_csv(project_id: str, event_date: str) -> Path:
         writer.writeheader()
         writer.writerows(all_rows)
 
-    print(f"[daily_report] ✅ Progress.csv → {out_path}")
-    print(f"[daily_report] ✅ 累計進度表更新 → {cumulative_path}")
+    print(f"[daily_report] [OK] Progress.csv → {out_path}")
+    print(f"[daily_report] [OK] 累計進度表更新 → {cumulative_path}")
     return out_path
 
 
@@ -378,7 +378,7 @@ def run(project_id: str, event_date: str):
     print(f"{'='*50}\n")
     events = _load_events(project_id, event_date)
     if not events:
-        print("[daily_report] ⚠️ 找不到今日工項資料，日報將以空白格式輸出")
+        print("[daily_report] [WARN] 找不到今日工項資料，日報將以空白格式輸出")
 
     report_path = generate_daily_report(project_id, event_date)
     csv_path = generate_progress_csv(project_id, event_date)

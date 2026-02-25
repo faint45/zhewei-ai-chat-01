@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 築未科技 Construction Brain
 safety_engine.py
@@ -26,7 +26,7 @@ from pathlib import Path
 BASE_DIR = Path(os.environ.get("ZHEWEI_BASE", r"C:\ZheweiConstruction"))
 DB_PATH = BASE_DIR / "db" / "index.db"
 
-SEVERITY_LABEL = {"high": "🔴 高", "medium": "🟡 中", "low": "🟢 低"}
+SEVERITY_LABEL = {"high": "[CRIT] 高", "medium": "🟡 中", "low": "🟢 低"}
 SEVERITY_DUE_DAYS = {"high": 0, "medium": 1, "low": 3}
 SEVERITY_SUGGESTION = {
     "high": "立即停工改善，確認安全後方可復工",
@@ -238,7 +238,7 @@ def generate_safety_csv(project_id: str, event_date: str) -> Path:
 
     high_count = sum(1 for r in rows if r["severity"] == "high")
     med_count = sum(1 for r in rows if r["severity"] == "medium")
-    print(f"[safety] ✅ SafetyIssues.csv → {out_path}")
+    print(f"[safety] [OK] SafetyIssues.csv → {out_path}")
     print(f"[safety]    高風險:{high_count} 件｜中風險:{med_count} 件｜合計:{len(rows)} 件")
     return out_path
 
@@ -281,7 +281,7 @@ def generate_rectify_plan(project_id: str, event_date: str) -> Path:
         lines.append("")
         lines.append(f"| 嚴重度 | 件數 |")
         lines.append(f"|-------|------|")
-        lines.append(f"| 🔴 高風險（立即改善） | {len(high_rows)} 件 |")
+        lines.append(f"| [CRIT] 高風險（立即改善） | {len(high_rows)} 件 |")
         lines.append(f"| 🟡 中風險（本日改善） | {len(med_rows)} 件 |")
         lines.append(f"| 🟢 低風險（3日內改善）| {len(low_rows)} 件 |")
         lines.append("")
@@ -317,7 +317,7 @@ def generate_rectify_plan(project_id: str, event_date: str) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "RectifyPlan.md"
     out_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"[safety] ✅ RectifyPlan.md → {out_path}")
+    print(f"[safety] [OK] RectifyPlan.md → {out_path}")
     return out_path
 
 

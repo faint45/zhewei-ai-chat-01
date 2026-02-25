@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 築未科技 Construction Brain
 license_validator.py
@@ -237,7 +237,7 @@ def activate(license_key: str) -> bool:
     try:
         payload = _verify_and_decode(license_key)
     except ValueError as e:
-        print(f"[license] ❌ 授權碼驗證失敗：{e}")
+        print(f"[license] [ERR] 授權碼驗證失敗：{e}")
         return False
 
     LICENSE_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -249,7 +249,7 @@ def activate(license_key: str) -> bool:
     }
     LICENSE_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"[license] ✅ 授權啟用成功！")
+    print(f"[license] [OK] 授權啟用成功！")
     print(f"  版本  ：{SKU_NAMES.get(payload['sku'], payload['sku'])}")
     print(f"  授權給：{payload.get('issued_to', '')}")
     print(f"  到期日：{payload['expires']}")
@@ -288,7 +288,7 @@ def require_module(module_name: str) -> bool:
     data = _load_license()
 
     if data is None:
-        print(f"[license] ⚠️  未找到有效授權，模組「{module_name}」無法使用")
+        print(f"[license] [WARN]  未找到有效授權，模組「{module_name}」無法使用")
         print(f"[license]    請聯絡築未科技取得授權碼，然後執行：")
         print(f"[license]    python license_validator.py --activate YOUR-KEY")
         return False
@@ -296,7 +296,7 @@ def require_module(module_name: str) -> bool:
     payload = data["payload"]
     if module_name not in payload.get("modules", []):
         sku = payload.get("sku", "")
-        print(f"[license] ⚠️  目前方案（{SKU_NAMES.get(sku, sku)}）不含「{module_name}」模組")
+        print(f"[license] [WARN]  目前方案（{SKU_NAMES.get(sku, sku)}）不含「{module_name}」模組")
         print(f"[license]    升級至專業版或企業版可解鎖此功能")
         print(f"[license]    聯絡：contact@zhewei.tech")
         return False
@@ -324,7 +324,7 @@ def show_status():
 
     data = _load_license()
     if data is None:
-        print("  狀態：❌ 尚未授權")
+        print("  狀態：[ERR] 尚未授權")
         print()
         print("  取得授權步驟：")
         print(f"  1. 複製上方 machine_id 給築未科技業務")
@@ -334,8 +334,8 @@ def show_status():
         payload = data["payload"]
         expires = date.fromisoformat(payload["expires"])
         days_left = (expires - date.today()).days
-        status = "✅ 有效" if days_left > 0 else "❌ 已到期"
-        warn = f"（⚠️ 剩餘 {days_left} 天，請盡快續約）" if 0 < days_left <= 30 else ""
+        status = "[OK] 有效" if days_left > 0 else "[ERR] 已到期"
+        warn = f"（[WARN] 剩餘 {days_left} 天，請盡快續約）" if 0 < days_left <= 30 else ""
 
         print(f"  狀態  ：{status} {warn}")
         print(f"  版本  ：{SKU_NAMES.get(payload['sku'], payload['sku'])}")

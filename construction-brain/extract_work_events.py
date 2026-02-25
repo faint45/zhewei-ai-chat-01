@@ -210,7 +210,7 @@ def extract(
     conn.commit()
     conn.close()
 
-    status_icon = "✅" if parse_status == "ok" else "⚠️"
+    status_icon = "[OK]" if parse_status == "ok" else "[WARN]"
     print(f"[extract] {status_icon} parse_status={parse_status}  event_id={event_id[:8]}")
     return event
 
