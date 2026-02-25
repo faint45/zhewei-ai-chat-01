@@ -19,9 +19,9 @@ $Host.UI.RawUI.WindowTitle = "築未科技 Construction Brain — 安裝程式"
 
 # ─── 顏色輸出函式 ────────────────────────────────────────────
 function Write-Step  { param($msg) Write-Host "`n► $msg" -ForegroundColor Cyan }
-function Write-OK    { param($msg) Write-Host "  ✅ $msg" -ForegroundColor Green }
-function Write-Warn  { param($msg) Write-Host "  ⚠️  $msg" -ForegroundColor Yellow }
-function Write-Fail  { param($msg) Write-Host "  ❌ $msg" -ForegroundColor Red }
+function Write-OK    { param($msg) Write-Host "  [OK] $msg" -ForegroundColor Green }
+function Write-Warn  { param($msg) Write-Host "  [WARN] $msg" -ForegroundColor Yellow }
+function Write-Fail  { param($msg) Write-Host "  [FAIL] $msg" -ForegroundColor Red }
 function Write-Info  { param($msg) Write-Host "     $msg" -ForegroundColor Gray }
 
 # ─── 常數 ───────────────────────────────────────────────────
@@ -255,12 +255,12 @@ Write-OK "Windows 服務已啟動：$SERVICE_NAME（狀態：$($svc.Status)）"
 # ════════════════════════════════════════════════════════════
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║           ✅  安裝完成！                              ║" -ForegroundColor Green
+Write-Host "║           [OK]  安裝完成！                            ║" -ForegroundColor Green
 Write-Host "╚══════════════════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
-Write-Host "  📁 安裝目錄  ：$BASE_DIR" -ForegroundColor White
-Write-Host "  🌐 LINE Webhook ：http://localhost:$PORT/webhook" -ForegroundColor White
-Write-Host "  📋 專案代碼  ：$ProjectId" -ForegroundColor White
+Write-Host "  安裝目錄    ：$BASE_DIR" -ForegroundColor White
+Write-Host "  LINE Webhook：http://localhost:$PORT/webhook" -ForegroundColor White
+Write-Host "  專案代碼    ：$ProjectId" -ForegroundColor White
 Write-Host ""
 Write-Host "  ─── 下一步 ───────────────────────────────────────" -ForegroundColor Yellow
 Write-Host "  1. 填入 LINE Token：$envFile" -ForegroundColor Yellow
