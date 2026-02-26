@@ -1,46 +1,62 @@
-<<<<<<< HEAD
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# ===== 築未科技 .gitignore =====
 
-# Dependencies
-node_modules
+# --- 環境變數 & 密鑰 ---
+.env
+.env.*
+*.env
+.config/
+rclone.conf
 
-# Python virtual environments
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
 venv38/
 venv312/
 .venv/
+env/
+ENV/
+*.egg-info/
+build/
 
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
+# --- Node.js ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+package-lock.json
 
-# Large models / binaries (依需求還原)
+# --- 資料庫 ---
+*.db
+*.sqlite
+*.sqlite3
+
+# --- 日誌 ---
+logs/
+*.log
+.waylog/
+system_health_report.json
+zhewei_remote_master.csv
+search_log.csv
+ai_brain_log.txt
+
+# --- 大型模型 / 二進制 ---
 vosk-model-small-cn/
 vosk-model-small-cn.zip
 yolov8n.pt
 ffmpeg-8.0.1.tar.xz
+*.onnx
+*.engine
+*.gguf
+*.safetensors
+ai_engines/models/
 
-# 執行紀錄（可含敏感路徑）
-zhewei_remote_master.csv
-search_log.csv
-ai_brain_log.txt
-storage_config.json
-
-# 部署壓縮檔
-deploy.zip
-
-# Chat history (may contain sensitive data)
-chat_history.json
-
-# Brain learning data
+# --- AI 學習數據 ---
 brain_learn.json
 ai_discoveries.json
 ai_cost_log.json
@@ -50,107 +66,63 @@ creative_output/
 vision_output/
 piper_models/
 brain_chroma_db/
+chat_history.json
 
-# Environment variables
-.env
-.env.local
-.env.production
-.env.development
+# --- 第三方 clone（不推到 GitHub）---
+OpenHands/
+everything-claude-code/
+stable-diffusion-webui-forge/
+ComfyUI/
+LivePortrait/
+Wav2Lip/
+DeepDiagram/
+metagpt/
+memU/
 
-# Build outputs
-dist
-dist-ssr
-release
-桌面版輸出
+# --- Phone Agent ---
+phone_agent_data/
 
-# OS files
+# --- Build / 部署 ---
+dist/
+dist-ssr/
+release/
+deploy.zip
+deploy_temp/
+cloudrun_deploy/
+桌面版輸出/
+
+# --- 暫存 / 快取 ---
+*.local
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+.vite/
+.vercel/
+tsconfig.tsbuildinfo
+nul
+
+# --- OS ---
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-
-# Temporary files
-*.local
-*.tmp
-*.temp
-
-# Raw data archive (contains sensitive files)
-raw_data_archive/*
-!raw_data_archive/.gitkeep
-
-# Rclone 配置（含敏感憑證，勿提交）
-.config/
-rclone.conf
-
-# Cache
-.cache
-.parcel-cache
-.vite
-
-.vercel
-.env*.local
-
-# 自檢報告（含歷史）
-reports/
-=======
-# 環境變量和密鑰
-.env*
-*.env
-.env.cloud
-.env.seven_stage
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
-ENV/
-*.egg-info/
-dist/
-build/
-
-# 資料庫
-*.db
-*.sqlite
-*.sqlite3
-api_monitoring.db
-website.db
-
-# 日誌
-*.log
-logs/
-.waylog/
-system_health_report.json
-
-# IDE
+# --- IDE ---
 .vscode/
 .idea/
-.cursorrules
 
-# Docker
-.dockerignore
-
-# 系統文件
-.DS_Store
-Thumbs.db
-
-# 部署臨時文件
-deploy_temp/
-cloudrun_deploy/
-
-# 依賴
-*.pyc
-
-# 測試文件
+# --- 測試 / 報告 ---
+reports/
 test.html
->>>>>>> bd6537def53debaba0c16f279817e4a317eed98c
+test_report*.json
+agent_mcp_test_report.json
+storage_config.json
+
+# --- 其他 ---
+raw_data_archive/*
+!raw_data_archive/.gitkeep
+*.pyc
