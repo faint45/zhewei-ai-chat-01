@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "zh-CN"
+tone_instructions: "使用繁體中文進行程式碼審查，技術術語可保留英文"
+early_access: false
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbit"
+  auto_title_placeholder: "@coderabbit"
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  sequence_diagrams: true
+  changed_files_summary: true
+  labeling_instructions: []
+  path_filters: []
+  path_instructions:
+    - path: "construction-brain/**"
+      instructions: "營建自動化核心模組，注意資料欄位與公共工程施工日誌格式的正確性"
+    - path: "ai_modules/**"
+      instructions: "AI 模組，注意模型呼叫的 timeout、fallback 和錯誤處理"
+    - path: "brain_server.py"
+      instructions: "主要後端服務，注意 API 端點的認證檢查和效能"
+    - path: "smart_bridge.py"
+      instructions: "Smart Bridge 服務，不可覆蓋已穩定功能，僅增量修改"
+    - path: "construction_mgmt/**"
+      instructions: "營建管理系統，注意 SQLite 查詢效能和語音辨識準確度"
+    - path: "mcp_servers/**"
+      instructions: "MCP Server 工具，確保工具定義完整且錯誤處理妥善"
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: "auto"
+  issues:
+    scope: "auto"
+  jira:
+    project_keys: []
+  linear:
+    team_keys: []
+  pull_requests:
+    scope: "auto"
