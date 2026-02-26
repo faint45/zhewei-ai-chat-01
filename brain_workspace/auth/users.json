@@ -1,0 +1,14 @@
+{
+  "1b35fdd7-1647-4c77-aa0c-21d9419165e6": {
+    "id": "1b35fdd7-1647-4c77-aa0c-21d9419165e6",
+    "username": "allen34556",
+    "email": "",
+    "password_hash": "47c65e06b9f3481868360f6dad6c519e341e83517def2622ae49f1772deb1695",
+    "password_salt": "45db7cc4725eb32505ba7581748a551f",
+    "role": "superadmin",
+    "subscription": "active",
+    "subscription_plan": "unlimited",
+    "created_at": "2026-02-14T00:47:35",
+    "updated_at": "2026-02-14T00:47:35"
+  }
+}

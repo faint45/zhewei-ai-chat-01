@@ -55,10 +55,12 @@ def main():
     if not (gemini or ollama):
         print("  建議：至少設定 GEMINI_API_KEY 或啟動 Ollama，否則單次任務可能失敗。")
 
-    # 3. 啟動 brain_server
+    # 3. 啟動 brain_server（預設埠 8002，避開 8000 衝突）
+    port = os.environ.get("PORT", os.environ.get("BRAIN_WS_PORT", "8002"))
     print("\n啟動 brain_server...")
-    print("  管理介面：http://localhost:8000/admin 或 /static/index.html")
-    print("  健康檢查：http://localhost:8000/health")
+    print(f"  管理介面：http://localhost:{port}/admin（需登入）")
+    print(f"  對話頁：http://localhost:{port}/chat")
+    print(f"  健康檢查：http://localhost:{port}/health")
     print("  (Ctrl+C 結束)\n")
     try:
         subprocess.run([sys.executable, "brain_server.py"], cwd=str(ROOT))

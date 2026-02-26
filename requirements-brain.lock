@@ -1,0 +1,13 @@
+# 築未科技大腦 — 鎖定依賴（防止 Playwright/Ollama 等快速更新導致壞掉）
+# 安裝：pip install -r requirements-brain.lock
+# 更新鎖定：pip freeze -r requirements-brain.txt > requirements-brain.lock.new && move requirements-brain.lock.new requirements-brain.lock
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-dotenv==1.0.1
+python-multipart==0.0.18
+google-generativeai==0.8.3
+httpx==0.28.1
+anthropic==0.39.0
+chromadb==1.5.0
+psycopg2-binary==2.9.10

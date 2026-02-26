@@ -1,0 +1,98 @@
+import asyncio
+import datetime
+from winsdk.windows.ui.notifications.management import UserNotificationListener, UserNotificationListenerAccessStatus
+from winsdk.windows.ui.notifications import NotificationKinds
+
+async def get_notifications():
+    """
+    非同步函式：讀取 Windows 通知中心的內容
+    """
+    # 1. 取得監聽器實例
+    listener = UserNotificationListener.get_current()
+
+    # 2. 請求存取權限 (第一次執行時 Windows 會跳出詢問視窗)
+    access_status = await listener.request_access_async()
+
+    if access_status != UserNotificationListenerAccessStatus(ALLOWED):
+        print("❌ 存取被拒絕！請至 Windows 設定 > 隱私權 > 通知 > 允許應用程式存取通知。")
+        return []
+
+    # 3. 獲取所有現存的通知 (包含 Toast 彈出訊息)
+    notifications = await listener.get_notifications_async(NotificationKinds.TOAST)
+    
+    results = []
+    
+    print(f"🔍 掃描中... 發現 {notifications.size} 則通知")
+    
+    for notification in notifications:
+        try:
+            # 取得應用程式名稱 (例如: LINE, WeChat, Outlook)
+            app_name = notification.app_info.display_info.display_name
+            
+            # 過濾：這裡可以設定只讀取特定軟體，例如 'LINE'
+            if "LINE" not in app_name:
+                continue 
+
+            # 解析通知內容 (標題與內文)
+            # Windows 通知通常由多個文字綁定組成
+            bindings = notification.notification.visual.get_binding("ToastGeneric")
+            if bindings:
+                texts = bindings.get_text_elements()
+                title = texts[0].text if len(texts) > 0 else "無標題"
+                body = texts[1].text if len(texts) > 1 else "無內容"
+                
+                # 取得時間戳記
+                # 這裡做簡單的時間轉換，實際應用可保留原始格式
+                msg_data = {
+                    "app": app_name,
+                    "sender": title,   # LINE 的通知標題通常是發訊者
+                    "message": body,   # 內容
+                    "time": datetime.datetime.now().strftime("%H:%M:%S")
+                }
+                results.append(msg_data)
+                
+                # 顯示抓取到的資料 (除錯用)
+                print(f"✅ [{app_name}] {title}: {body}")
+                
+        except Exception as e:
+            print(f"⚠️ 解析錯誤: {e}")
+            continue
+            
+    return results
+
+# === 執行測試 ===
+if __name__ == "__main__":
+    print("=== Windows 通知讀取測試 (按 Ctrl+C 結束) ===")
+    print("請確保 LINE 電腦版已開啟，且有人傳訊息給您...")
+    
+    try:
+        # 簡單的輪詢 (Polling) 模擬實時監控
+        while True:
+            notifications = asyncio.run(get_notifications())
+            if notifications:
+                # 處理通知
+                for notification in notifications:
+                    print(f"收到通知：{notification['app']} - {notification['sender']}：{notification['message']}")
+            # 每 5 秒檢查一次，避免佔用過多 CPU
+            # 實際產品建議使用 Event Listener (事件驅動) 模式
+            import time
+            time.sleep(5) 
+            print("--- 等待新訊息 ---")
+    except KeyboardInterrupt:
+        print("\n程式已停止。")
+
+    # === 事件驅動模式 ===
+    def on_notification_arrived(listener, notification):
+        print(f"收到通知：{notification.app_info.display_info.display_name} - {notification.notification.visual.get_binding('ToastGeneric').get_text_elements()[0].text}")
+        
+    listener = UserNotificationListener.get_current()
+    listener.add_on_notification_arrived(on_notification_arrived)
+    listener.start()
+    
+    try:
+        while True:
+            import time
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n程式已停止。")
+        listener.stop()

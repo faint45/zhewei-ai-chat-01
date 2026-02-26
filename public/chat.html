@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>築未科技 - AI 對話窗口</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', 'PingFang TC', 'Heiti TC', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .chat-container {
+            height: 500px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.bot {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .user .message-content {
+            background: #007bff;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .bot .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e9ecef;
+            border-bottom-left-radius: 4px;
+        }
+
+        .timestamp {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        .input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        #messageInput:focus {
+            border-color: #007bff;
+        }
+
+        #sendButton {
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        #sendButton:hover {
+            background: #0056b3;
+        }
+
+        #sendButton:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .typing-indicator {
+            padding: 8px 16px;
+            color: #666;
+            font-style: italic;
+            display: none;
+        }
+
+        .status-bar {
+            background: #f8f9fa;
+            padding: 10px 20px;
+            border-top: 1px solid #e9ecef;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .network-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .network-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: background 0.3s;
+        }
+
+        .network-btn:hover {
+            background: #218838;
+        }
+
+        .network-btn.qr {
+            background: #ff6b35;
+        }
+
+        .network-btn.qr:hover {
+            background: #e55a2b;
+        }
+
+        .server-input {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 15px;
+            font-size: 11px;
+            width: 200px;
+        }
+
+        .qrcode-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .qrcode-content {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        #qrcode {
+            margin: 15px 0;
+        }
+
+        /* 手機適配 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                border-radius: 15px;
+            }
+
+            .chat-container {
+                height: 400px;
+                padding: 15px;
+            }
+
+            .message-content {
+                max-width: 85%;
+                font-size: 16px;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .input-group {
+                flex-direction: column;
+            }
+
+            #sendButton {
+                width: 100%;
+            }
+        }
+
+        /* 動畫效果 */
+        .message {
+            animation: fadeInUp 0.3s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 築未科技 AI 對話窗口</h1>
+            <p>支援手機與電腦跨設備對話</p>
+        </div>
+
+        <div class="status-bar">
+            <span id="connectionStatus">🔌 連接中...</span>
+            <div class="network-controls">
+                <input type="text" id="serverInput" class="server-input" placeholder="http://IP:5100">
+                <button class="network-btn" onclick="changeServer()">切換伺服器</button>
+                <button class="network-btn qr" onclick="showQRCode()">顯示QR碼</button>
+            </div>
+        </div>
+
+        <!-- QR碼彈窗 -->
+        <div class="qrcode-modal" id="qrcodeModal">
+            <div class="qrcode-content">
+                <h3>📱 掃描 QR 碼快速訪問</h3>
+                <div id="qrcode"></div>
+                <p>使用手機相機掃描此 QR 碼</p>
+                <button class="network-btn" onclick="closeQRCode()">關閉</button>
+            </div>
+        </div>
+
+        <div class="chat-container" id="chatMessages">
+            <div class="message bot">
+                <div class="message-content">
+                    您好！我是築未科技的 AI 助手，可以為您提供天氣查詢、時間服務、智能對話等功能。有什麼可以幫助您的嗎？
+                    <div class="timestamp" id="welcomeTime"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator">
+            AI 正在思考中...
+        </div>
+
+        <div class="input-container">
+            <div class="input-group">
+                <input type="text" id="messageInput" placeholder="輸入您的訊息..." autocomplete="off">
+                <button id="sendButton" onclick="sendMessage()">發送</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 設定歡迎訊息的時間戳
+        document.getElementById('welcomeTime').textContent = new Date().toLocaleString('zh-TW');
+
+        // 初始化伺服器地址
+        let baseURL = localStorage.getItem('brain_server_url') || window.location.origin;
+        let sessionToken = localStorage.getItem('brain_session_token');
+        let isConnected = false;
+        
+        // Vercel 環境適配
+        if (window.location.hostname.includes('vercel.app')) {
+            baseURL = window.location.origin;
+            document.getElementById('serverInput').value = baseURL;
+            document.getElementById('serverInput').disabled = true;
+            document.querySelector('.network-btn').style.display = 'none';
+        } else {
+            // 本地環境使用默認端口
+            baseURL = localStorage.getItem('brain_server_url') || window.location.origin.replace(/:[0-9]+$/, ':5100');
+            document.getElementById('serverInput').value = baseURL;
+        }
+
+        // 檢查連接狀態
+        async function checkConnection() {
+            try {
+                // Vercel 環境使用不同的端點
+                const healthEndpoint = window.location.hostname.includes('vercel.app') 
+                    ? `${baseURL}/api/health` 
+                    : `${baseURL}/health`;
+                
+                const response = await fetch(healthEndpoint);
+                if (response.ok) {
+                    const data = await response.json();
+                    const platform = data.platform || 'local';
+                    document.getElementById('connectionStatus').innerHTML = `🟢 已連接 (${platform})`;
+                    isConnected = true;
+                } else {
+                    throw new Error('連接失敗');
+                }
+            } catch (error) {
+                document.getElementById('connectionStatus').innerHTML = '🔴 連接失敗 - 請檢查伺服器狀態';
+                isConnected = false;
+            }
+        }
+
+        // 發送訊息
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message || !isConnected) return;
+
+            // 添加用戶訊息到對話框
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // 顯示輸入中提示
+            document.getElementById('typingIndicator').style.display = 'block';
+            
+            try {
+                // Vercel 環境使用不同的端點
+                const chatEndpoint = window.location.hostname.includes('vercel.app') 
+                    ? `${baseURL}/api/chat` 
+                    : `${baseURL}/chat`;
+                
+                const response = await fetch(chatEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-Token': sessionToken || ''
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        user_id: 'web'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    addMessage(data.reply, 'bot', data.type);
+                } else if (response.status === 401) {
+                    // 需要登入
+                    showLoginPrompt();
+                } else {
+                    throw new Error(`錯誤 ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                addMessage(`抱歉，發生錯誤：${error.message}`, 'bot', 'error');
+            } finally {
+                document.getElementById('typingIndicator').style.display = 'none';
+            }
+        }
+
+        // 添加訊息到對話框
+        function addMessage(content, sender, type = 'text') {
+            const chatContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const icon = type === 'weather' ? '☀️' : type === 'time' ? '⏰' : type === 'agent' ? '🤖' : '💭';
+            const messageContent = type === 'error' ? `❌ ${content}` : `${icon} ${content}`;
+            
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    ${messageContent}
+                    <div class="timestamp">${new Date().toLocaleString('zh-TW')}</div>
+                </div>
+            `;
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // 顯示登入提示
+        function showLoginPrompt() {
+            const username = prompt('請輸入使用者名稱：');
+            const password = prompt('請輸入密碼：');
+            
+            if (username && password) {
+                login(username, password);
+            }
+        }
+
+        // 登入功能
+        async function login(username, password) {
+            try {
+                const response = await fetch(`${baseURL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    sessionToken = data.session_token;
+                    localStorage.setItem('brain_session_token', sessionToken);
+                    addMessage('✅ 登入成功！現在可以繼續對話。', 'bot');
+                } else {
+                    throw new Error('登入失敗，請檢查帳號密碼');
+                }
+            } catch (error) {
+                addMessage(`❌ ${error.message}`, 'bot', 'error');
+            }
+        }
+
+        // 快捷鍵支持
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // 自動聚焦輸入框
+        document.getElementById('messageInput').focus();
+
+        // 初始化檢查連接
+        checkConnection();
+
+        // 切換伺服器
+        function changeServer() {
+            const newServer = document.getElementById('serverInput').value.trim();
+            if (newServer && newServer !== baseURL) {
+                if (confirm(`確定要切換到 ${newServer} 嗎？`)) {
+                    baseURL = newServer;
+                    localStorage.setItem('brain_server_url', baseURL);
+                    addMessage(`🔄 已切換伺服器至: ${baseURL}`, 'bot', 'system');
+                    checkConnection();
+                }
+            }
+        }
+
+        // 顯示QR碼
+        function showQRCode() {
+            const modal = document.getElementById('qrcodeModal');
+            const qrContainer = document.getElementById('qrcode');
+            
+            // 清空之前的QR碼
+            qrContainer.innerHTML = '';
+            
+            // 創建QR碼
+            const qrCode = document.createElement('canvas');
+            qrCode.width = 200;
+            qrCode.height = 200;
+            
+            const ctx = qrCode.getContext('2d');
+            
+            // 簡單的QR碼生成（實際項目中建議使用專業QR碼庫）
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, 200, 200);
+            
+            ctx.fillStyle = 'black';
+            const url = window.location.href;
+            const text = `請使用瀏覽器訪問: ${url}`;
+            
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('掃描此碼後', 100, 30);
+            ctx.fillText('輸入以下網址:', 100, 50);
+            ctx.fillText(baseURL.replace('http://', ''), 100, 90);
+            ctx.fillText('或直接訪問:', 100, 120);
+            ctx.fillText(window.location.host, 100, 140);
+            
+            qrContainer.appendChild(qrCode);
+            modal.style.display = 'flex';
+        }
+
+        // 關閉QR碼
+        function closeQRCode() {
+            document.getElementById('qrcodeModal').style.display = 'none';
+        }
+
+        // 支持Enter鍵切換伺服器
+        document.getElementById('serverInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                changeServer();
+            }
+        });
+
+        // 自動檢測可用的伺服器地址
+        async function detectServers() {
+            const possibleServers = [
+                baseURL,
+                'http://127.0.0.1:5100',
+                'http://localhost:5100',
+                `http://${window.location.hostname}:5100`
+            ];
+            
+            for (const server of possibleServers) {
+                try {
+                    const response = await fetch(`${server}/health`, { timeout: 2000 });
+                    if (response.ok) {
+                        if (server !== baseURL) {
+                            baseURL = server;
+                            localStorage.setItem('brain_server_url', baseURL);
+                            document.getElementById('serverInput').value = baseURL;
+                            addMessage(`🔍 自動檢測到可用伺服器: ${baseURL}`, 'bot', 'system');
+                        }
+                        break;
+                    }
+                } catch (error) {
+                    // 繼續嘗試下一個伺服器
+                }
+            }
+        }
+
+        // 初始化檢查連接
+        checkConnection();
+        
+        // 自動檢測可用伺服器
+        setTimeout(detectServers, 1000);
+
+        // 每30秒檢查一次連接狀態
+        setInterval(checkConnection, 30000);
+
+        // 網路狀態監聽
+        window.addEventListener('online', function() {
+            addMessage('📶 網路已恢復連接', 'bot', 'system');
+            checkConnection();
+        });
+
+        window.addEventListener('offline', function() {
+            addMessage('📶 網路連接中斷', 'bot', 'system');
+            document.getElementById('connectionStatus').innerHTML = '🔴 網路中斷';
+            isConnected = false;
+        });
+    </script>
+</body>
+</html>

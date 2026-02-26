@@ -1,0 +1,22 @@
+{
+  "name": "UFO Cam — 天空攝影機",
+  "short_name": "UFO Cam",
+  "description": "將 iPhone 變成 UFO 偵測系統的無線攝影機",
+  "start_url": "/cam",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0a0a0f",
+  "theme_color": "#dc2626",
+  "icons": [
+    {
+      "src": "/cam/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/cam/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

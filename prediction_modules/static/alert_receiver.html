@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#991B1B">
+    <title>國家級警報系統 - 築未科技</title>
+    <link rel="manifest" href="/static/alert_manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+        .alert-emergency {
+            animation: pulse-red 1s ease-in-out infinite;
+            background: linear-gradient(135deg, #991B1B 0%, #DC2626 100%);
+        }
+        .alert-critical {
+            background: linear-gradient(135deg, #EF4444 0%, #F87171 100%);
+        }
+        .alert-alert {
+            background: linear-gradient(135deg, #F97316 0%, #FB923C 100%);
+        }
+        .alert-warning {
+            background: linear-gradient(135deg, #F59E0B 0%, #FCD34D 100%);
+        }
+        .alert-info {
+            background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
+        }
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #DC2626;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .safe-area {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white safe-area">
+    <div id="app">
+        <!-- 頂部狀態欄 -->
+        <div class="bg-gray-800 px-4 py-3 flex items-center justify-between sticky top-0 z-50 shadow-lg">
+            <div class="flex items-center space-x-3">
+                <div class="text-2xl">🚨</div>
+                <div>
+                    <h1 class="text-lg font-bold">國家級警報系統</h1>
+                    <p class="text-xs text-gray-400">Taiwan National Alert</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <div class="relative">
+                    <button @click="showSettings = !showSettings" class="p-2 bg-gray-700 rounded-lg">
+                        ⚙️
+                    </button>
+                </div>
+                <div class="relative">
+                    <div :class="connected ? 'bg-green-500' : 'bg-red-500'" 
+                         class="w-3 h-3 rounded-full animate-pulse"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 緊急警報橫幅 -->
+        <div v-if="emergencyAlerts.length > 0" class="alert-emergency px-4 py-6 text-center">
+            <div class="text-4xl mb-2">🆘</div>
+            <h2 class="text-2xl font-bold mb-2">國家級緊急警報</h2>
+            <p class="text-lg">{{ emergencyAlerts[0].title }}</p>
+            <button @click="viewAlert(emergencyAlerts[0])" 
+                    class="mt-4 bg-white text-red-900 px-6 py-3 rounded-lg font-bold text-lg">
+                查看詳情
+            </button>
+        </div>
+
+        <!-- 警報類型篩選 -->
+        <div class="px-4 py-3 bg-gray-800 overflow-x-auto">
+            <div class="flex space-x-2 min-w-max">
+                <button @click="filterType = 'all'" 
+                        :class="filterType === 'all' ? 'bg-blue-600' : 'bg-gray-700'"
+                        class="px-4 py-2 rounded-lg whitespace-nowrap">
+                    全部 ({{ alerts.length }})
+                </button>
+                <button v-for="(config, type) in alertTypes" :key="type"
+                        @click="filterType = type"
+                        :class="filterType === type ? 'bg-blue-600' : 'bg-gray-700'"
+                        class="px-4 py-2 rounded-lg whitespace-nowrap">
+                    {{ config.icon }} {{ config.name }}
+                </button>
+            </div>
+        </div>
+
+        <!-- 警報列表 -->
+        <div class="p-4 space-y-4">
+            <div v-if="filteredAlerts.length === 0" class="text-center py-12 text-gray-400">
+                <div class="text-6xl mb-4">✅</div>
+                <p class="text-xl">目前沒有警報</p>
+                <p class="text-sm mt-2">系統正常運作中</p>
+            </div>
+
+            <div v-for="alert in filteredAlerts" :key="alert.id"
+                 @click="viewAlert(alert)"
+                 :class="getAlertClass(alert.alert_level)"
+                 class="rounded-lg p-4 shadow-lg cursor-pointer transform transition hover:scale-105">
+                
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-2xl">{{ getAlertIcon(alert.alert_level) }}</span>
+                        <span class="text-2xl">{{ getTypeIcon(alert.alert_type) }}</span>
+                    </div>
+                    <span class="text-xs opacity-75">{{ formatTime(alert.timestamp) }}</span>
+                </div>
+
+                <h3 class="text-lg font-bold mb-2">{{ alert.title }}</h3>
+                <p class="text-sm opacity-90 line-clamp-2">{{ alert.message }}</p>
+                
+                <div class="mt-3 flex items-center justify-between text-xs">
+                    <span>📍 {{ alert.area }}</span>
+                    <span :class="getLevelBadge(alert.alert_level)" 
+                          class="px-2 py-1 rounded">
+                        {{ getLevelText(alert.alert_level) }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 警報詳情彈窗 -->
+        <div v-if="selectedAlert" 
+             @click="selectedAlert = null"
+             class="fixed inset-0 bg-black bg-opacity-75 flex items-end justify-center z-50">
+            <div @click.stop 
+                 class="bg-gray-800 rounded-t-3xl w-full max-h-[80vh] overflow-y-auto p-6 animate-slide-up">
+                
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-4xl">{{ getAlertIcon(selectedAlert.alert_level) }}</span>
+                        <span class="text-4xl">{{ getTypeIcon(selectedAlert.alert_type) }}</span>
+                    </div>
+                    <button @click="selectedAlert = null" class="text-3xl">&times;</button>
+                </div>
+
+                <h2 class="text-2xl font-bold mb-4">{{ selectedAlert.title }}</h2>
+                
+                <div class="space-y-4 mb-6">
+                    <div class="bg-gray-700 rounded-lg p-4">
+                        <p class="whitespace-pre-wrap">{{ selectedAlert.message }}</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-700 rounded-lg p-3">
+                            <p class="text-xs text-gray-400 mb-1">警報等級</p>
+                            <p class="font-bold">{{ getLevelText(selectedAlert.alert_level) }}</p>
+                        </div>
+                        <div class="bg-gray-700 rounded-lg p-3">
+                            <p class="text-xs text-gray-400 mb-1">影響區域</p>
+                            <p class="font-bold">{{ selectedAlert.area }}</p>
+                        </div>
+                        <div class="bg-gray-700 rounded-lg p-3">
+                            <p class="text-xs text-gray-400 mb-1">發布時間</p>
+                            <p class="text-sm">{{ formatTime(selectedAlert.timestamp) }}</p>
+                        </div>
+                        <div class="bg-gray-700 rounded-lg p-3">
+                            <p class="text-xs text-gray-400 mb-1">警報編號</p>
+                            <p class="text-sm font-mono">{{ selectedAlert.id }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <button @click="shareAlert(selectedAlert)" 
+                            class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold">
+                        📤 分享警報
+                    </button>
+                    <button @click="markAsSafe(selectedAlert)" 
+                            class="w-full bg-green-600 text-white py-3 rounded-lg font-bold">
+                        ✅ 我安全
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 設定面板 -->
+        <div v-if="showSettings" 
+             @click="showSettings = false"
+             class="fixed inset-0 bg-black bg-opacity-75 flex items-end justify-center z-50">
+            <div @click.stop 
+                 class="bg-gray-800 rounded-t-3xl w-full max-h-[80vh] overflow-y-auto p-6">
+                
+                <h2 class="text-2xl font-bold mb-6">警報設定</h2>
+
+                <div class="space-y-4">
+                    <div class="bg-gray-700 rounded-lg p-4">
+                        <h3 class="font-bold mb-3">訂閱警報類型</h3>
+                        <div class="space-y-2">
+                            <label v-for="(config, type) in alertTypes" :key="type"
+                                   class="flex items-center justify-between p-3 bg-gray-600 rounded-lg">
+                                <span>{{ config.icon }} {{ config.name }}</span>
+                                <input type="checkbox" 
+                                       v-model="subscribedTypes"
+                                       :value="type"
+                                       class="w-6 h-6">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-700 rounded-lg p-4">
+                        <h3 class="font-bold mb-3">通知設定</h3>
+                        <label class="flex items-center justify-between p-3 bg-gray-600 rounded-lg mb-2">
+                            <span>🔔 推播通知</span>
+                            <input type="checkbox" v-model="settings.notifications" class="w-6 h-6">
+                        </label>
+                        <label class="flex items-center justify-between p-3 bg-gray-600 rounded-lg mb-2">
+                            <span>🔊 聲音提示</span>
+                            <input type="checkbox" v-model="settings.sound" class="w-6 h-6">
+                        </label>
+                        <label class="flex items-center justify-between p-3 bg-gray-600 rounded-lg">
+                            <span>📳 震動提示</span>
+                            <input type="checkbox" v-model="settings.vibrate" class="w-6 h-6">
+                        </label>
+                    </div>
+
+                    <div class="bg-gray-700 rounded-lg p-4">
+                        <h3 class="font-bold mb-3">連線狀態</h3>
+                        <div class="flex items-center justify-between">
+                            <span>伺服器連線</span>
+                            <span :class="connected ? 'text-green-400' : 'text-red-400'" class="font-bold">
+                                {{ connected ? '✅ 已連線' : '❌ 未連線' }}
+                            </span>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-400">
+                            <p>伺服器: {{ ntfyServer }}</p>
+                            <p>訂閱數: {{ subscribedTypes.length }} 個主題</p>
+                        </div>
+                    </div>
+
+                    <button @click="saveSettings" 
+                            class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold">
+                        💾 儲存設定
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部導航 -->
+        <div class="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 safe-area">
+            <div class="flex justify-around py-3">
+                <button @click="activeTab = 'alerts'" 
+                        :class="activeTab === 'alerts' ? 'text-blue-400' : 'text-gray-400'"
+                        class="flex flex-col items-center">
+                    <span class="text-2xl">🚨</span>
+                    <span class="text-xs mt-1">警報</span>
+                </button>
+                <button @click="activeTab = 'map'" 
+                        :class="activeTab === 'map' ? 'text-blue-400' : 'text-gray-400'"
+                        class="flex flex-col items-center">
+                    <span class="text-2xl">🗺️</span>
+                    <span class="text-xs mt-1">地圖</span>
+                </button>
+                <button @click="activeTab = 'history'" 
+                        :class="activeTab === 'history' ? 'text-blue-400' : 'text-gray-400'"
+                        class="flex flex-col items-center">
+                    <span class="text-2xl">📜</span>
+                    <span class="text-xs mt-1">歷史</span>
+                </button>
+                <button @click="activeTab = 'info'" 
+                        :class="activeTab === 'info' ? 'text-blue-400' : 'text-gray-400'"
+                        class="flex flex-col items-center">
+                    <span class="text-2xl">ℹ️</span>
+                    <span class="text-xs mt-1">資訊</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    connected: false,
+                    alerts: [],
+                    emergencyAlerts: [],
+                    selectedAlert: null,
+                    showSettings: false,
+                    filterType: 'all',
+                    activeTab: 'alerts',
+                    subscribedTypes: ['earthquake', 'tsunami', 'typhoon', 'flood'],
+                    settings: {
+                        notifications: true,
+                        sound: true,
+                        vibrate: true
+                    },
+                    ntfyServer: 'https://ntfy.sh',
+                    eventSources: [],
+                    alertTypes: {
+                        'earthquake': { name: '地震', icon: '🌍' },
+                        'tsunami': { name: '海嘯', icon: '🌊' },
+                        'typhoon': { name: '颱風', icon: '🌀' },
+                        'flood': { name: '水災', icon: '💧' },
+                        'landslide': { name: '土石流', icon: '⛰️' },
+                        'fire': { name: '火災', icon: '🔥' },
+                        'weather_severe': { name: '劇烈天氣', icon: '⛈️' },
+                        'air_quality': { name: '空氣品質', icon: '💨' },
+                        'epidemic': { name: '疫情', icon: '🦠' },
+                        'economic': { name: '經濟', icon: '📉' }
+                    }
+                }
+            },
+            computed: {
+                filteredAlerts() {
+                    if (this.filterType === 'all') {
+                        return this.alerts;
+                    }
+                    return this.alerts.filter(a => a.alert_type === this.filterType);
+                }
+            },
+            mounted() {
+                this.loadSettings();
+                this.requestNotificationPermission();
+                this.connectToNtfy();
+                this.loadAlertHistory();
+            },
+            methods: {
+                async requestNotificationPermission() {
+                    if ('Notification' in window && Notification.permission === 'default') {
+                        await Notification.requestPermission();
+                    }
+                },
+                connectToNtfy() {
+                    this.subscribedTypes.forEach(type => {
+                        const topic = `taiwan_${type}_alert`;
+                        const url = `${this.ntfyServer}/${topic}/sse`;
+                        
+                        const eventSource = new EventSource(url);
+                        
+                        eventSource.onopen = () => {
+                            this.connected = true;
+                            console.log(`已連線到 ${topic}`);
+                        };
+                        
+                        eventSource.onmessage = (event) => {
+                            try {
+                                const data = JSON.parse(event.data);
+                                if (data.event === 'message') {
+                                    this.handleNewAlert(data);
+                                }
+                            } catch (e) {
+                                console.error('解析訊息失敗:', e);
+                            }
+                        };
+                        
+                        eventSource.onerror = () => {
+                            this.connected = false;
+                            console.error(`連線錯誤: ${topic}`);
+                        };
+                        
+                        this.eventSources.push(eventSource);
+                    });
+                },
+                handleNewAlert(data) {
+                    const alert = {
+                        id: data.id || Date.now().toString(),
+                        timestamp: new Date(data.time * 1000).toISOString(),
+                        title: data.title || '新警報',
+                        message: data.message || '',
+                        alert_type: this.extractType(data.tags),
+                        alert_level: this.extractLevel(data.priority),
+                        area: '台灣'
+                    };
+                    
+                    this.alerts.unshift(alert);
+                    
+                    if (alert.alert_level === 5) {
+                        this.emergencyAlerts.unshift(alert);
+                    }
+                    
+                    this.showNotification(alert);
+                    this.saveToHistory(alert);
+                },
+                extractType(tags) {
+                    if (!tags) return 'system';
+                    const tagArray = tags.split(',');
+                    for (const tag of tagArray) {
+                        if (this.alertTypes[tag]) {
+                            return tag;
+                        }
+                    }
+                    return 'system';
+                },
+                extractLevel(priority) {
+                    const levelMap = { 1: 1, 2: 1, 3: 2, 4: 3, 5: 4 };
+                    return levelMap[priority] || 1;
+                },
+                showNotification(alert) {
+                    if (!this.settings.notifications) return;
+                    
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        const notification = new Notification(alert.title, {
+                            body: alert.message,
+                            icon: '/static/alert-icon.png',
+                            badge: '/static/alert-badge.png',
+                            vibrate: this.settings.vibrate ? [200, 100, 200] : undefined,
+                            requireInteraction: alert.alert_level >= 4
+                        });
+                        
+                        notification.onclick = () => {
+                            this.viewAlert(alert);
+                            notification.close();
+                        };
+                    }
+                    
+                    if (this.settings.sound) {
+                        this.playAlertSound(alert.alert_level);
+                    }
+                },
+                playAlertSound(level) {
+                    const audio = new Audio();
+                    if (level >= 4) {
+                        audio.src = '/static/sounds/emergency.mp3';
+                    } else if (level >= 3) {
+                        audio.src = '/static/sounds/alarm.mp3';
+                    } else {
+                        audio.src = '/static/sounds/notification.mp3';
+                    }
+                    audio.play().catch(e => console.log('無法播放聲音:', e));
+                },
+                async loadAlertHistory() {
+                    try {
+                        const response = await fetch('/api/prediction/alerts/history?limit=50');
+                        const data = await response.json();
+                        this.alerts = data.alerts || [];
+                        this.emergencyAlerts = this.alerts.filter(a => a.alert_level === 5);
+                    } catch (e) {
+                        console.error('載入歷史失敗:', e);
+                    }
+                },
+                saveToHistory(alert) {
+                    const history = JSON.parse(localStorage.getItem('alert_history') || '[]');
+                    history.unshift(alert);
+                    if (history.length > 100) history.pop();
+                    localStorage.setItem('alert_history', JSON.stringify(history));
+                },
+                viewAlert(alert) {
+                    this.selectedAlert = alert;
+                },
+                async shareAlert(alert) {
+                    const text = `${alert.title}\n\n${alert.message}\n\n📍 ${alert.area}\n⏰ ${this.formatTime(alert.timestamp)}`;
+                    
+                    if (navigator.share) {
+                        try {
+                            await navigator.share({
+                                title: alert.title,
+                                text: text,
+                                url: window.location.href
+                            });
+                        } catch (e) {
+                            console.log('分享取消');
+                        }
+                    } else {
+                        navigator.clipboard.writeText(text);
+                        alert('已複製到剪貼簿');
+                    }
+                },
+                markAsSafe(alert) {
+                    alert('已回報安全狀態');
+                    this.selectedAlert = null;
+                },
+                loadSettings() {
+                    const saved = localStorage.getItem('alert_settings');
+                    if (saved) {
+                        const settings = JSON.parse(saved);
+                        this.subscribedTypes = settings.subscribedTypes || this.subscribedTypes;
+                        this.settings = settings.settings || this.settings;
+                    }
+                },
+                saveSettings() {
+                    localStorage.setItem('alert_settings', JSON.stringify({
+                        subscribedTypes: this.subscribedTypes,
+                        settings: this.settings
+                    }));
+                    this.showSettings = false;
+                    
+                    this.eventSources.forEach(es => es.close());
+                    this.eventSources = [];
+                    this.connectToNtfy();
+                    
+                    alert('設定已儲存');
+                },
+                getAlertClass(level) {
+                    const classes = {
+                        5: 'alert-emergency',
+                        4: 'alert-critical',
+                        3: 'alert-alert',
+                        2: 'alert-warning',
+                        1: 'alert-info'
+                    };
+                    return classes[level] || 'alert-info';
+                },
+                getAlertIcon(level) {
+                    const icons = { 5: '🆘', 4: '🔴', 3: '🚨', 2: '⚠️', 1: 'ℹ️' };
+                    return icons[level] || 'ℹ️';
+                },
+                getTypeIcon(type) {
+                    return this.alertTypes[type]?.icon || '🔔';
+                },
+                getLevelText(level) {
+                    const texts = { 5: '國家級緊急', 4: '緊急', 3: '警報', 2: '注意', 1: '資訊' };
+                    return texts[level] || '資訊';
+                },
+                getLevelBadge(level) {
+                    const badges = {
+                        5: 'bg-red-900 text-white',
+                        4: 'bg-red-600 text-white',
+                        3: 'bg-orange-600 text-white',
+                        2: 'bg-yellow-600 text-black',
+                        1: 'bg-blue-600 text-white'
+                    };
+                    return badges[level] || 'bg-gray-600';
+                },
+                formatTime(timestamp) {
+                    if (!timestamp) return '-';
+                    const date = new Date(timestamp);
+                    const now = new Date();
+                    const diff = now - date;
+                    
+                    if (diff < 60000) return '剛剛';
+                    if (diff < 3600000) return `${Math.floor(diff / 60000)} 分鐘前`;
+                    if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小時前`;
+                    
+                    return date.toLocaleString('zh-TW');
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

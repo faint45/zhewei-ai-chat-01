@@ -1,0 +1,1 @@
+{"timestamp": "2026-02-10T23:31:34.586033", "request": "請執行 deploy_service 重啟 Ollama 服務", "result": "API 錯誤: 404 models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods."}

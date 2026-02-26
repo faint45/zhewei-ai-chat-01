@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>築未科技｜Agent Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    body { background: #0b1020; color: #e5e7eb; }
+    .card { background: rgba(17,24,39,.8); border: 1px solid rgba(55,65,81,.8); }
+    .active { border-color: #3b82f6; color: #93c5fd; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div id="app" class="max-w-6xl mx-auto p-4 md:p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-xl md:text-2xl font-semibold">Agent Hub（遠端獨立窗口）</h1>
+      <div class="text-xs text-slate-400">預設本地（Ollama），僅 vision/complex 用 API</div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div class="lg:col-span-4 space-y-4">
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">模式切換（點擊式）</div>
+          <div class="flex gap-2 mb-3">
+            <button class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600" @click="switchMode('daily')">切到 Daily</button>
+            <button class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600" @click="switchMode('dev')">切到 Dev</button>
+          </div>
+          <div class="text-xs text-slate-400 mb-1">目前模式：<span class="text-cyan-300">[[ mode ]]</span></div>
+          <pre class="text-xs text-slate-400 whitespace-pre-wrap">[[ modeOutput ]]</pre>
+        </div>
+
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">代理通道</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button v-for="p in providers" :key="p" @click="provider=p"
+              :class="['px-3 py-2 rounded-lg border bg-slate-800 hover:bg-slate-700', provider===p ? 'active' : 'border-slate-700']">
+              [[ p ]]
+            </button>
+          </div>
+          <div class="text-xs text-slate-400 mt-3">
+            ollama=本地（Qwen/DeepSeek）。vision/complex 才用 Gemini/Claude API。
+          </div>
+        </div>
+
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">真正代理人模式（任務派工）</div>
+          <button @click="createDesktopDemoTask" class="w-full mb-3 px-3 py-2 rounded-lg bg-rose-700 hover:bg-rose-600">
+            一鍵執行桌面示範（會移動滑鼠）
+          </button>
+          <button @click="createLineOpenTask" class="w-full mb-2 px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600">
+            開啟 LINE（主機端）
+          </button>
+          <button @click="createLineReadTask" class="w-full mb-3 px-3 py-2 rounded-lg bg-amber-700 hover:bg-amber-600">
+            OCR 讀取 LINE 畫面（不保證穩定）
+          </button>
+          <div class="text-[11px] text-slate-400 mb-3">
+            提醒：LINE 無官方讀訊 API，OCR 讀取僅供輔助，可能受介面更新影響。
+          </div>
+          <input v-model="taskObjective" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" placeholder="任務目標（例如：整理今天測試失敗原因）" />
+          <textarea v-model="taskContext" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm min-h-[78px]" placeholder="上下文（可選）"></textarea>
+          <label class="text-xs text-slate-400 flex items-center gap-2 mb-3">
+            <input type="checkbox" v-model="taskAutoRun" />
+            建立後自動執行
+          </label>
+          <button @click="createTask" class="w-full px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500">建立代理任務</button>
+        </div>
+
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">本地全功能操作（封鎖關機與自毀）</div>
+          <input v-model="localCommand" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" placeholder="本地命令，例如：dir /b scripts" />
+          <div class="flex gap-2 mb-2">
+            <input v-model.number="localCommandTimeout" type="number" class="w-32 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" placeholder="timeout" />
+            <button @click="createLocalCommandTask" class="flex-1 px-3 py-2 rounded-lg bg-cyan-700 hover:bg-cyan-600">執行本地命令</button>
+          </div>
+          <input v-model="localPythonPath" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" placeholder="Python 腳本路徑，例如：scripts/line_agent.py" />
+          <input v-model="localPythonArgsRaw" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" placeholder="腳本參數（空白分隔），例如：--action open" />
+          <div class="flex gap-2 mb-1">
+            <input v-model.number="localPythonTimeout" type="number" class="w-32 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" placeholder="timeout" />
+            <button @click="createLocalPythonTask" class="flex-1 px-3 py-2 rounded-lg bg-violet-700 hover:bg-violet-600">執行 Python 腳本</button>
+          </div>
+          <div class="text-[11px] text-slate-400">安全策略：關機/重開/格式化/自我銷毀類命令會被阻擋。</div>
+        </div>
+
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">VLM 視覺任務（取代純 OCR）</div>
+          <input v-model="vlmQuestion" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" placeholder="問題，例如：最後一則訊息是誰發的？有沒有提到緊急？" />
+          <div class="flex gap-2">
+            <button @click="createLineVlmTask" class="flex-1 px-3 py-2 rounded-lg bg-amber-700 hover:bg-amber-600">LINE VLM 判讀</button>
+            <button @click="createScreenVlmTask" class="flex-1 px-3 py-2 rounded-lg bg-fuchsia-700 hover:bg-fuchsia-600">全螢幕 VLM 判讀</button>
+          </div>
+        </div>
+
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">語義路由（Semantic Router）</div>
+          <textarea v-model="semanticText" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm min-h-[70px]" placeholder="自然語句，例如：幫我查嘉義高鐵到工地路線，截圖後傳到 LINE 群組"></textarea>
+          <button @click="createSemanticRouteTask" class="w-full px-3 py-2 rounded-lg bg-sky-700 hover:bg-sky-600">自動拆解並派工</button>
+        </div>
+
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">Smart GUI Agent（Computer Use）</div>
+          <textarea v-model="smartGuiInstruction" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm min-h-[70px]" placeholder="例如：在目前畫面找到傳送按鈕並點擊"></textarea>
+          <div class="flex gap-2 mb-2">
+            <input v-model.number="smartGuiMaxActions" type="number" class="w-28 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" placeholder="步數" />
+            <input v-model.number="smartGuiRetryCount" type="number" class="w-28 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" placeholder="重試" />
+            <label class="text-xs text-slate-300 flex items-center gap-2">
+              <input type="checkbox" v-model="smartGuiExecute" />
+              直接執行（關閉為 dry-run）
+            </label>
+          </div>
+          <button @click="createSmartGuiTask" class="w-full px-3 py-2 rounded-lg bg-orange-700 hover:bg-orange-600">執行 Smart GUI 任務</button>
+        </div>
+
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">商用五套模板（一鍵派工）</div>
+          <select v-model="selectedPlaybookId" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+            <option value="">請選擇模板</option>
+            <option v-for="p in playbooks" :key="p.id" :value="p.id">[[ p.name ]]（[[ p.step_count ]] 步）</option>
+          </select>
+          <textarea v-model="playbookContext" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm min-h-[70px]" placeholder="執行上下文，例如：今天只處理嘉義，先通知王經理"></textarea>
+          <button @click="runPlaybook" class="w-full px-3 py-2 rounded-lg bg-lime-700 hover:bg-lime-600">執行模板</button>
+          <div class="text-[11px] text-slate-400 mt-2">你只要改上下文或模板 JSON 參數，不必重改主程式。</div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-8 card rounded-xl p-4 flex flex-col min-h-[60vh]">
+        <div class="flex-1 overflow-y-auto space-y-2 pr-1">
+          <div v-for="(m,i) in logs" :key="i" class="text-sm border-b border-slate-800 pb-2">
+            <div class="text-xs text-slate-500">[[ m.time ]] · [[ m.role ]]</div>
+            <div class="whitespace-pre-wrap">[[ m.text ]]</div>
+          </div>
+        </div>
+        <div class="mt-3 flex gap-2">
+          <input v-model="input" @keyup.enter="send" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2" placeholder="輸入你的需求..." />
+          <button @click="send" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500">送出</button>
+        </div>
+        <div class="mt-4 border-t border-slate-800 pt-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-sm text-slate-300">任務佇列</div>
+            <button @click="loadTasks" class="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600">刷新</button>
+          </div>
+          <div class="space-y-2 max-h-56 overflow-y-auto">
+            <div v-for="t in tasks" :key="t.id" class="text-xs bg-slate-900 border border-slate-800 rounded-lg p-2">
+              <div class="flex items-center justify-between gap-2">
+                <div class="text-slate-200 font-medium">[[ t.id ]] · [[ t.provider ]]</div>
+                <div class="text-slate-400">[[ t.status ]]</div>
+              </div>
+              <div class="text-slate-300 mt-1 break-words">[[ t.objective ]]</div>
+              <div class="mt-1 text-slate-500">[[ t.updated_at ]]</div>
+              <div class="mt-2 flex gap-2">
+                <button v-if="t.status==='pending' || t.status==='error'" @click="runTask(t.id)" class="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600">執行</button>
+                <button @click="showTaskResult(t)" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600">結果</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, onMounted } = Vue;
+    createApp({
+      setup() {
+        const providers = ['ollama', 'cursor', 'gemini', 'claude', 'codebuddy'];
+        const provider = ref('ollama');
+        const mode = ref('daily');
+        const modeOutput = ref('');
+        const sessionId = ref('hub-' + Date.now());
+        const input = ref('');
+        const logs = ref([]);
+        const taskObjective = ref('');
+        const taskContext = ref('');
+        const taskAutoRun = ref(true);
+        const tasks = ref([]);
+        const localCommand = ref('');
+        const localCommandTimeout = ref(180);
+        const localPythonPath = ref('');
+        const localPythonArgsRaw = ref('');
+        const localPythonTimeout = ref(240);
+        const vlmQuestion = ref('最後一則訊息是誰發的？內容是什麼？有沒有提到緊急或修改？');
+        const semanticText = ref('');
+        const smartGuiInstruction = ref('');
+        const smartGuiExecute = ref(true);
+        const smartGuiMaxActions = ref(8);
+        const smartGuiRetryCount = ref(3);
+        const playbooks = ref([]);
+        const selectedPlaybookId = ref('');
+        const playbookContext = ref('');
+
+        const now = () => new Date().toLocaleTimeString();
+        const push = (role, text) => logs.value.push({ role, text, time: now() });
+
+        async function loadMode() {
+          try {
+            const r = await fetch('/api/system/mode/status');
+            const j = await r.json();
+            mode.value = j.mode || 'unknown';
+            modeOutput.value = JSON.stringify(j.dependencies || {}, null, 2);
+          } catch (e) {
+            modeOutput.value = String(e);
+          }
+        }
+
+        async function switchMode(m) {
+          modeOutput.value = '切換中...';
+          try {
+            const r = await fetch('/api/system/mode/switch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mode: m })
+            });
+            const j = await r.json();
+            if (j.ok && !j.queued) {
+              mode.value = m;
+              modeOutput.value = (j.output || '切換成功').toString();
+              return;
+            }
+            if (j.queued) {
+              modeOutput.value = (j.hint || '已排入切換佇列，等待主機代理執行...').toString();
+              for (let i = 0; i < 10; i++) {
+                await new Promise(res => setTimeout(res, 2500));
+                const rr = await fetch('/api/system/mode/result');
+                const jr = await rr.json();
+                if (jr && jr.requested_at && jr.mode === m) {
+                  modeOutput.value = (jr.output || JSON.stringify(jr)).toString();
+                  if (jr.ok) mode.value = m;
+                  return;
+                }
+              }
+              return;
+            }
+            modeOutput.value = (j.output || j.error || JSON.stringify(j)).toString();
+          } catch (e) {
+            modeOutput.value = String(e);
+          }
+        }
+
+        async function send() {
+          const text = (input.value || '').trim();
+          if (!text) return;
+          push('you', text);
+          input.value = '';
+          try {
+            const r = await fetch('/api/remote/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                provider: provider.value,
+                message: text,
+                session_id: sessionId.value,
+                max_turns: 12
+              })
+            });
+            const j = await r.json();
+            push(j.provider_mapping || provider.value, j.reply || '(no response)');
+          } catch (e) {
+            push('system', '呼叫失敗: ' + String(e));
+          }
+        }
+
+        async function loadTasks() {
+          try {
+            const r = await fetch('/api/agent/tasks');
+            const j = await r.json();
+            tasks.value = j.tasks || [];
+          } catch (e) {
+            push('system', '載入任務失敗: ' + String(e));
+          }
+        }
+
+        async function createTask() {
+          const objective = (taskObjective.value || '').trim();
+          if (!objective) return;
+          try {
+            const r = await fetch('/api/agent/tasks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                objective,
+                context: taskContext.value || '',
+                provider: provider.value,
+                auto_run: taskAutoRun.value
+              })
+            });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `任務已建立：${j.task.id}（${j.task.status}）`);
+              taskObjective.value = '';
+              taskContext.value = '';
+              await loadTasks();
+            } else {
+              push('system', '建立任務失敗: ' + JSON.stringify(j));
+            }
+          } catch (e) {
+            push('system', '建立任務失敗: ' + String(e));
+          }
+        }
+
+        async function createDesktopDemoTask() {
+          try {
+            const r = await fetch('/api/agent/tasks/desktop-demo', { method: 'POST' });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `已建立桌面示範任務：${j.task.id}（會操作滑鼠鍵盤）`);
+              await loadTasks();
+            } else {
+              push('system', '建立桌面示範任務失敗: ' + JSON.stringify(j));
+            }
+          } catch (e) {
+            push('system', '建立桌面示範任務失敗: ' + String(e));
+          }
+        }
+
+        async function createLineOpenTask() {
+          try {
+            const r = await fetch('/api/agent/tasks/line-open', { method: 'POST' });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `已建立 LINE 開啟任務：${j.task.id}`);
+              await loadTasks();
+            } else {
+              push('system', '建立 LINE 任務失敗: ' + JSON.stringify(j));
+            }
+          } catch (e) {
+            push('system', '建立 LINE 任務失敗: ' + String(e));
+          }
+        }
+
+        async function createLineReadTask() {
+          try {
+            const r = await fetch('/api/agent/tasks/line-read', { method: 'POST' });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `已建立 LINE OCR 任務：${j.task.id}`);
+              await loadTasks();
+            } else {
+              push('system', '建立 LINE OCR 任務失敗: ' + JSON.stringify(j));
+            }
+          } catch (e) {
+            push('system', '建立 LINE OCR 任務失敗: ' + String(e));
+          }
+        }
+
+        async function createLocalCommandTask() {
+          const command = (localCommand.value || '').trim();
+          if (!command) return;
+          try {
+            const r = await fetch('/api/agent/tasks/local-command', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                command,
+                timeout: Number(localCommandTimeout.value || 180),
+              }),
+            });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `已建立本地命令任務：${j.task.id}`);
+              localCommand.value = '';
+              await loadTasks();
+            } else {
+              push('system', '建立本地命令任務失敗: ' + JSON.stringify(j));
+            }
+          } catch (e) {
+            push('system', '建立本地命令任務失敗: ' + String(e));
+          }
+        }
+
+        async function createLocalPythonTask() {
+          const scriptPath = (localPythonPath.value || '').trim();
+          if (!scriptPath) return;
+          const scriptArgs = (localPythonArgsRaw.value || '')
+            .split(/\s+/)
+            .map(x => x.trim())
+            .filter(Boolean);
+          try {
+            const r = await fetch('/api/agent/tasks/local-python', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                script_path: scriptPath,
+                script_args: scriptArgs,
+                timeout: Number(localPythonTimeout.value || 240),
+              }),
+            });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `已建立本地 Python 任務：${j.task.id}`);
+              localPythonPath.value = '';
+              localPythonArgsRaw.value = '';
+              await loadTasks();
+            } else {
+              push('system', '建立本地 Python 任務失敗: ' + JSON.stringify(j));
+            }
+          } catch (e) {
+            push('system', '建立本地 Python 任務失敗: ' + String(e));
+          }
+        }
+
+        async function createLineVlmTask() {
+          try {
+            const r = await fetch('/api/agent/tasks/line-read-vlm', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                question: (vlmQuestion.value || '').trim(),
+                keywords: ['緊急', '修改', 'urgent', 'change'],
+              }),
+            });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `已建立 LINE VLM 任務：${j.task.id}`);
+              await loadTasks();
+            } else {
+              push('system', '建立 LINE VLM 任務失敗: ' + JSON.stringify(j));
+            }
+          } catch (e) {
+            push('system', '建立 LINE VLM 任務失敗: ' + String(e));
+          }
+        }
+
+        async function createScreenVlmTask() {
+          const question = (vlmQuestion.value || '').trim();
+          if (!question) return;
+          try {
+            const r = await fetch('/api/agent/tasks/screen-vlm', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ question }),
+            });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `已建立全螢幕 VLM 任務：${j.task.id}`);
+              await loadTasks();
+            } else {
+              push('system', '建立全螢幕 VLM 任務失敗: ' + JSON.stringify(j));
+            }
+          } catch (e) {
+            push('system', '建立全螢幕 VLM 任務失敗: ' + String(e));
+          }
+        }
+
+        async function createSemanticRouteTask() {
+          const text = (semanticText.value || '').trim();
+          if (!text) return;
+          try {
+            const r = await fetch('/api/agent/tasks/semantic-route', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text, auto_run: true }),
+            });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `語義路由已建立：${j.route_id}（${j.count} 個任務）`);
+              semanticText.value = '';
+              await loadTasks();
+            } else {
+              push('system', '語義路由建立失敗: ' + JSON.stringify(j));
+            }
+          } catch (e) {
+            push('system', '語義路由建立失敗: ' + String(e));
+          }
+        }
+
+        async function createSmartGuiTask() {
+          const instruction = (smartGuiInstruction.value || '').trim();
+          if (!instruction) return;
+          try {
+            const r = await fetch('/api/agent/tasks/smart-gui', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                instruction,
+                execute: !!smartGuiExecute.value,
+                max_actions: Number(smartGuiMaxActions.value || 8),
+                retry_count: Number(smartGuiRetryCount.value || 3),
+              }),
+            });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `已建立 Smart GUI 任務：${j.task.id}`);
+              await loadTasks();
+            } else {
+              push('system', '建立 Smart GUI 任務失敗: ' + JSON.stringify(j));
+            }
+          } catch (e) {
+            push('system', '建立 Smart GUI 任務失敗: ' + String(e));
+          }
+        }
+
+        async function loadPlaybooks() {
+          try {
+            const r = await fetch('/api/playbooks');
+            const j = await r.json();
+            playbooks.value = j.playbooks || [];
+            if (!selectedPlaybookId.value && playbooks.value.length > 0) {
+              selectedPlaybookId.value = playbooks.value[0].id;
+            }
+          } catch (e) {
+            push('system', '載入模板失敗: ' + String(e));
+          }
+        }
+
+        async function runPlaybook() {
+          const pid = (selectedPlaybookId.value || '').trim();
+          if (!pid) return;
+          try {
+            const r = await fetch(`/api/playbooks/${encodeURIComponent(pid)}/run`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                auto_run: true,
+                context: playbookContext.value || '',
+                overrides: {}
+              }),
+            });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `模板已派工：${j.playbook_name}（${j.count} 個任務）`);
+              await loadTasks();
+            } else {
+              push('system', '模板執行失敗: ' + JSON.stringify(j));
+            }
+          } catch (e) {
+            push('system', '模板執行失敗: ' + String(e));
+          }
+        }
+
+        async function runTask(taskId) {
+          try {
+            const r = await fetch(`/api/agent/tasks/${taskId}/run`, { method: 'POST' });
+            const j = await r.json();
+            push('agent', `任務已派工：${taskId}`);
+            await loadTasks();
+          } catch (e) {
+            push('system', '派工失敗: ' + String(e));
+          }
+        }
+
+        function showTaskResult(t) {
+          const txt = (t.result || t.error || '目前尚無結果');
+          push(`task:${t.id}`, txt);
+        }
+
+        onMounted(async () => {
+          await loadMode();
+          await loadPlaybooks();
+          await loadTasks();
+          setInterval(loadTasks, 5000);
+        });
+        return {
+          providers, provider, mode, modeOutput, input, logs, send, switchMode,
+          taskObjective, taskContext, taskAutoRun, tasks, createTask, createDesktopDemoTask, createLineOpenTask, createLineReadTask,
+          localCommand, localCommandTimeout, localPythonPath, localPythonArgsRaw, localPythonTimeout,
+          createLocalCommandTask, createLocalPythonTask,
+          vlmQuestion, semanticText, smartGuiInstruction, smartGuiExecute, smartGuiMaxActions, smartGuiRetryCount,
+          playbooks, selectedPlaybookId, playbookContext, loadPlaybooks, runPlaybook,
+          createLineVlmTask, createScreenVlmTask, createSemanticRouteTask, createSmartGuiTask,
+          loadTasks, runTask, showTaskResult
+        };
+      },
+      delimiters: ['[[', ']]']
+    }).mount('#app');
+  </script>
+</body>
+</html>

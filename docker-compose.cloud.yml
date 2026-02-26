@@ -1,0 +1,203 @@
+# 築未科技 — 雲端完整部署配置（24/7 運行）
+# 使用方式：在雲端 VPS 上執行
+#   docker compose -f docker-compose.cloud.yml up -d
+#
+# 此配置包含 Ollama 容器，完全獨立運行，不依賴本地主機
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-common: &common
+  build: .
+  env_file: [.env]
+  restart: unless-stopped
+  logging: *default-logging
+
+services:
+  # ── Ollama AI 引擎（雲端版）──
+  ollama:
+    image: ollama/ollama:latest
+    container_name: zhewei_ollama
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Nginx Gateway ──
+  gateway:
+    image: nginx:alpine
+    container_name: zhewei_gateway
+    volumes:
+      - ./gateway/nginx.cloud.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      brain_server: { condition: service_started }
+      portal: { condition: service_started }
+      cms: { condition: service_started }
+      codesim: { condition: service_started }
+      prediction: { condition: service_started }
+    networks: [default]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/nginx-health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Brain Server ──
+  brain_server:
+    <<: *common
+    container_name: zhewei_brain
+    environment:
+      BRAIN_WORKSPACE: /app/brain_workspace
+      ZHEWEI_MEMORY_ROOT: /memory
+      BRAIN_WS_PORT: "8000"
+      PORT: "8000"
+      OLLAMA_BASE_URL: http://ollama:11434
+      AI_COST_MODE: local_first
+    volumes:
+      - .:/app
+      - ./zhewei_memory:/memory
+      - ./brain_workspace:/app/brain_workspace
+    ports: ["8002:8000"]
+    depends_on:
+      ollama: { condition: service_healthy }
+    networks: [default]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Smart Bridge ──
+  smart_bridge:
+    <<: *common
+    container_name: zhewei_smart_bridge
+    environment:
+      SMART_BRIDGE_PORT: "8003"
+      SMART_BRIDGE_HOST: "0.0.0.0"
+      OLLAMA_BASE_URL: http://ollama:11434
+    volumes:
+      - .:/app
+      - ./bridge_workspace:/app/bridge_workspace
+      - ./zhewei_memory:/memory
+    ports: ["8003:8003"]
+    command: ["python", "smart_bridge.py"]
+    depends_on:
+      ollama: { condition: service_healthy }
+    networks: [default]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Portal (PWA 入口) ──
+  portal:
+    <<: *common
+    container_name: zhewei_portal
+    environment:
+      PORTAL_PORT: "8888"
+    volumes:
+      - .:/app
+      - ./portal:/app/portal
+    command: ["python", "portal_server.py"]
+    networks: [default]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8888/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── CMS 營建管理系統 ──
+  cms:
+    <<: *common
+    container_name: zhewei_cms
+    volumes:
+      - .:/app
+      - ./construction_mgmt:/app/construction_mgmt
+    command: ["python", "construction_mgmt/app.py"]
+    networks: [default]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8020/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── CodeSim 代碼模擬器 ──
+  codesim:
+    <<: *common
+    container_name: zhewei_codesim
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+    volumes:
+      - .:/app
+      - ./simulator:/app/simulator
+    command: ["python", "simulator/code_simulator.py"]
+    depends_on:
+      ollama: { condition: service_healthy }
+    networks: [default]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Prediction System 預測系統 ──
+  prediction:
+    <<: *common
+    container_name: zhewei_prediction
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+    volumes:
+      - .:/app
+      - ./prediction_modules:/app/prediction_modules
+    command: ["python", "prediction_modules/prediction_service.py"]
+    ports: ["8025:8025"]
+    depends_on:
+      ollama: { condition: service_healthy }
+    networks: [default]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8025/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Cloudflare Tunnel → Gateway ──
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: zhewei_tunnel
+    restart: always
+    logging: *default-logging
+    command: ["tunnel", "--protocol", "http2", "run", "--token", "${CLOUDFLARE_TOKEN}"]
+    depends_on:
+      gateway: { condition: service_started }
+    networks: [default]
+
+volumes:
+  ollama_models:
+    driver: local
+
+networks:
+  default:
+    driver: bridge

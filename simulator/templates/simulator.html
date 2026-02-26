@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>築未科技 — 代碼模擬器</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<style>
+:root {
+  --bg-primary: #0f0f1a;
+  --bg-secondary: #1a1a2e;
+  --bg-tertiary: #16213e;
+  --bg-card: rgba(26,26,46,0.85);
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0b0;
+  --text-muted: #666680;
+  --accent-1: #667eea;
+  --accent-2: #764ba2;
+  --accent-3: #f093fb;
+  --border: rgba(102,126,234,0.2);
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --radius: 12px;
+  --glass: rgba(255,255,255,0.05);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top Bar ─────────────────────────────── */
+.topbar {
+  height: 48px;
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  flex-shrink: 0;
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  z-index: 100;
+}
+.topbar .logo {
+  font-size: 15px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  white-space: nowrap;
+}
+.topbar select, .topbar button {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.topbar select:hover, .topbar button:hover {
+  border-color: var(--accent-1);
+  background: rgba(102,126,234,0.15);
+}
+.topbar .spacer { flex: 1; }
+.device-btns { display: flex; gap: 4px; }
+.device-btns button { padding: 5px 8px; font-size: 14px; }
+.device-btns button.active {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  border-color: transparent;
+}
+.topbar .run-btn {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  border: none;
+  padding: 5px 14px;
+  font-weight: 600;
+}
+.topbar .run-btn:hover { opacity: 0.9; }
+.topbar .run-btn.exec { background: linear-gradient(135deg, #4ade80, #22c55e); }
+.topbar .user-badge { font-size: 11px; color: var(--text-secondary); padding: 0 6px; }
+
+/* ── Main Layout ─────────────────────────── */
+.main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── Left Panel: File Tree + Editor ──────── */
+.left-panel {
+  width: 38%;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+}
+.file-tree-header {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  gap: 8px;
+}
+.file-tree-header button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.file-tree-header button:hover { background: var(--glass); color: var(--text-primary); }
+.file-tree {
+  height: 140px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.file-tree .file-item {
+  padding: 4px 12px 4px 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s;
+}
+.file-tree .file-item:hover { background: var(--glass); }
+.file-tree .file-item.active { background: rgba(102,126,234,0.15); color: var(--accent-1); }
+.file-tree .file-icon { font-size: 13px; }
+
+/* Editor tabs */
+.editor-tabs {
+  display: flex;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.editor-tabs .tab {
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.editor-tabs .tab:hover { background: var(--glass); }
+.editor-tabs .tab.active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--accent-1);
+}
+.editor-tabs .tab .close-tab {
+  font-size: 14px;
+  opacity: 0.5;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  padding: 0 2px;
+}
+.editor-tabs .tab .close-tab:hover { opacity: 1; color: var(--error); }
+.editor-area { flex: 1; overflow: hidden; }
+.CodeMirror { height: 100% !important; font-size: 13px; }
+
+/* ── Center Panel: Preview ───────────────── */
+.center-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+}
+.preview-toolbar {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.preview-toolbar button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.preview-toolbar button:hover { background: var(--glass); color: var(--text-primary); }
+.preview-toolbar .url-bar {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: monospace;
+}
+.preview-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e1e2e;
+  padding: 16px;
+  overflow: hidden;
+}
+.device-frame {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  transition: all 0.3s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.device-frame.desktop { width: 100%; height: 100%; border-radius: 8px; }
+.device-frame.tablet { width: 768px; height: 100%; max-height: 1024px; border-radius: 16px; border: 3px solid #333; }
+.device-frame.phone { width: 375px; height: 100%; max-height: 812px; border-radius: 32px; border: 4px solid #333; }
+.device-frame.phone::before {
+  content: '';
+  display: block;
+  height: 28px;
+  background: #000;
+  border-radius: 0 0 16px 16px;
+  width: 40%;
+  margin: 0 auto;
+  flex-shrink: 0;
+}
+.device-frame iframe {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: #fff;
+}
+
+/* Console */
+.console-panel {
+  height: 0;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border);
+  overflow-y: auto;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 12px;
+  padding: 0;
+  transition: height 0.2s;
+}
+.console-panel.open { height: 150px; padding: 8px 12px; }
+.console-line { padding: 2px 0; color: var(--text-secondary); }
+.console-line.error { color: var(--error); }
+.console-line.warn { color: var(--warning); }
+
+/* Exec Output */
+.exec-panel {
+  height: 0;
+  background: #0d1117;
+  border-top: 1px solid var(--border);
+  overflow-y: auto;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 12px;
+  padding: 0;
+  transition: height 0.3s;
+  position: relative;
+}
+.exec-panel.open { height: 200px; padding: 0; }
+.exec-header {
+  position: sticky; top: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  background: #161b22;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px; color: var(--text-secondary);
+  z-index: 1;
+}
+.exec-header button {
+  background: none; border: none; color: var(--text-secondary);
+  cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px;
+}
+.exec-header button:hover { background: var(--glass); color: var(--text-primary); }
+.exec-header .exec-status { margin-left: auto; font-size: 10px; }
+.exec-header .exec-status.ok { color: var(--success); }
+.exec-header .exec-status.err { color: var(--error); }
+.exec-header .exec-status.running { color: var(--warning); }
+.exec-body { padding: 8px 12px; white-space: pre-wrap; word-break: break-all; color: #c9d1d9; line-height: 1.6; }
+.exec-body .exec-stderr { color: var(--error); }
+
+/* ── Right Panel: AI Chat ────────────────── */
+.right-panel {
+  width: 28%;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+}
+.ai-header {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  gap: 8px;
+}
+.ai-header select {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.ai-quick-actions {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.ai-quick-actions button {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.ai-quick-actions button:hover {
+  border-color: var(--accent-1);
+  color: var(--accent-1);
+  background: rgba(102,126,234,0.1);
+}
+.ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ai-msg {
+  max-width: 95%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.ai-msg.user {
+  align-self: flex-end;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.ai-msg.assistant {
+  align-self: flex-start;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.ai-msg pre {
+  background: rgba(0,0,0,0.3);
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin: 6px 0;
+  overflow-x: auto;
+  font-size: 12px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+}
+.ai-msg code {
+  background: rgba(0,0,0,0.2);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+.ai-input-area {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+}
+.ai-input-area textarea {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: none;
+  height: 40px;
+  max-height: 120px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.ai-input-area textarea:focus { border-color: var(--accent-1); }
+.ai-input-area button {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  border: none;
+  color: #fff;
+  width: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+.ai-input-area button:hover { opacity: 0.85; }
+.ai-input-area button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Bottom Status Bar ───────────────────── */
+.statusbar {
+  height: 24px;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.85);
+  gap: 16px;
+  flex-shrink: 0;
+}
+.statusbar .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  display: inline-block;
+  margin-right: 4px;
+}
+.statusbar .dot.offline { background: var(--error); }
+
+/* ── Scrollbar ───────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(102,126,234,0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(102,126,234,0.5); }
+
+/* ── Modal ───────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  min-width: 360px;
+  max-width: 500px;
+}
+.modal h3 {
+  margin-bottom: 16px;
+  font-size: 16px;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.modal input, .modal select {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  outline: none;
+}
+.modal input:focus { border-color: var(--accent-1); }
+.modal .modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.modal .modal-actions button {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--glass);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+.modal .modal-actions button:hover { border-color: var(--accent-1); }
+.modal .modal-actions button.primary {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  border: none;
+  color: #fff;
+}
+
+/* ── Resizer ─────────────────────────────── */
+.resizer {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.resizer:hover, .resizer.active { background: var(--accent-1); }
+
+/* ── Loading spinner ─────────────────────── */
+.typing-indicator { display: flex; gap: 4px; padding: 4px 0; }
+.typing-indicator span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent-1);
+  animation: bounce 1.4s infinite ease-in-out;
+}
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+/* ── App Simulator Tab ───────────────────── */
+.app-sim-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-secondary);
+  padding: 0 8px;
+}
+.app-sim-tabs button {
+  padding: 4px 12px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+.app-sim-tabs button.active {
+  color: var(--accent-1);
+  border-bottom-color: var(--accent-1);
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="logo">築未科技 CodeSim</div>
+  <select id="projectSelect" onchange="switchProject(this.value)" title="選擇項目"></select>
+  <button onclick="showNewProjectModal()">+ 新建</button>
+  <div class="spacer"></div>
+  <div class="device-btns">
+    <button onclick="setDevice('desktop')" id="btn-desktop" class="active" title="桌面">🖥️</button>
+    <button onclick="setDevice('tablet')" id="btn-tablet" title="平板">📱</button>
+    <button onclick="setDevice('phone')" id="btn-phone" title="手機">📲</button>
+  </div>
+  <div class="device-btns">
+    <button onclick="setOS('web')" id="btn-web" class="active" title="Web">🌐</button>
+    <button onclick="setOS('ios')" id="btn-ios" title="iOS">🍎</button>
+    <button onclick="setOS('android')" id="btn-android" title="Android">🤖</button>
+  </div>
+  <button class="run-btn" onclick="runPreview()">▶ 預覽</button>
+  <button class="run-btn exec" onclick="executeCode()" title="執行當前檔案 (Python/JS)">▶ 執行</button>
+  <button onclick="saveCurrentFile()" title="儲存 (Ctrl+S)">💾</button>
+  <button onclick="toggleConsole()" title="控制台">🔧</button>
+  <span id="userBadge" class="user-badge"></span>
+  <button onclick="codesimLogout()" title="登出">🚪</button>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <!-- Left: File Tree + Editor -->
+  <div class="left-panel" id="leftPanel">
+    <div class="file-tree-header">
+      <span>📁 文件</span>
+      <div class="spacer"></div>
+      <button onclick="showNewFileModal()" title="新建文件">+</button>
+      <button onclick="loadFiles()" title="刷新">↻</button>
+    </div>
+    <div class="file-tree" id="fileTree"></div>
+    <div class="editor-tabs" id="editorTabs"></div>
+    <div class="editor-area" id="editorArea"></div>
+  </div>
+
+  <div class="resizer" id="resizer1"></div>
+
+  <!-- Center: Preview -->
+  <div class="center-panel" id="centerPanel">
+    <div class="preview-toolbar">
+      <button onclick="runPreview()" title="刷新">↻</button>
+      <div class="url-bar" id="urlBar">about:blank</div>
+      <button onclick="toggleConsole()">Console</button>
+    </div>
+    <div class="preview-container" id="previewContainer">
+      <div class="device-frame desktop" id="deviceFrame">
+        <iframe id="previewFrame" title="預覽窗口" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"></iframe>
+      </div>
+    </div>
+    <div class="console-panel" id="consolePanel"></div>
+    <div class="exec-panel" id="execPanel">
+      <div class="exec-header">
+        <span>💻 執行輸出</span>
+        <button onclick="clearExecOutput()" title="清除">🗑️</button>
+        <button onclick="toggleExecPanel()" title="關閉">✕</button>
+        <span class="exec-status" id="execStatus"></span>
+      </div>
+      <div class="exec-body" id="execBody"></div>
+    </div>
+  </div>
+
+  <div class="resizer" id="resizer2"></div>
+
+  <!-- Right: AI Chat -->
+  <div class="right-panel" id="rightPanel">
+    <div class="ai-header">
+      <span>🤖 AI 助手</span>
+      <div class="spacer"></div>
+      <select id="aiProvider" onchange="updateAIProvider()" title="AI 模型">
+        <option value="auto">Auto</option>
+      </select>
+      <button onclick="clearAIChat()" title="清除對話" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:13px;padding:2px 4px">🗑️</button>
+    </div>
+    <div class="ai-quick-actions">
+      <button onclick="aiAction('analyze')">🔍 分析</button>
+      <button onclick="aiAction('optimize')">⚡ 優化</button>
+      <button onclick="aiAction('fix')">🔧 修復</button>
+      <button onclick="aiAction('generate')">✨ 生成</button>
+      <button onclick="aiAction('explain')">📖 解釋</button>
+    </div>
+    <div class="ai-messages" id="aiMessages">
+      <div class="ai-msg assistant">歡迎使用築未科技代碼模擬器！我可以幫你分析、優化、修復或生成代碼。選擇左側文件開始編輯，或直接和我對話。</div>
+    </div>
+    <div class="ai-input-area">
+      <textarea id="aiInput" placeholder="輸入訊息或代碼問題..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIMessage()}"></textarea>
+      <button onclick="sendAIMessage()" id="aiSendBtn">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- Status Bar -->
+<div class="statusbar">
+  <span><span class="dot" id="statusDot"></span><span id="statusText">已連線</span></span>
+  <span id="statusProject">項目: -</span>
+  <span id="statusFile">文件: -</span>
+  <span id="statusLang">語言: -</span>
+  <span class="spacer"></span>
+  <span id="statusAI">AI: Auto</span>
+</div>
+
+<!-- New Project Modal -->
+<div class="modal-overlay" id="newProjectModal">
+  <div class="modal">
+    <h3>新建項目</h3>
+    <input id="newProjectName" placeholder="項目名稱" autofocus>
+    <select id="newProjectTemplate">
+      <option value="html">HTML / CSS / JS</option>
+      <option value="react">React (CDN)</option>
+      <option value="vue">Vue 3 (CDN)</option>
+      <option value="empty">空項目</option>
+    </select>
+    <div class="modal-actions">
+      <button onclick="closeModal('newProjectModal')">取消</button>
+      <button class="primary" onclick="createProject()">建立</button>
+    </div>
+  </div>
+</div>
+
+<!-- New File Modal -->
+<div class="modal-overlay" id="newFileModal">
+  <div class="modal">
+    <h3>新建文件</h3>
+    <input id="newFileName" placeholder="文件名稱 (例: components/header.html)">
+    <div class="modal-actions">
+      <button onclick="closeModal('newFileModal')">取消</button>
+      <button class="primary" onclick="createFile()">建立</button>
+    </div>
+  </div>
+</div>
+
+<!-- Version History Modal -->
+<div class="modal-overlay" id="historyModal">
+  <div class="modal" style="min-width:450px">
+    <h3>版本歷史</h3>
+    <div id="historyList" style="max-height:300px;overflow-y:auto;margin-bottom:12px"></div>
+    <div class="modal-actions">
+      <button onclick="closeModal('historyModal')">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/jsx/jsx.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/vue/vue.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closetag.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/xml-fold.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+<script>
+// ── Auth Check ────────────────────────────────────
+(async () => {
+  const token = localStorage.getItem('codesim_token');
+  if (!token) { window.location.href = '/simulator-login'; return; }
+  try {
+    const r = await fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
+    const d = await r.json();
+    if (!d.ok) { localStorage.removeItem('codesim_token'); window.location.href = '/simulator-login'; return; }
+    window._codesim_user = d.user;
+  } catch { localStorage.removeItem('codesim_token'); window.location.href = '/simulator-login'; return; }
+})();
+
+function codesimLogout() {
+  localStorage.removeItem('codesim_token');
+  localStorage.removeItem('codesim_user');
+  window.location.href = '/simulator-login';
+}
+
+// ── State ──────────────────────────────────────────
+const API = '';
+let currentProject = '';
+let openTabs = [];  // [{path, content, dirty}]
+let activeTab = -1;
+let editor = null;
+let ws = null;
+let currentDevice = 'desktop';
+let currentOS = 'web';
+let aiMessages = [];
+let isAIStreaming = false;
+let autoSaveTimer = null;
+
+// ── Init ───────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  initEditor();
+  initResizers();
+  initWebSocket();
+  await loadProjects();
+  await loadAIProviders();
+  // 顯示用戶名
+  if (window._codesim_user) {
+    document.getElementById('userBadge').textContent = '👤 ' + window._codesim_user.username;
+  }
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      saveCurrentFile();
+    }
+  });
+});
+
+function initEditor() {
+  editor = CodeMirror(document.getElementById('editorArea'), {
+    theme: 'dracula',
+    lineNumbers: true,
+    matchBrackets: true,
+    autoCloseBrackets: true,
+    autoCloseTags: true,
+    tabSize: 2,
+    indentWithTabs: false,
+    lineWrapping: true,
+    foldGutter: true,
+    gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+  });
+  editor.on('change', () => {
+    if (activeTab >= 0 && openTabs[activeTab]) {
+      openTabs[activeTab].content = editor.getValue();
+      openTabs[activeTab].dirty = true;
+      renderTabs();
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => autoSave(), 2000);
+    }
+  });
+}
+
+// ── WebSocket ──────────────────────────────────────
+function initWebSocket() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws/preview`);
+  ws.onopen = () => {
+    document.getElementById('statusDot').className = 'dot';
+    document.getElementById('statusText').textContent = '已連線';
+  };
+  ws.onclose = () => {
+    document.getElementById('statusDot').className = 'dot offline';
+    document.getElementById('statusText').textContent = '已斷線';
+    setTimeout(initWebSocket, 3000);
+  };
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'preview_update') {
+        runPreview();
+      }
+    } catch {}
+  };
+}
+
+// ── Projects ───────────────────────────────────────
+async function loadProjects() {
+  try {
+    const res = await fetch(`${API}/api/projects`);
+    const projects = await res.json();
+    const sel = document.getElementById('projectSelect');
+    sel.innerHTML = projects.map(p => `<option value="${p.name}">${p.name} (${p.file_count} files)</option>`).join('');
+    if (projects.length > 0) {
+      currentProject = projects[0].name;
+      await loadFiles();
+    }
+  } catch (e) {
+    console.error('Failed to load projects:', e);
+  }
+}
+
+async function switchProject(name) {
+  currentProject = name;
+  openTabs = [];
+  activeTab = -1;
+  renderTabs();
+  editor.setValue('');
+  await loadFiles();
+  runPreview();
+  document.getElementById('statusProject').textContent = `項目: ${name}`;
+}
+
+function showNewProjectModal() {
+  document.getElementById('newProjectModal').classList.add('show');
+  document.getElementById('newProjectName').focus();
+}
+
+async function createProject() {
+  const name = document.getElementById('newProjectName').value.trim();
+  const template = document.getElementById('newProjectTemplate').value;
+  if (!name) return;
+  try {
+    await fetch(`${API}/api/projects`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, template}),
+    });
+    closeModal('newProjectModal');
+    document.getElementById('newProjectName').value = '';
+    await loadProjects();
+    switchProject(name);
+  } catch (e) {
+    alert('建立失敗: ' + e.message);
+  }
+}
+
+// ── Files ──────────────────────────────────────────
+async function loadFiles() {
+  if (!currentProject) return;
+  try {
+    const res = await fetch(`${API}/api/projects/${currentProject}/files`);
+    const files = await res.json();
+    renderFileTree(files);
+    document.getElementById('statusProject').textContent = `項目: ${currentProject}`;
+  } catch (e) {
+    console.error('Failed to load files:', e);
+  }
+}
+
+function renderFileTree(files) {
+  const tree = document.getElementById('fileTree');
+  const icons = {
+    html: '🌐', css: '🎨', javascript: '⚡', jsx: '⚛️', vue: '💚',
+    python: '🐍', json: '📋', markdown: '📝', text: '📄', xml: '📰',
+    typescript: '🔷', tsx: '⚛️',
+  };
+  tree.innerHTML = files.map(f => {
+    const icon = icons[f.language] || '📄';
+    const isActive = activeTab >= 0 && openTabs[activeTab]?.path === f.path;
+    return `<div class="file-item ${isActive ? 'active' : ''}" onclick="openFile('${f.path}')" oncontextmenu="fileContextMenu(event,'${f.path}')">
+      <span class="file-icon">${icon}</span>
+      <span>${f.path}</span>
+    </div>`;
+  }).join('');
+}
+
+async function openFile(path) {
+  const existing = openTabs.findIndex(t => t.path === path);
+  if (existing >= 0) {
+    setActiveTab(existing);
+    return;
+  }
+  try {
+    const res = await fetch(`${API}/api/projects/${currentProject}/files/${path}`);
+    const data = await res.json();
+    openTabs.push({path: data.path, content: data.content, language: data.language, dirty: false});
+    setActiveTab(openTabs.length - 1);
+  } catch (e) {
+    console.error('Failed to open file:', e);
+  }
+}
+
+function setActiveTab(idx) {
+  activeTab = idx;
+  const tab = openTabs[idx];
+  if (!tab) return;
+  const modeMap = {
+    html: 'htmlmixed', css: 'css', javascript: 'javascript', jsx: 'jsx',
+    vue: 'vue', python: 'python', json: {name: 'javascript', json: true},
+    markdown: 'markdown', typescript: 'javascript', tsx: 'jsx',
+  };
+  editor.setValue(tab.content || '');
+  editor.setOption('mode', modeMap[tab.language] || 'text');
+  editor.clearHistory();
+  renderTabs();
+  loadFiles();
+  document.getElementById('statusFile').textContent = `文件: ${tab.path}`;
+  document.getElementById('statusLang').textContent = `語言: ${tab.language}`;
+}
+
+function closeTab(idx, e) {
+  if (e) e.stopPropagation();
+  openTabs.splice(idx, 1);
+  if (activeTab >= openTabs.length) activeTab = openTabs.length - 1;
+  if (activeTab >= 0) setActiveTab(activeTab);
+  else {
+    editor.setValue('');
+    document.getElementById('statusFile').textContent = '文件: -';
+  }
+  renderTabs();
+}
+
+function renderTabs() {
+  const container = document.getElementById('editorTabs');
+  container.innerHTML = openTabs.map((t, i) => {
+    const name = t.path.split('/').pop();
+    return `<div class="tab ${i === activeTab ? 'active' : ''}" onclick="setActiveTab(${i})">
+      ${t.dirty ? '● ' : ''}${name}
+      <button class="close-tab" onclick="closeTab(${i}, event)">×</button>
+    </div>`;
+  }).join('');
+}
+
+function showNewFileModal() {
+  document.getElementById('newFileModal').classList.add('show');
+  document.getElementById('newFileName').focus();
+}
+
+async function createFile() {
+  const name = document.getElementById('newFileName').value.trim();
+  if (!name) return;
+  try {
+    await fetch(`${API}/api/projects/${currentProject}/files/${name}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({content: '', message: 'New file'}),
+    });
+    closeModal('newFileModal');
+    document.getElementById('newFileName').value = '';
+    await loadFiles();
+    openFile(name);
+  } catch (e) {
+    alert('建立失敗: ' + e.message);
+  }
+}
+
+async function saveCurrentFile() {
+  if (activeTab < 0 || !openTabs[activeTab]) return;
+  const tab = openTabs[activeTab];
+  try {
+    await fetch(`${API}/api/projects/${currentProject}/files/${tab.path}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({content: tab.content, message: 'Manual save'}),
+    });
+    tab.dirty = false;
+    renderTabs();
+    runPreview();
+  } catch (e) {
+    console.error('Save failed:', e);
+  }
+}
+
+async function autoSave() {
+  if (activeTab < 0 || !openTabs[activeTab]?.dirty) return;
+  const tab = openTabs[activeTab];
+  try {
+    await fetch(`${API}/api/projects/${currentProject}/files/${tab.path}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({content: tab.content, message: 'Auto-save'}),
+    });
+    tab.dirty = false;
+    renderTabs();
+  } catch {}
+}
+
+function fileContextMenu(e, path) {
+  e.preventDefault();
+  if (confirm(`刪除文件 ${path}？`)) {
+    fetch(`${API}/api/projects/${currentProject}/files/${path}`, {method: 'DELETE'})
+      .then(() => {
+        const idx = openTabs.findIndex(t => t.path === path);
+        if (idx >= 0) closeTab(idx);
+        loadFiles();
+      });
+  }
+}
+
+// ── Preview ────────────────────────────────────────
+function runPreview() {
+  if (!currentProject) return;
+  const frame = document.getElementById('previewFrame');
+  const url = `${API}/preview/${currentProject}/index.html`;
+  frame.src = url;
+  document.getElementById('urlBar').textContent = url;
+}
+
+function setDevice(device) {
+  currentDevice = device;
+  const frame = document.getElementById('deviceFrame');
+  frame.className = `device-frame ${device}`;
+  document.querySelectorAll('.device-btns button').forEach(b => {
+    if (b.id.startsWith('btn-')) b.classList.remove('active');
+  });
+  document.getElementById(`btn-${device}`).classList.add('active');
+}
+
+function setOS(os) {
+  currentOS = os;
+  document.querySelectorAll('.device-btns button').forEach(b => {
+    if (['btn-web','btn-ios','btn-android'].includes(b.id)) b.classList.remove('active');
+  });
+  document.getElementById(`btn-${os}`).classList.add('active');
+  const frame = document.getElementById('deviceFrame');
+  if (os === 'ios') {
+    frame.style.borderColor = '#333';
+    if (currentDevice === 'desktop') setDevice('phone');
+  } else if (os === 'android') {
+    frame.style.borderColor = '#4a4a4a';
+    if (currentDevice === 'desktop') setDevice('phone');
+  } else {
+    frame.style.borderColor = '#333';
+  }
+}
+
+function toggleConsole() {
+  document.getElementById('consolePanel').classList.toggle('open');
+}
+
+function toggleExecPanel() {
+  document.getElementById('execPanel').classList.toggle('open');
+}
+
+function clearExecOutput() {
+  document.getElementById('execBody').innerHTML = '';
+  document.getElementById('execStatus').textContent = '';
+  document.getElementById('execStatus').className = 'exec-status';
+}
+
+async function executeCode() {
+  if (activeTab < 0 || !openTabs[activeTab]) {
+    alert('請先打開一個檔案');
+    return;
+  }
+  const tab = openTabs[activeTab];
+  const lang = tab.language;
+  const supported = ['python', 'javascript', 'typescript'];
+  if (!supported.includes(lang)) {
+    alert(`目前支援執行: ${supported.join(', ')}\n當前檔案語言: ${lang}`);
+    return;
+  }
+
+  // 先儲存
+  if (tab.dirty) await saveCurrentFile();
+
+  const code = editor.getValue();
+  const panel = document.getElementById('execPanel');
+  const body = document.getElementById('execBody');
+  const status = document.getElementById('execStatus');
+
+  panel.classList.add('open');
+  body.innerHTML = '';
+  status.textContent = '⚙️ 執行中...';
+  status.className = 'exec-status running';
+
+  try {
+    const res = await fetch(`${API}/api/execute`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({code, language: lang, project: currentProject, file_path: tab.path}),
+    });
+    const data = await res.json();
+
+    let html = '';
+    if (data.stdout) html += escapeHtml(data.stdout);
+    if (data.stderr) html += `<span class="exec-stderr">${escapeHtml(data.stderr)}</span>`;
+    if (!data.stdout && !data.stderr) html = '<span style="color:var(--text-muted)">（無輸出）</span>';
+    body.innerHTML = html;
+
+    if (data.exit_code === 0) {
+      status.textContent = `✅ 完成 (${data.duration}s)`;
+      status.className = 'exec-status ok';
+    } else {
+      status.textContent = `❌ 錯誤 (exit ${data.exit_code}, ${data.duration}s)`;
+      status.className = 'exec-status err';
+    }
+    body.scrollTop = body.scrollHeight;
+  } catch (e) {
+    body.innerHTML = `<span class="exec-stderr">請求失敗: ${escapeHtml(e.message)}</span>`;
+    status.textContent = '❌ 失敗';
+    status.className = 'exec-status err';
+  }
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function logToConsole(msg, type = 'log') {
+  const panel = document.getElementById('consolePanel');
+  const line = document.createElement('div');
+  line.className = `console-line ${type}`;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  panel.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+// ── AI Chat ────────────────────────────────────────
+async function loadAIProviders() {
+  try {
+    const res = await fetch(`${API}/api/ai/providers`);
+    const data = await res.json();
+    const sel = document.getElementById('aiProvider');
+    sel.innerHTML = '<option value="auto">Auto</option>' +
+      data.providers.map(p => `<option value="${p}">${p}</option>`).join('');
+  } catch {}
+}
+
+function updateAIProvider() {
+  const provider = document.getElementById('aiProvider').value;
+  document.getElementById('statusAI').textContent = `AI: ${provider}`;
+}
+
+async function sendAIMessage() {
+  const input = document.getElementById('aiInput');
+  const text = input.value.trim();
+  if (!text || isAIStreaming) return;
+  input.value = '';
+  input.style.height = '40px';
+
+  addAIMessage('user', text);
+  aiMessages.push({role: 'user', content: text});
+
+  const provider = document.getElementById('aiProvider').value;
+  isAIStreaming = true;
+  document.getElementById('aiSendBtn').disabled = true;
+
+  const msgEl = addAIMessage('assistant', '');
+  const indicator = document.createElement('div');
+  indicator.className = 'typing-indicator';
+  indicator.innerHTML = '<span></span><span></span><span></span>';
+  msgEl.appendChild(indicator);
+
+  try {
+    const systemMsg = buildSystemContext();
+    const messages = [{role: 'system', content: systemMsg}, ...aiMessages];
+
+    const res = await fetch(`${API}/api/ai/chat/stream`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({messages, provider}),
+    });
+
+    indicator.remove();
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let buffer = '';
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, {stream: true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.content) {
+              fullContent += data.content;
+              msgEl.innerHTML = renderMarkdown(fullContent);
+              scrollAIToBottom();
+            }
+            if (data.error) {
+              fullContent += `\n\n⚠️ Error: ${data.error}`;
+              msgEl.innerHTML = renderMarkdown(fullContent);
+            }
+          } catch {}
+        }
+      }
+    }
+
+    if (fullContent) {
+      aiMessages.push({role: 'assistant', content: fullContent});
+      autoApplyCode(fullContent, msgEl);
+      // 顯示 provider badge（流式模式用選擇的 provider）
+      const badge = document.createElement('div');
+      badge.style.cssText = 'font-size:10px;color:var(--text-muted);margin-top:6px';
+      badge.textContent = `via ${provider === 'auto' ? 'Auto (local-first)' : provider}`;
+      msgEl.appendChild(badge);
+    }
+  } catch (e) {
+    indicator.remove();
+    msgEl.innerHTML = `<span style="color:var(--error)">請求失敗: ${e.message}</span>`;
+  }
+
+  isAIStreaming = false;
+  document.getElementById('aiSendBtn').disabled = false;
+}
+
+function buildSystemContext() {
+  let ctx = `你是築未科技代碼模擬器的 AI 助手。用戶正在編輯代碼，請用中文回答。
+當用戶要求生成或修改代碼時，請將完整代碼放在 \`\`\` 代碼塊中。`;
+  if (activeTab >= 0 && openTabs[activeTab]) {
+    const tab = openTabs[activeTab];
+    ctx += `\n\n當前文件: ${tab.path} (${tab.language})\n\`\`\`${tab.language}\n${tab.content}\n\`\`\``;
+  }
+  return ctx;
+}
+
+function addAIMessage(role, content) {
+  const container = document.getElementById('aiMessages');
+  const div = document.createElement('div');
+  div.className = `ai-msg ${role}`;
+  div.innerHTML = content ? renderMarkdown(content) : '';
+  container.appendChild(div);
+  scrollAIToBottom();
+  return div;
+}
+
+function scrollAIToBottom() {
+  const c = document.getElementById('aiMessages');
+  c.scrollTop = c.scrollHeight;
+}
+
+function renderMarkdown(text) {
+  try {
+    return marked.parse(text);
+  } catch {
+    return text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  }
+}
+
+function autoApplyCode(content, msgEl) {
+  const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
+  let match;
+  const blocks = [];
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    blocks.push({lang: match[1], code: match[2].trim()});
+  }
+  if (blocks.length > 0 && activeTab >= 0 && msgEl) {
+    blocks.forEach((block, i) => {
+      const btn = document.createElement('button');
+      btn.style.cssText = 'margin-top:8px;margin-right:6px;padding:4px 12px;border-radius:6px;border:1px solid var(--accent-1);background:rgba(102,126,234,0.15);color:var(--accent-1);cursor:pointer;font-size:11px';
+      btn.textContent = blocks.length === 1 ? '✅ 套用代碼' : `✅ 套用代碼 #${i+1}`;
+      btn.onclick = () => {
+        editor.setValue(block.code);
+        openTabs[activeTab].content = block.code;
+        openTabs[activeTab].dirty = true;
+        renderTabs();
+        runPreview();
+        btn.textContent = '✅ 已套用';
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+      };
+      msgEl.appendChild(btn);
+    });
+  }
+}
+
+function clearAIChat() {
+  aiMessages = [];
+  const container = document.getElementById('aiMessages');
+  container.innerHTML = '<div class="ai-msg assistant">對話已清除。我可以幫你分析、優化、修復或生成代碼。</div>';
+}
+
+async function aiAction(action) {
+  if (activeTab < 0 || !openTabs[activeTab]) {
+    addAIMessage('assistant', '請先打開一個文件。');
+    return;
+  }
+  const tab = openTabs[activeTab];
+  const code = editor.getSelection() || tab.content;
+  const provider = document.getElementById('aiProvider').value;
+
+  let endpoint, body;
+  switch (action) {
+    case 'analyze':
+      endpoint = '/api/ai/analyze';
+      body = {code, language: tab.language, provider};
+      break;
+    case 'optimize':
+      endpoint = '/api/ai/optimize';
+      body = {code, language: tab.language, provider};
+      break;
+    case 'fix':
+      endpoint = '/api/ai/fix';
+      body = {code, language: tab.language, provider};
+      break;
+    case 'generate':
+      const desc = prompt('描述你想生成的功能：');
+      if (!desc) return;
+      endpoint = '/api/ai/generate';
+      body = {description: desc, language: tab.language, provider};
+      break;
+    case 'explain':
+      endpoint = '/api/ai/chat';
+      body = {messages: [{role: 'user', content: `請用中文解釋以下 ${tab.language} 代碼的功能和邏輯：\n\`\`\`${tab.language}\n${code}\n\`\`\``}], provider};
+      break;
+    default: return;
+  }
+
+  addAIMessage('user', `[${action}] ${tab.path}`);
+  const msgEl = addAIMessage('assistant', '');
+  const indicator = document.createElement('div');
+  indicator.className = 'typing-indicator';
+  indicator.innerHTML = '<span></span><span></span><span></span>';
+  msgEl.appendChild(indicator);
+
+  try {
+    const res = await fetch(`${API}${endpoint}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    indicator.remove();
+    const content = data.content || data.error || JSON.stringify(data);
+    msgEl.innerHTML = renderMarkdown(content);
+    if (data.provider) {
+      const badge = document.createElement('div');
+      badge.style.cssText = 'font-size:10px;color:var(--text-muted);margin-top:6px';
+      badge.textContent = `via ${data.provider}${data.model ? ' / ' + data.model : ''}`;
+      msgEl.appendChild(badge);
+    }
+    scrollAIToBottom();
+  } catch (e) {
+    indicator.remove();
+    msgEl.innerHTML = `<span style="color:var(--error)">請求失敗: ${e.message}</span>`;
+  }
+}
+
+// ── Version History ────────────────────────────────
+async function showHistory() {
+  if (activeTab < 0) return;
+  const tab = openTabs[activeTab];
+  try {
+    const res = await fetch(`${API}/api/projects/${currentProject}/files/${tab.path}/history`);
+    const history = await res.json();
+    const list = document.getElementById('historyList');
+    list.innerHTML = history.map(h => `
+      <div style="padding:8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:12px">#${h.id} — ${h.hash}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${h.created_at} ${h.message ? '— ' + h.message : ''}</div>
+        </div>
+        <button onclick="restoreVersion(${h.id})" style="background:var(--glass);border:1px solid var(--border);color:var(--text-primary);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px">還原</button>
+      </div>
+    `).join('');
+    document.getElementById('historyModal').classList.add('show');
+  } catch (e) {
+    alert('載入失敗: ' + e.message);
+  }
+}
+
+async function restoreVersion(id) {
+  try {
+    const res = await fetch(`${API}/api/versions/${id}`, {method: 'GET'});
+    const data = await res.json();
+    if (data.content !== undefined && activeTab >= 0) {
+      editor.setValue(data.content);
+      openTabs[activeTab].content = data.content;
+      openTabs[activeTab].dirty = true;
+      renderTabs();
+      closeModal('historyModal');
+    }
+  } catch (e) {
+    alert('還原失敗: ' + e.message);
+  }
+}
+
+// ── Resizers ───────────────────────────────────────
+function initResizers() {
+  setupResizer('resizer1', 'leftPanel', 'centerPanel', true);
+  setupResizer('resizer2', 'centerPanel', 'rightPanel', false);
+}
+
+function setupResizer(resizerId, leftId, rightId, isLeft) {
+  const resizer = document.getElementById(resizerId);
+  const left = document.getElementById(leftId);
+  const right = document.getElementById(rightId);
+  let startX, startLeftW, startRightW;
+
+  resizer.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startX = e.clientX;
+    startLeftW = left.offsetWidth;
+    startRightW = right.offsetWidth;
+    resizer.classList.add('active');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  function onMove(e) {
+    const dx = e.clientX - startX;
+    const newLeftW = Math.max(200, startLeftW + dx);
+    const newRightW = Math.max(200, startRightW - dx);
+    left.style.width = newLeftW + 'px';
+    left.style.flex = 'none';
+    if (!isLeft) {
+      right.style.width = newRightW + 'px';
+      right.style.flex = 'none';
+    }
+    if (editor) editor.refresh();
+  }
+
+  function onUp() {
+    resizer.classList.remove('active');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+}
+
+// ── Modal helpers ──────────────────────────────────
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// Close modals on overlay click
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('modal-overlay')) {
+    e.target.classList.remove('show');
+  }
+});
+
+// Enter key in modals
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    if (document.getElementById('newProjectModal').classList.contains('show')) createProject();
+    else if (document.getElementById('newFileModal').classList.contains('show')) createFile();
+  }
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
+  }
+});
+
+// Auto-resize AI textarea
+document.getElementById('aiInput').addEventListener('input', function() {
+  this.style.height = '40px';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+</script>
+</body>
+</html>

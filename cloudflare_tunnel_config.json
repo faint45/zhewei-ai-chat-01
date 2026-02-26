@@ -1,0 +1,50 @@
+{
+  "ingress": [
+    {
+      "hostname": "zhe-wei.net",
+      "service": "http://gateway:80",
+      "originRequest": {}
+    },
+    {
+      "hostname": "www.zhe-wei.net",
+      "service": "http://gateway:80",
+      "originRequest": {}
+    },
+    {
+      "hostname": "jarvis.zhe-wei.net",
+      "service": "http://gateway:80",
+      "originRequest": {}
+    },
+    {
+      "hostname": "bridge.zhe-wei.net",
+      "service": "http://gateway:80",
+      "originRequest": {}
+    },
+    {
+      "hostname": "dify.zhe-wei.net",
+      "service": "http://gateway:80",
+      "originRequest": {}
+    },
+    {
+      "hostname": "cms.zhe-wei.net",
+      "service": "http://gateway:80",
+      "originRequest": {}
+    },
+    {
+      "hostname": "vision.zhe-wei.net",
+      "service": "http://gateway:80",
+      "originRequest": {}
+    },
+    {
+      "hostname": "codesim.zhe-wei.net",
+      "service": "http://gateway:80",
+      "originRequest": {}
+    },
+    {
+      "service": "http://gateway:80"
+    }
+  ],
+  "warp-routing": {
+    "enabled": false
+  }
+}

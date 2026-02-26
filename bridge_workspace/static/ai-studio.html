@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>AI 創作工作室 - 無限生圖 · 生影片</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://js.puter.com/v2/"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+        body{font-family:'Noto Sans TC',sans-serif;margin:0;height:100vh;overflow:hidden}
+        ::-webkit-scrollbar{width:5px}
+        ::-webkit-scrollbar-track{background:#0f172a}
+        ::-webkit-scrollbar-thumb{background:#475569;border-radius:3px}
+        .glass{background:rgba(15,23,42,.7);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.08)}
+        .gradient-text{background:linear-gradient(135deg,#f472b6,#a855f7,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        @keyframes fade-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .fade-up{animation:fade-up .25s ease-out}
+        .gallery-item{transition:all .2s}
+        .gallery-item:hover{transform:scale(1.02);box-shadow:0 12px 32px rgba(0,0,0,.4)}
+        .tab-active{background:linear-gradient(135deg,rgba(168,85,247,.2),rgba(236,72,153,.2));border-color:rgba(168,85,247,.5);color:#e9d5ff}
+        .model-chip{transition:all .15s}
+        .model-chip:hover{transform:translateY(-1px)}
+        .model-chip.active{background:linear-gradient(135deg,#7c3aed,#db2777);color:white;border-color:transparent}
+        .nsfw-toggle{position:relative;width:40px;height:22px;border-radius:11px;cursor:pointer;transition:all .2s}
+        .nsfw-toggle .dot{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:white;transition:all .2s}
+        .nsfw-toggle.on{background:linear-gradient(135deg,#ef4444,#dc2626)}.nsfw-toggle.on .dot{left:20px}
+        .nsfw-toggle.off{background:#334155}
+        .drop-zone{border:2px dashed #475569;transition:all .2s}
+        .drop-zone:hover,.drop-zone.dragover{border-color:#a855f7;background:rgba(168,85,247,.05)}
+        .drop-zone.has-image{border-style:solid;border-color:#475569}
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col h-screen">
+
+<!-- 頂部 -->
+<nav class="flex-shrink-0 glass border-b border-slate-800 px-4 py-2.5 z-50">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <a href="/" class="text-slate-400 hover:text-white transition" title="返回"><i class="fas fa-arrow-left"></i></a>
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-violet-600 flex items-center justify-center">
+                <i class="fas fa-palette text-white text-sm"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-sm gradient-text leading-tight">AI 創作工作室</h1>
+                <p class="text-[10px] text-slate-500 leading-tight">無限生圖 · 圖片生影片 · <span id="planBadge" class="text-emerald-400">免費體驗</span></p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <!-- 本地模式開關 -->
+            <div class="flex items-center gap-1.5">
+                <span class="text-[10px] text-emerald-500" id="localModeLabel">☁️ 雲端</span>
+                <div id="localToggle" class="nsfw-toggle off" onclick="toggleLocalMode()" title="本地模式：全部使用本地 GPU 運算，0 token 消耗">
+                    <div class="dot"></div>
+                </div>
+            </div>
+            <!-- 成人模式開關 -->
+            <div class="flex items-center gap-1.5">
+                <span class="text-[10px] text-slate-500">無審查</span>
+                <div id="nsfwToggle" class="nsfw-toggle off" onclick="toggleNSFW()" title="成人模式（關閉安全過濾器）">
+                    <div class="dot"></div>
+                </div>
+            </div>
+            <span class="text-[10px] text-slate-500">今日：<span id="todayCount">0</span> 張</span>
+            <a href="/payment" id="upgradeBtn" class="text-[10px] bg-gradient-to-r from-pink-600 to-violet-600 hover:from-pink-500 hover:to-violet-500 text-white px-2.5 py-1 rounded-lg font-medium transition">升級方案</a>
+        </div>
+    </div>
+</nav>
+
+<!-- 分頁 -->
+<div class="flex-shrink-0 border-b border-slate-800/50 px-4">
+    <div class="max-w-7xl mx-auto flex gap-1 py-1.5">
+        <button onclick="switchTab('image')" id="tabImage" class="tab-active px-4 py-1.5 rounded-lg text-xs font-medium border border-transparent transition">
+            <i class="fas fa-image mr-1"></i>文字生圖
+        </button>
+        <button onclick="switchTab('img2vid')" id="tabImg2vid" class="px-4 py-1.5 rounded-lg text-xs font-medium text-slate-400 border border-transparent hover:bg-slate-800 transition">
+            <i class="fas fa-photo-film mr-1"></i>圖片生影片
+        </button>
+        <button onclick="switchTab('video')" id="tabVideo" class="px-4 py-1.5 rounded-lg text-xs font-medium text-slate-400 border border-transparent hover:bg-slate-800 transition">
+            <i class="fas fa-video mr-1"></i>文字生影片
+        </button>
+        <button onclick="switchTab('gallery')" id="tabGallery" class="px-4 py-1.5 rounded-lg text-xs font-medium text-slate-400 border border-transparent hover:bg-slate-800 transition">
+            <i class="fas fa-images mr-1"></i>作品庫
+        </button>
+    </div>
+</div>
+
+<!-- 主體 -->
+<div class="flex-1 flex overflow-hidden">
+
+    <!-- ===== 文字生圖 ===== -->
+    <div id="panelImage" class="flex-1 flex overflow-hidden">
+        <div class="w-full lg:w-[380px] flex-shrink-0 flex flex-col border-r border-slate-800/60 overflow-y-auto">
+            <div class="p-3 space-y-3">
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-wider">描述你想要的圖片</label>
+                    <textarea id="imgPrompt" rows="3" placeholder="例如：一隻穿著太空衣的柴犬在月球上散步，背景是地球，電影級光影..."
+                        class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition placeholder:text-slate-600"></textarea>
+                </div>
+                <!-- 參考圖上傳 -->
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">參考圖片（可選）</label>
+                    <div id="refDropZone" class="drop-zone rounded-xl p-4 text-center cursor-pointer" onclick="document.getElementById('refFileInput').click()">
+                        <div id="refPreview" class="hidden relative">
+                            <img id="refPreviewImg" class="max-h-32 mx-auto rounded-lg" alt="參考圖片">
+                            <button onclick="event.stopPropagation(); clearRefImage()" class="absolute top-1 right-1 w-5 h-5 bg-red-600 hover:bg-red-500 rounded-full flex items-center justify-center text-[10px] text-white" title="移除"><i class="fas fa-xmark"></i></button>
+                            <p class="text-[10px] text-slate-400 mt-1.5">AI 將以此圖為基礎，依文字描述修改</p>
+                        </div>
+                        <div id="refPlaceholder">
+                            <i class="fas fa-image text-lg text-slate-600 mb-1"></i>
+                            <p class="text-[10px] text-slate-500">拖放或點擊上傳參考圖（可選）</p>
+                        </div>
+                    </div>
+                    <input type="file" id="refFileInput" accept="image/*" class="hidden" onchange="handleRefUpload(this)">
+                    <!-- 修改強度 -->
+                    <div id="refStrengthWrap" class="hidden mt-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[10px] text-slate-500">修改強度</label>
+                            <span id="refStrengthVal" class="text-[10px] text-violet-400">0.7</span>
+                        </div>
+                        <input type="range" id="refStrength" min="0.1" max="1.0" step="0.05" value="0.7"
+                            class="w-full h-1 mt-1 accent-violet-500" oninput="document.getElementById('refStrengthVal').textContent=this.value">
+                        <div class="flex justify-between text-[9px] text-slate-600 mt-0.5">
+                            <span>保留原圖</span><span>完全重繪</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- AI 提示詞增強 -->
+                <div class="flex gap-1.5">
+                    <button onclick="enhancePrompt()" id="enhanceBtn" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-1.5 rounded-lg text-[11px] transition flex items-center justify-center gap-1" title="智慧路由 AI 增強（Groq 70B → Gemini → Grok → Ollama）">
+                        <i class="fas fa-magic"></i>AI 增強 <span class="text-[9px] text-violet-400 opacity-70">智慧路由</span>
+                    </button>
+                    <select id="enhanceStyle" title="風格選擇" class="bg-slate-900 border border-slate-800 rounded-lg text-[10px] text-slate-400 px-2 py-1 focus:outline-none">
+                        <option value="photorealistic">寫實</option>
+                        <option value="anime">動漫</option>
+                        <option value="illustration">插畫</option>
+                        <option value="cinematic">電影</option>
+                        <option value="abstract">抽象</option>
+                        <option value="3d_render">3D 渲染</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">模型</label>
+                    <div class="flex flex-wrap gap-1.5" id="imgModels">
+                        <button onclick="selectImgModel(this,'dall-e-3')" class="model-chip active px-2.5 py-1 rounded-lg text-[11px] border border-slate-700">DALL·E 3</button>
+                        <button onclick="selectImgModel(this,'gpt-image-1')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">GPT Image</button>
+                        <button onclick="selectImgModel(this,'black-forest-labs/FLUX.1-schnell')" data-together="1" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">Flux Schnell ⚡</button>
+                        <button onclick="selectImgModel(this,'black-forest-labs/FLUX.1-dev')" data-together="1" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">Flux Dev</button>
+                        <button onclick="selectImgModel(this,'stabilityai/stable-diffusion-xl-base-1.0')" data-together="1" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">SDXL</button>
+                        <button onclick="selectImgModel(this,'google/imagen-4.0-fast')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">Imagen 4</button>
+                        <button onclick="selectImgModel(this,'ideogram/ideogram-3.0')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">Ideogram 3</button>
+                        <button onclick="selectImgModel(this,'ByteDance-Seed/Seedream-4.0')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">Seedream 4</button>
+                        <span class="w-full h-0 border-t border-slate-800/50"></span>
+                        <button onclick="selectImgModel(this,'__comfyui__')" data-local="1" data-together="1" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-emerald-800 text-emerald-400 bg-emerald-950/30">
+                            <i class="fas fa-server mr-0.5"></i>ComfyUI <span id="comfyuiDot" class="inline-block w-1.5 h-1.5 rounded-full bg-slate-600 ml-0.5"></span> <span class="text-[9px] opacity-60">0 token</span>
+                        </button>
+                        <button onclick="selectImgModel(this,'__forge__')" data-local="1" data-together="1" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-amber-800 text-amber-400 bg-amber-950/30">
+                            <i class="fas fa-bolt mr-0.5"></i>Forge <span id="forgeDot" class="inline-block w-1.5 h-1.5 rounded-full bg-slate-600 ml-0.5"></span> <span class="text-[9px] opacity-60">0 token</span>
+                        </button>
+                    </div>
+                    <!-- 成人模式專用模型（隱藏，開啟時顯示） -->
+                    <div id="nsfwModelsHint" class="hidden mt-2 p-2 bg-red-950/30 border border-red-900/30 rounded-lg">
+                        <p class="text-[10px] text-red-400"><i class="fas fa-fire mr-1"></i>無審查模式 — <b>Flux Schnell⚡/ Flux Dev / SDXL / 本地 Forge</b> 有效</p>
+                        <p class="text-[9px] text-red-400/60 mt-0.5">DALL·E、GPT Image、Imagen、Seedream、Ideogram 無法繞過。<b>Forge 本地無任何限制</b></p>
+                    </div>
+                </div>
+                <!-- 圖片尺寸 -->
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">尺寸</label>
+                    <div class="flex flex-wrap gap-1.5" id="imgSizes">
+                        <button onclick="selectImgSize(this,'1024x1024')" class="model-chip active px-2.5 py-1 rounded-lg text-[11px] border border-slate-700">1:1</button>
+                        <button onclick="selectImgSize(this,'1280x720')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">16:9 橫</button>
+                        <button onclick="selectImgSize(this,'720x1280')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">9:16 直</button>
+                        <button onclick="selectImgSize(this,'1152x896')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">4:3</button>
+                        <button onclick="selectImgSize(this,'896x1152')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">3:4</button>
+                    </div>
+                </div>
+                <!-- 進階設定（可摺疊） -->
+                <details class="group">
+                    <summary class="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300 transition uppercase tracking-wider flex items-center gap-1">
+                        <i class="fas fa-sliders text-[9px]"></i>進階設定
+                        <i class="fas fa-chevron-down text-[8px] ml-auto group-open:rotate-180 transition-transform"></i>
+                    </summary>
+                    <div class="mt-2 space-y-2 p-2 bg-slate-900/50 rounded-lg border border-slate-800/50">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[10px] text-slate-500">步數 (Steps)</label>
+                            <span id="imgStepsVal" class="text-[10px] text-violet-400">25</span>
+                        </div>
+                        <input type="range" id="imgSteps" min="4" max="50" step="1" value="25" class="w-full h-1 accent-violet-500" oninput="document.getElementById('imgStepsVal').textContent=this.value">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[10px] text-slate-500">CFG Scale</label>
+                            <span id="imgCfgVal" class="text-[10px] text-violet-400">7.0</span>
+                        </div>
+                        <input type="range" id="imgCfg" min="1" max="20" step="0.5" value="7" class="w-full h-1 accent-violet-500" oninput="document.getElementById('imgCfgVal').textContent=parseFloat(this.value).toFixed(1)">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[10px] text-slate-500">負面提示詞</label>
+                        </div>
+                        <input type="text" id="imgNegPrompt" value="blurry, low quality, distorted, watermark, text, ugly, deformed" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-slate-400 focus:outline-none focus:border-violet-500/50">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[10px] text-slate-500">批次數量</label>
+                            <div class="flex gap-1">
+                                <button onclick="setBatchCount(1)" id="batch1" class="model-chip active px-2 py-0.5 rounded text-[10px] border border-slate-700">1 張</button>
+                                <button onclick="setBatchCount(2)" id="batch2" class="model-chip px-2 py-0.5 rounded text-[10px] border border-slate-700 text-slate-400">2 張</button>
+                                <button onclick="setBatchCount(4)" id="batch4" class="model-chip px-2 py-0.5 rounded text-[10px] border border-slate-700 text-slate-400">4 張</button>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+                <button onclick="generateImage()" id="imgGenBtn"
+                    class="w-full bg-gradient-to-r from-pink-600 to-violet-600 hover:from-pink-500 hover:to-violet-500 text-white font-semibold py-3 rounded-xl text-sm transition flex items-center justify-center gap-2">
+                    <i class="fas fa-wand-magic-sparkles"></i>生成圖片
+                </button>
+                <div id="imgStatus" class="hidden text-center py-2">
+                    <div class="inline-flex items-center gap-2 text-xs text-violet-300">
+                        <div class="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span id="imgStatusText">生成中...</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">快捷靈感</label>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <button onclick="setImgPrompt('一隻穿著太空衣的柴犬在月球上散步，背景是地球，電影級光影，超寫實')" class="text-left p-2 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition text-[10px] text-slate-400">🐕 太空柴犬</button>
+                        <button onclick="setImgPrompt('賽博朋克城市夜景，霓虹燈倒映在雨水中，飛行汽車穿梭，8K超高清')" class="text-left p-2 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition text-[10px] text-slate-400">🌃 賽博城市</button>
+                        <button onclick="setImgPrompt('水墨畫風格的台灣山脈，雲霧繚繞，日出金光，傳統東方美學')" class="text-left p-2 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition text-[10px] text-slate-400">🏔️ 水墨山脈</button>
+                        <button onclick="setImgPrompt('可愛的貓咪坐在咖啡杯裡，周圍是甜點和花朵，柔和的粉色調，插畫風格')" class="text-left p-2 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition text-[10px] text-slate-400">🐱 杯中貓咪</button>
+                        <button onclick="setImgPrompt('未來科技實驗室，全息投影顯示DNA結構，科學家在工作，藍色冷光調')" class="text-left p-2 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition text-[10px] text-slate-400">🔬 科技實驗室</button>
+                        <button onclick="setImgPrompt('奇幻森林中的精靈城堡，巨大的發光蘑菇，螢火蟲飛舞，魔幻寫實風格')" class="text-left p-2 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition text-[10px] text-slate-400">🏰 精靈城堡</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flex-1 flex items-center justify-center p-4 overflow-auto bg-slate-950">
+            <div id="imgEmpty" class="text-center fade-up">
+                <div class="text-5xl mb-3">🎨</div>
+                <h2 class="text-lg font-bold text-slate-300 mb-1">無限 AI 生圖</h2>
+                <p class="text-xs text-slate-500 max-w-xs">輸入描述或點擊靈感，免費生成無限張圖片</p>
+                <p class="text-[10px] text-slate-600 mt-2">DALL·E 3 · GPT Image · Flux · SDXL · Imagen 4 · Forge 本地</p>
+            </div>
+            <div id="imgResult" class="hidden max-w-full">
+                <div id="imgContainer" class="relative rounded-xl overflow-hidden shadow-2xl border border-slate-800"></div>
+                <div class="flex items-center justify-center gap-2 mt-3 flex-wrap">
+                    <button onclick="downloadCurrentImage()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs transition"><i class="fas fa-download mr-1"></i>下載</button>
+                    <button onclick="sendImgToI2V()" class="px-3 py-1.5 bg-violet-800 hover:bg-violet-700 rounded-lg text-xs transition"><i class="fas fa-photo-film mr-1"></i>轉影片</button>
+                    <button onclick="upscaleCurrentImage()" id="upscaleBtn" class="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 rounded-lg text-xs transition"><i class="fas fa-expand mr-1"></i>放大 2x</button>
+                    <button onclick="generateImage()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs transition"><i class="fas fa-rotate mr-1"></i>重新生成</button>
+                    <span id="imgMeta" class="text-[10px] text-slate-600 ml-2"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 圖片生影片 (Image-to-Video) ===== -->
+    <div id="panelImg2vid" class="flex-1 flex overflow-hidden hidden">
+        <div class="w-full lg:w-[380px] flex-shrink-0 flex flex-col border-r border-slate-800/60 overflow-y-auto">
+            <div class="p-3 space-y-3">
+                <!-- 上傳圖片區 -->
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">上傳參考圖片</label>
+                    <div id="i2vDropZone" class="drop-zone rounded-xl p-6 text-center cursor-pointer" onclick="document.getElementById('i2vFileInput').click()">
+                        <div id="i2vPreview" class="hidden">
+                            <img id="i2vPreviewImg" class="max-h-40 mx-auto rounded-lg" alt="">
+                            <p class="text-[10px] text-slate-400 mt-2">點擊更換圖片</p>
+                        </div>
+                        <div id="i2vPlaceholder">
+                            <i class="fas fa-cloud-arrow-up text-2xl text-slate-600 mb-2"></i>
+                            <p class="text-xs text-slate-500">拖放圖片或點擊上傳</p>
+                            <p class="text-[10px] text-slate-600 mt-1">支援 JPG / PNG / WebP</p>
+                        </div>
+                    </div>
+                    <input type="file" id="i2vFileInput" accept="image/*" class="hidden" onchange="handleI2VUpload(this)">
+                </div>
+                <!-- 動態描述 -->
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-wider">動態描述（可選）</label>
+                    <textarea id="i2vPrompt" rows="2" placeholder="描述你想要的動態效果，例如：鏡頭緩慢推進，頭髮隨風飄動..."
+                        class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition placeholder:text-slate-600"></textarea>
+                </div>
+                <!-- 模型 -->
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">模型</label>
+                    <div class="flex flex-wrap gap-1.5" id="i2vModels">
+                        <button onclick="selectI2VModel(this,'sora-2')" class="model-chip active px-2.5 py-1 rounded-lg text-[11px] border border-slate-700">Sora 2</button>
+                        <button onclick="selectI2VModel(this,'sora-2-pro')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">Sora 2 Pro</button>
+                        <button onclick="selectI2VModel(this,'kling-video/kolors-image-to-video')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-cyan-800 text-cyan-400 bg-cyan-950/20">Kling</button>
+                        <button onclick="selectI2VModel(this,'luma/ray-2-flash')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-cyan-800 text-cyan-400 bg-cyan-950/20">Luma Ray2</button>
+                        <button onclick="selectI2VModel(this,'minimax/image-to-video-01')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-cyan-800 text-cyan-400 bg-cyan-950/20">MiniMax</button>
+                        <button onclick="selectI2VModel(this,'wan-ai/wan2.1-i2v-480p')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-cyan-800 text-cyan-400 bg-cyan-950/20">Wan2.1</button>
+                        <span class="w-full h-0 border-t border-slate-800/50"></span>
+                        <button onclick="selectI2VModel(this,'__comfyui_vid__')" data-local="1" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-emerald-800 text-emerald-400 bg-emerald-950/30">
+                            <i class="fas fa-server mr-0.5"></i>ComfyUI 本地 <span class="text-[9px] opacity-60">0 token</span>
+                        </button>
+                    </div>
+                </div>
+                <!-- 時長 -->
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">時長</label>
+                    <div class="flex gap-1.5">
+                        <button onclick="selectI2VDur(this,4)" class="model-chip active px-3 py-1 rounded-lg text-[11px] border border-slate-700">4 秒</button>
+                        <button onclick="selectI2VDur(this,8)" class="model-chip px-3 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">8 秒</button>
+                        <button onclick="selectI2VDur(this,10)" class="model-chip px-3 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">10 秒</button>
+                    </div>
+                </div>
+                <!-- 解析度 -->
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">解析度</label>
+                    <div class="flex gap-1.5">
+                        <button onclick="selectI2VRes(this,'720p')" class="model-chip active px-3 py-1 rounded-lg text-[11px] border border-slate-700">720p</button>
+                        <button onclick="selectI2VRes(this,'1080p')" class="model-chip px-3 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">1080p</button>
+                    </div>
+                </div>
+                <button onclick="generateI2V()" id="i2vGenBtn"
+                    class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold py-3 rounded-xl text-sm transition flex items-center justify-center gap-2">
+                    <i class="fas fa-photo-film"></i>生成影片
+                </button>
+                <div id="i2vStatus" class="hidden text-center py-2">
+                    <div class="inline-flex items-center gap-2 text-xs text-cyan-300">
+                        <div class="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span id="i2vStatusText">影片生成中...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flex-1 flex items-center justify-center p-4 overflow-auto bg-slate-950">
+            <div id="i2vEmpty" class="text-center fade-up">
+                <div class="text-5xl mb-3">🎞️</div>
+                <h2 class="text-lg font-bold text-slate-300 mb-1">圖片生影片</h2>
+                <p class="text-xs text-slate-500 max-w-xs">上傳一張圖片，AI 讓它動起來</p>
+                <p class="text-[10px] text-slate-600 mt-2">Sora 2 · Kling · Luma Ray2 · MiniMax · Wan2.1</p>
+            </div>
+            <div id="i2vResult" class="hidden max-w-full w-full max-w-2xl">
+                <div id="i2vContainer" class="relative rounded-xl overflow-hidden shadow-2xl border border-slate-800 bg-black"></div>
+                <div class="flex items-center justify-center gap-2 mt-3">
+                    <button onclick="downloadI2V()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs transition"><i class="fas fa-download mr-1"></i>下載</button>
+                    <button onclick="generateI2V()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs transition"><i class="fas fa-rotate mr-1"></i>重新生成</button>
+                    <span id="i2vMeta" class="text-[10px] text-slate-600 ml-2"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 文字生影片 ===== -->
+    <div id="panelVideo" class="flex-1 flex overflow-hidden hidden">
+        <div class="w-full lg:w-[380px] flex-shrink-0 flex flex-col border-r border-slate-800/60 overflow-y-auto">
+            <div class="p-3 space-y-3">
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase tracking-wider">描述你想要的影片</label>
+                    <textarea id="vidPrompt" rows="3" placeholder="例如：日出時分，無人機飛越平靜的海面，金色陽光灑在波浪上..."
+                        class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/20 transition placeholder:text-slate-600"></textarea>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">模型</label>
+                    <div class="flex flex-wrap gap-1.5" id="vidModels">
+                        <button onclick="selectVidModel(this,'sora-2')" class="model-chip active px-2.5 py-1 rounded-lg text-[11px] border border-slate-700">Sora 2</button>
+                        <button onclick="selectVidModel(this,'sora-2-pro')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">Sora 2 Pro</button>
+                        <button onclick="selectVidModel(this,'luma/ray-2-flash')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-rose-800 text-rose-400 bg-rose-950/20">Luma Ray2</button>
+                        <button onclick="selectVidModel(this,'minimax/video-01')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-rose-800 text-rose-400 bg-rose-950/20">MiniMax</button>
+                        <button onclick="selectVidModel(this,'wan-ai/wan2.1-t2v-480p')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-rose-800 text-rose-400 bg-rose-950/20">Wan2.1</button>
+                        <button onclick="selectVidModel(this,'kling-video/kolors-text-to-video')" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-rose-800 text-rose-400 bg-rose-950/20">Kling</button>
+                        <span class="w-full h-0 border-t border-slate-800/50"></span>
+                        <button onclick="selectVidModel(this,'__comfyui_vid__')" data-local="1" class="model-chip px-2.5 py-1 rounded-lg text-[11px] border border-emerald-800 text-emerald-400 bg-emerald-950/30">
+                            <i class="fas fa-server mr-0.5"></i>ComfyUI 本地 <span class="text-[9px] opacity-60">0 token</span>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">時長</label>
+                    <div class="flex gap-1.5">
+                        <button onclick="selectVidDuration(this,4)" class="model-chip active px-3 py-1 rounded-lg text-[11px] border border-slate-700">4 秒</button>
+                        <button onclick="selectVidDuration(this,8)" class="model-chip px-3 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">8 秒</button>
+                        <button onclick="selectVidDuration(this,12)" class="model-chip px-3 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">12 秒</button>
+                        <button onclick="selectVidDuration(this,16)" class="model-chip px-3 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">16 秒</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">尺寸</label>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button onclick="selectVidSize(this,'1280x720')" class="model-chip active px-3 py-1 rounded-lg text-[11px] border border-slate-700">720p 橫</button>
+                        <button onclick="selectVidSize(this,'720x1280')" class="model-chip px-3 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">720p 直</button>
+                        <button onclick="selectVidSize(this,'1920x1080')" class="model-chip px-3 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">1080p 橫</button>
+                        <button onclick="selectVidSize(this,'1080x1920')" class="model-chip px-3 py-1 rounded-lg text-[11px] border border-slate-700 text-slate-400">1080p 直</button>
+                    </div>
+                </div>
+                <button onclick="generateVideo()" id="vidGenBtn"
+                    class="w-full bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-semibold py-3 rounded-xl text-sm transition flex items-center justify-center gap-2">
+                    <i class="fas fa-film"></i>生成影片
+                </button>
+                <div id="vidStatus" class="hidden text-center py-2">
+                    <div class="inline-flex items-center gap-2 text-xs text-pink-300">
+                        <div class="w-4 h-4 border-2 border-pink-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span id="vidStatusText">影片生成中（約 1-3 分鐘）...</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">快捷靈感</label>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <button onclick="setVidPrompt('日出時分無人機飛越平靜的海面，金色陽光灑在波浪上，電影級畫質')" class="text-left p-2 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition text-[10px] text-slate-400">🌅 海上日出</button>
+                        <button onclick="setVidPrompt('一隻狐狸在黃昏的雪地森林中奔跑，雪花飛舞，慢動作，電影感')" class="text-left p-2 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition text-[10px] text-slate-400">🦊 雪地狐狸</button>
+                        <button onclick="setVidPrompt('太空站窗外的地球緩慢旋轉，星星閃爍，寧靜的太空場景')" class="text-left p-2 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition text-[10px] text-slate-400">🌍 太空地球</button>
+                        <button onclick="setVidPrompt('繁忙的東京街頭夜景，霓虹燈閃爍，行人穿梭，縮時攝影風格')" class="text-left p-2 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition text-[10px] text-slate-400">🗼 東京夜景</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flex-1 flex items-center justify-center p-4 overflow-auto bg-slate-950">
+            <div id="vidEmpty" class="text-center fade-up">
+                <div class="text-5xl mb-3">🎬</div>
+                <h2 class="text-lg font-bold text-slate-300 mb-1">無限 AI 生影片</h2>
+                <p class="text-xs text-slate-500 max-w-xs">輸入描述，AI 生成電影級短片</p>
+                <p class="text-[10px] text-slate-600 mt-2">Sora 2 · Luma Ray2 · MiniMax · Wan2.1 · Kling · 最長 16s</p>
+            </div>
+            <div id="vidResult" class="hidden max-w-full w-full max-w-2xl">
+                <div id="vidContainer" class="relative rounded-xl overflow-hidden shadow-2xl border border-slate-800 bg-black"></div>
+                <div class="flex items-center justify-center gap-2 mt-3">
+                    <button onclick="downloadCurrentVideo()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs transition"><i class="fas fa-download mr-1"></i>下載</button>
+                    <button onclick="generateVideo()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs transition"><i class="fas fa-rotate mr-1"></i>重新生成</button>
+                    <span id="vidMeta" class="text-[10px] text-slate-600 ml-2"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 作品庫 ===== -->
+    <div id="panelGallery" class="flex-1 overflow-y-auto p-4 hidden">
+        <div class="max-w-6xl mx-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm font-bold text-slate-300">我的作品</h2>
+                <button onclick="clearGallery()" class="text-[10px] text-red-400 hover:text-red-300 transition">清空全部</button>
+            </div>
+            <div id="galleryGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                <div class="text-center text-xs text-slate-600 col-span-full py-12">尚無作品，去生成一些吧！</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── 狀態 ──
+let currentImgModel = 'dall-e-3';
+let currentImgSize = '1024x1024';
+let currentVidModel = 'sora-2';
+let currentVidDuration = 4;
+let currentVidSize = '1280x720';
+let currentI2VModel = 'sora-2';
+let currentI2VDur = 4;
+let currentI2VRes = '720p';
+let currentImgElement = null;
+let currentVidElement = null;
+let currentI2VElement = null;
+let i2vImageDataUrl = null;
+let refImageBase64 = null;
+let refImageMime = null;
+let batchCount = 1;
+let localMode = localStorage.getItem('ai_studio_local') === 'true';
+let comfyuiVideoSupport = { animatediff: false, svd: false, wan: false, vhs: false };
+let nsfwMode = localStorage.getItem('ai_studio_nsfw') === 'true';
+let comfyuiOnline = false;
+let comfyuiModels = [];
+let forgeOnline = false;
+let forgeModels = [];
+let forgeCurrentModel = '';
+let gallery = JSON.parse(localStorage.getItem('ai_studio_gallery') || '[]');
+let todayCount = parseInt(localStorage.getItem('ai_studio_today_' + new Date().toDateString()) || '0');
+document.getElementById('todayCount').textContent = todayCount;
+
+// ── 訂閱/付費牆系統 ──
+let userPlan = 'creator_free'; // creator_free | creator_basic | creator_pro | creator_ultra
+let planLimits = { creator_free: {images:20,videos:5,nsfw:false,local:false}, creator_basic: {images:200,videos:30,nsfw:false,local:false}, creator_pro: {images:-1,videos:100,nsfw:true,local:true}, creator_ultra: {images:-1,videos:-1,nsfw:true,local:true} };
+let monthlyImageCount = 0;
+let monthlyVideoCount = 0;
+
+async function checkSubscription() {
+    try {
+        const token = localStorage.getItem('jarvis_token');
+        if (!token) { updatePlanUI('creator_free'); return; }
+        const r = await fetch('/api/revenue/subscriptions?product=ai_creator', { headers: { 'Authorization': 'Bearer ' + token } });
+        const d = await r.json();
+        if (d.ok && d.subscriptions && d.subscriptions.length > 0) {
+            const sub = d.subscriptions[d.subscriptions.length - 1];
+            userPlan = sub.plan;
+        }
+    } catch(e) { console.log('Subscription check failed:', e); }
+    updatePlanUI(userPlan);
+}
+
+function updatePlanUI(plan) {
+    const badge = document.getElementById('planBadge');
+    const upgradeBtn = document.getElementById('upgradeBtn');
+    const names = { creator_free:'免費體驗', creator_basic:'基礎版', creator_pro:'專業版', creator_ultra:'無限版' };
+    const colors = { creator_free:'text-slate-400', creator_basic:'text-emerald-400', creator_pro:'text-pink-400', creator_ultra:'text-violet-400' };
+    badge.textContent = names[plan] || '免費體驗';
+    badge.className = colors[plan] || 'text-slate-400';
+    upgradeBtn.classList.toggle('hidden', plan === 'creator_ultra');
+}
+
+function canGenerate(type) {
+    const limits = planLimits[userPlan] || planLimits.creator_free;
+    if (type === 'image' && limits.images !== -1 && todayCount >= Math.ceil(limits.images / 30)) {
+        showPaywall('今日圖片額度已用完', `您的 ${userPlan === 'creator_free' ? '免費' : '基礎'}方案每日可生成約 ${Math.ceil(limits.images/30)} 張圖片。升級以獲得更多額度！`);
+        return false;
+    }
+    if (type === 'video' && limits.videos !== -1 && monthlyVideoCount >= limits.videos) {
+        showPaywall('本月影片額度已用完', `升級到專業版以獲得更多影片生成額度！`);
+        return false;
+    }
+    return true;
+}
+
+function canUseNSFW() {
+    const limits = planLimits[userPlan] || planLimits.creator_free;
+    if (!limits.nsfw) {
+        showPaywall('無審查模式需要專業版', '升級到專業版（$799/月）即可解鎖無審查模式，使用 Forge 本地無限制生圖。');
+        return false;
+    }
+    return true;
+}
+
+function canUseLocal() {
+    // 本地模型使用自己的 GPU，不消耗任何 token，永遠允許
+    return true;
+}
+
+function showPaywall(title, desc) {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-black/70 z-[999] flex items-center justify-center p-4';
+    overlay.innerHTML = `<div class="glass rounded-2xl p-6 max-w-md w-full text-center">
+        <div class="text-4xl mb-3">🔒</div>
+        <h3 class="text-lg font-bold mb-2">${title}</h3>
+        <p class="text-sm text-slate-400 mb-4">${desc}</p>
+        <div class="flex gap-2 justify-center">
+            <a href="/payment" class="bg-gradient-to-r from-pink-600 to-violet-600 hover:from-pink-500 hover:to-violet-500 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition">升級方案</a>
+            <button onclick="this.closest('.fixed').remove()" class="bg-slate-800 hover:bg-slate-700 px-6 py-2.5 rounded-xl text-sm transition">稍後</button>
+        </div>
+        <div class="mt-4 grid grid-cols-3 gap-2 text-[10px]">
+            <div class="p-2 bg-slate-900/50 rounded-lg"><div class="text-pink-400 font-bold">基礎 $299</div><div class="text-slate-500">200 圖/月</div></div>
+            <div class="p-2 bg-pink-950/30 rounded-lg border border-pink-900/30"><div class="text-pink-400 font-bold">專業 $799</div><div class="text-slate-500">無限+NSFW</div></div>
+            <div class="p-2 bg-violet-950/30 rounded-lg border border-violet-900/30"><div class="text-violet-400 font-bold">無限 $1,999</div><div class="text-slate-500">全部無限</div></div>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+checkSubscription();
+
+// ── 成人模式 ──
+function toggleNSFW() {
+    if (!nsfwMode && !canUseNSFW()) return;
+    nsfwMode = !nsfwMode;
+    localStorage.setItem('ai_studio_nsfw', nsfwMode);
+    updateNSFWUI();
+}
+function updateNSFWUI() {
+    const tog = document.getElementById('nsfwToggle');
+    const hint = document.getElementById('nsfwModelsHint');
+    const chips = document.querySelectorAll('#imgModels .model-chip');
+    if (nsfwMode) {
+        tog.classList.remove('off'); tog.classList.add('on');
+        hint.classList.remove('hidden');
+        // 灰掉不支援的模型，高亮 Together 模型
+        chips.forEach(c => {
+            if (!c.dataset.together) {
+                c.style.opacity = '0.35';
+                c.style.pointerEvents = 'none';
+            } else {
+                c.style.opacity = ''; c.style.pointerEvents = '';
+            }
+        });
+        // 自動切換到 Flux Schnell（如果當前選的不支援）
+        const cur = document.querySelector('#imgModels .model-chip.active');
+        if (cur && !cur.dataset.together) {
+            const fluxBtn = document.querySelector('#imgModels .model-chip[data-together]');
+            if (fluxBtn) fluxBtn.click();
+        }
+    } else {
+        tog.classList.remove('on'); tog.classList.add('off');
+        hint.classList.add('hidden');
+        chips.forEach(c => { c.style.opacity = ''; c.style.pointerEvents = ''; });
+    }
+}
+updateNSFWUI();
+
+// ── 本地模式 ──
+function toggleLocalMode() {
+    localMode = !localMode;
+    localStorage.setItem('ai_studio_local', localMode);
+    updateLocalModeUI();
+}
+function updateLocalModeUI() {
+    const tog = document.getElementById('localToggle');
+    const label = document.getElementById('localModeLabel');
+    if (localMode) {
+        tog.classList.remove('off'); tog.classList.add('on');
+        tog.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        label.textContent = '🖥️ 本地';
+        label.className = 'text-[10px] text-emerald-400 font-bold';
+        // 自動選擇 Forge（如果在線）或 ComfyUI
+        if (forgeOnline) {
+            const forgeBtn = document.querySelector('#imgModels [data-local][onclick*="__forge__"]');
+            if (forgeBtn) forgeBtn.click();
+        } else if (comfyuiOnline) {
+            const comfyBtn = document.querySelector('#imgModels [data-local][onclick*="__comfyui__"]');
+            if (comfyBtn) comfyBtn.click();
+        }
+        // 灰掉雲端模型
+        document.querySelectorAll('#imgModels .model-chip:not([data-local])').forEach(c => {
+            c.style.opacity = '0.3'; c.style.pointerEvents = 'none';
+        });
+        document.querySelectorAll('#imgModels .model-chip[data-local]').forEach(c => {
+            c.style.opacity = ''; c.style.pointerEvents = '';
+        });
+    } else {
+        tog.classList.remove('on'); tog.classList.add('off');
+        tog.style.background = '';
+        label.textContent = '☁️ 雲端';
+        label.className = 'text-[10px] text-slate-500';
+        // 恢復所有模型
+        document.querySelectorAll('#imgModels .model-chip').forEach(c => {
+            c.style.opacity = ''; c.style.pointerEvents = '';
+        });
+    }
+}
+updateLocalModeUI();
+
+// 檢查 ComfyUI 影片支援
+async function checkComfyUIVideo() {
+    try {
+        const r = await fetch('/api/comfyui/video-status');
+        const d = await r.json();
+        comfyuiVideoSupport = d;
+    } catch { comfyuiVideoSupport = { online: false, animatediff: false, svd: false, wan: false, vhs: false }; }
+}
+checkComfyUIVideo();
+
+// 智慧翻譯（Groq 70B → Gemini → Grok → Ollama fallback）
+async function translatePromptLocal(prompt) {
+    try {
+        const r = await fetch('/api/ai/translate-prompt', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ prompt, local_only: localMode })
+        });
+        const d = await r.json();
+        if (d.ok && d.translated) {
+            const provider = d.provider || '';
+            const stxt = document.getElementById('imgStatusText');
+            if (stxt && provider && provider !== 'none') stxt.textContent = `[${provider}] 翻譯完成 → 生成中...`;
+            return d.translated;
+        }
+    } catch {}
+    return prompt; // fallback: 原文
+}
+
+// 本地 ComfyUI 影片生成
+async function generateLocalVideo(prompt, opts = {}) {
+    const r = await fetch('/api/comfyui/generate-video', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+            prompt,
+            width: opts.width || 512,
+            height: opts.height || 512,
+            frames: opts.frames || 16,
+            fps: opts.fps || 8,
+            steps: opts.steps || 20,
+            cfg: opts.cfg || 7.0,
+            init_image: opts.init_image || null,
+        })
+    });
+    const d = await r.json();
+    if (d.error) {
+        let errMsg = d.error;
+        if (d.install_guide) errMsg += '\n\n' + d.install_guide;
+        if (d.download_url) errMsg += '\n下載: ' + d.download_url;
+        if (d.url) errMsg += '\n連線位址: ' + d.url;
+        throw new Error(errMsg);
+    }
+    return d.video; // data:video/mp4;base64,... or data:image/gif;base64,...
+}
+
+// ── 分頁切換 ──
+const TABS = ['image','img2vid','video','gallery'];
+function switchTab(tab) {
+    TABS.forEach(t => {
+        const panelId = 'panel' + t.charAt(0).toUpperCase() + t.slice(1);
+        const tabId = 'tab' + t.charAt(0).toUpperCase() + t.slice(1);
+        document.getElementById(panelId).classList.toggle('hidden', t !== tab);
+        const el = document.getElementById(tabId);
+        if (t === tab) { el.classList.add('tab-active'); el.classList.remove('text-slate-400'); }
+        else { el.classList.remove('tab-active'); el.classList.add('text-slate-400'); }
+    });
+    if (tab === 'gallery') renderGallery();
+}
+
+// ── 模型選擇 ──
+function selectChip(containerId, btn) {
+    document.querySelectorAll('#' + containerId + ' .model-chip').forEach(b => { b.classList.remove('active'); b.classList.add('text-slate-400'); });
+    btn.classList.add('active'); btn.classList.remove('text-slate-400');
+}
+function selectImgModel(btn, model) { currentImgModel = model; selectChip('imgModels', btn); }
+function selectImgSize(btn, size) { currentImgSize = size; btn.parentElement.querySelectorAll('.model-chip').forEach(b => { b.classList.remove('active'); b.classList.add('text-slate-400'); }); btn.classList.add('active'); btn.classList.remove('text-slate-400'); }
+function selectVidModel(btn, model) { currentVidModel = model; selectChip('vidModels', btn); }
+function selectI2VModel(btn, model) { currentI2VModel = model; selectChip('i2vModels', btn); }
+function selectVidDuration(btn, dur) { currentVidDuration = dur; btn.parentElement.querySelectorAll('.model-chip').forEach(b => { b.classList.remove('active'); b.classList.add('text-slate-400'); }); btn.classList.add('active'); btn.classList.remove('text-slate-400'); }
+function selectVidSize(btn, size) { currentVidSize = size; btn.parentElement.querySelectorAll('.model-chip').forEach(b => { b.classList.remove('active'); b.classList.add('text-slate-400'); }); btn.classList.add('active'); btn.classList.remove('text-slate-400'); }
+function selectI2VDur(btn, dur) { currentI2VDur = dur; btn.parentElement.querySelectorAll('.model-chip').forEach(b => { b.classList.remove('active'); b.classList.add('text-slate-400'); }); btn.classList.add('active'); btn.classList.remove('text-slate-400'); }
+function selectI2VRes(btn, res) { currentI2VRes = res; btn.parentElement.querySelectorAll('.model-chip').forEach(b => { b.classList.remove('active'); b.classList.add('text-slate-400'); }); btn.classList.add('active'); btn.classList.remove('text-slate-400'); }
+function setBatchCount(n) { batchCount = n; [1,2,4].forEach(v => { const el = document.getElementById('batch'+v); if(el){ if(v===n){el.classList.add('active');el.classList.remove('text-slate-400');}else{el.classList.remove('active');el.classList.add('text-slate-400');} } }); }
+
+// ── AI 提示詞增強（智慧路由：Groq 70B → Gemini → Grok → Ollama） ──
+async function enhancePrompt() {
+    const prompt = document.getElementById('imgPrompt').value.trim();
+    if (!prompt) { alert('請先輸入描述'); return; }
+    const btn = document.getElementById('enhanceBtn');
+    const style = document.getElementById('enhanceStyle').value;
+    btn.disabled = true; btn.innerHTML = '<div class="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>增強中...';
+    try {
+        const r = await fetch('/api/ai/enhance-prompt', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ prompt, style, local_only: localMode })
+        });
+        const d = await r.json();
+        if (d.ok && d.enhanced) {
+            document.getElementById('imgPrompt').value = d.enhanced;
+            document.getElementById('imgPrompt').style.borderColor = 'rgba(168,85,247,0.5)';
+            setTimeout(() => document.getElementById('imgPrompt').style.borderColor = '', 2000);
+            // 顯示使用的 AI 提供者
+            const provider = d.provider || 'AI';
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-magic"></i>✅ ${provider}`;
+            setTimeout(() => { btn.innerHTML = '<i class="fas fa-magic"></i>AI 增強 <span class="text-[9px] text-violet-400 opacity-70">智慧路由</span>'; }, 3000);
+            return;
+        } else {
+            alert('增強失敗：' + (d.error || '未知錯誤'));
+        }
+    } catch(e) { alert('AI 增強服務不可用'); }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic"></i>AI 增強 <span class="text-[9px] text-violet-400 opacity-70">智慧路由</span>';
+}
+
+// ── 快捷填入 ──
+function setImgPrompt(p) { document.getElementById('imgPrompt').value = p; }
+function setVidPrompt(p) { document.getElementById('vidPrompt').value = p; }
+
+// ── 參考圖上傳 ──
+function handleRefUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    refImageMime = file.type || 'image/png';
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        refImageBase64 = dataUrl.split(',')[1];
+        document.getElementById('refPreviewImg').src = dataUrl;
+        document.getElementById('refPreview').classList.remove('hidden');
+        document.getElementById('refPlaceholder').classList.add('hidden');
+        document.getElementById('refDropZone').classList.add('has-image');
+        document.getElementById('refStrengthWrap').classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+}
+function clearRefImage() {
+    refImageBase64 = null; refImageMime = null;
+    document.getElementById('refPreview').classList.add('hidden');
+    document.getElementById('refPlaceholder').classList.remove('hidden');
+    document.getElementById('refDropZone').classList.remove('has-image');
+    document.getElementById('refStrengthWrap').classList.add('hidden');
+    document.getElementById('refFileInput').value = '';
+}
+(function() {
+    const rdz = document.getElementById('refDropZone');
+    if (!rdz) return;
+    rdz.addEventListener('dragover', e => { e.preventDefault(); rdz.classList.add('dragover'); });
+    rdz.addEventListener('dragleave', () => rdz.classList.remove('dragover'));
+    rdz.addEventListener('drop', e => {
+        e.preventDefault(); rdz.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const dt = new DataTransfer(); dt.items.add(file);
+            document.getElementById('refFileInput').files = dt.files;
+            handleRefUpload(document.getElementById('refFileInput'));
+        }
+    });
+})();
+
+// ── 圖片生影片：上傳處理 ──
+function handleI2VUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        i2vImageDataUrl = e.target.result;
+        document.getElementById('i2vPreviewImg').src = i2vImageDataUrl;
+        document.getElementById('i2vPreview').classList.remove('hidden');
+        document.getElementById('i2vPlaceholder').classList.add('hidden');
+        document.getElementById('i2vDropZone').classList.add('has-image');
+    };
+    reader.readAsDataURL(file);
+}
+// 拖放
+const dz = document.getElementById('i2vDropZone');
+if (dz) {
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+    dz.addEventListener('drop', e => {
+        e.preventDefault(); dz.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const dt = new DataTransfer(); dt.items.add(file);
+            document.getElementById('i2vFileInput').files = dt.files;
+            handleI2VUpload(document.getElementById('i2vFileInput'));
+        }
+    });
+}
+
+// ── 從生圖結果直接轉影片 ──
+function sendImgToI2V() {
+    if (!currentImgElement || !currentImgElement.src) return;
+    i2vImageDataUrl = currentImgElement.src;
+    document.getElementById('i2vPreviewImg').src = i2vImageDataUrl;
+    document.getElementById('i2vPreview').classList.remove('hidden');
+    document.getElementById('i2vPlaceholder').classList.add('hidden');
+    document.getElementById('i2vDropZone').classList.add('has-image');
+    switchTab('img2vid');
+}
+
+// ── ComfyUI 狀態檢查 ──
+async function checkComfyUI() {
+    try {
+        const r = await fetch('/api/comfyui/status');
+        const d = await r.json();
+        comfyuiOnline = d.online;
+        comfyuiModels = d.models || [];
+        const dot = document.getElementById('comfyuiDot');
+        if (dot) dot.className = 'inline-block w-1.5 h-1.5 rounded-full ml-0.5 ' + (comfyuiOnline ? 'bg-emerald-400' : 'bg-red-500');
+    } catch { comfyuiOnline = false; }
+}
+checkComfyUI();
+setInterval(checkComfyUI, 30000);
+
+// ── Forge Chroma 狀態檢查 ──
+async function checkForge() {
+    try {
+        const r = await fetch('/api/forge/status');
+        const d = await r.json();
+        forgeOnline = d.online;
+        forgeModels = d.models || [];
+        forgeCurrentModel = d.current_model || '';
+        const dot = document.getElementById('forgeDot');
+        if (dot) dot.className = 'inline-block w-1.5 h-1.5 rounded-full ml-0.5 ' + (forgeOnline ? 'bg-amber-400' : 'bg-red-500');
+    } catch { forgeOnline = false; }
+}
+checkForge();
+setInterval(checkForge, 30000);
+
+// ── Forge Chroma 生圖 ──
+async function generateViaForge(prompt, opts = {}) {
+    // 自動翻譯中文 prompt（Forge 用英文效果更好）
+    const hasChinese = /[\u4e00-\u9fff]/.test(prompt);
+    if (hasChinese) {
+        const stxt = document.getElementById('imgStatusText');
+        if (stxt) stxt.textContent = '[本地 Ollama] 翻譯中文 prompt → 英文...';
+        prompt = await translatePromptLocal(prompt);
+    }
+    const [w, h] = currentImgSize.split('x').map(Number);
+    const neg = document.getElementById('imgNegPrompt')?.value || 'blurry, low quality, distorted, watermark, text, ugly, deformed';
+    const steps = parseInt(document.getElementById('imgSteps')?.value || '25');
+    const cfg = parseFloat(document.getElementById('imgCfg')?.value || '7');
+    const hasRef = !!refImageBase64;
+
+    // img2img 模式（有參考圖時）
+    if (hasRef) {
+        const strength = parseFloat(document.getElementById('refStrength')?.value || '0.7');
+        const body = {
+            prompt, negative_prompt: neg,
+            init_image: refImageBase64,
+            denoising_strength: strength,
+            width: w, height: h, steps, cfg_scale: cfg,
+            sampler_name: 'Euler a', seed: -1,
+        };
+        const r = await fetch('/api/forge/img2img', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        const d = await r.json();
+        if (d.error) throw new Error(d.error);
+        return d.image;
+    }
+
+    // 批次模式
+    if (batchCount > 1) {
+        const body = {
+            prompt, negative_prompt: neg,
+            width: w, height: h, steps, cfg_scale: cfg,
+            sampler_name: 'Euler a', batch_size: batchCount,
+        };
+        const r = await fetch('/api/forge/batch', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        const d = await r.json();
+        if (d.error) throw new Error(d.error);
+        return d.images; // 返回陣列
+    }
+
+    // 標準 txt2img
+    const body = {
+        prompt, negative_prompt: neg,
+        width: w, height: h, steps, cfg_scale: cfg,
+        sampler_name: 'Euler a', seed: -1,
+    };
+    const r = await fetch('/api/forge/generate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    return d.image;
+}
+
+// ── 本地 ComfyUI 生圖 ──
+async function generateViaComfyUI(prompt) {
+    // 自動翻譯中文 prompt
+    const hasChinese = /[\u4e00-\u9fff]/.test(prompt);
+    if (hasChinese) {
+        const stxt = document.getElementById('imgStatusText');
+        if (stxt) stxt.textContent = '[本地 Ollama] 翻譯中文 prompt → 英文...';
+        prompt = await translatePromptLocal(prompt);
+    }
+    const ckpt = comfyuiModels.length > 0 ? comfyuiModels[0] : 'v1-5-pruned-emaonly.safetensors';
+    const isFlux = ckpt.toLowerCase().includes('flux');
+    const body = {
+        prompt,
+        checkpoint: ckpt,
+        width: isFlux ? 1024 : 512,
+        height: isFlux ? 1024 : 512,
+        steps: isFlux ? 4 : 20,
+        cfg: isFlux ? 1.0 : 7.0,
+        sampler: isFlux ? 'euler' : 'euler_ancestral',
+    };
+    const r = await fetch('/api/comfyui/generate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    return d.image;
+}
+
+// ── 文字生圖 ──
+async function generateImage() {
+    const prompt = document.getElementById('imgPrompt').value.trim();
+    if (!prompt) return;
+    const isLocalCheck = currentImgModel === '__comfyui__' || currentImgModel === '__forge__';
+    // 本地模型不受付費牆限制（使用自己的 GPU，0 token）
+    if (!isLocalCheck && !localMode) {
+        if (!canGenerate('image')) return;
+    }
+    const btn = document.getElementById('imgGenBtn');
+    const status = document.getElementById('imgStatus');
+    const stxt = document.getElementById('imgStatusText');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>生成中...';
+    status.classList.remove('hidden');
+
+    const isLocal = currentImgModel === '__comfyui__' || currentImgModel === '__forge__';
+    const isForge = currentImgModel === '__forge__';
+    const hasRef = !!refImageBase64;
+    const t0 = Date.now();
+
+    try {
+        let imgSrc;
+        let isBatch = false;
+        if (isForge) {
+            if (!forgeOnline) throw new Error('Forge Chroma 未啟動（請先開啟 Forge）');
+            const mName = forgeCurrentModel || forgeModels[0] || 'NoobAI-XL';
+            const modeStr = hasRef ? '[img2img] ' : (batchCount > 1 ? `[批次 ×${batchCount}] ` : '');
+            stxt.textContent = `[本地 Forge] ${modeStr}使用 ${mName} 生成中...`;
+            const result = await generateViaForge(prompt);
+            if (Array.isArray(result)) {
+                isBatch = true;
+                imgSrc = result;
+            } else {
+                imgSrc = result;
+            }
+        } else if (isLocal) {
+            if (!comfyuiOnline) throw new Error('ComfyUI 未啟動（請先開啟 ComfyUI）');
+            const ckptName = comfyuiModels[0] || 'SD 1.5';
+            stxt.textContent = `[本地 ComfyUI] 使用 ${ckptName} 生成中...`;
+            imgSrc = await generateViaComfyUI(prompt);
+        } else {
+            const opts = { model: currentImgModel };
+            if (nsfwMode) opts.disable_safety_checker = true;
+            // 傳遞尺寸給雲端模型
+            const [imgW, imgH] = currentImgSize.split('x').map(Number);
+            if (imgW && imgH) { opts.width = imgW; opts.height = imgH; }
+            if (hasRef) {
+                const strength = parseFloat(document.getElementById('refStrength').value);
+                const m = currentImgModel.toLowerCase();
+                if (m.includes('gemini') || m.includes('imagen')) {
+                    opts.provider = 'gemini';
+                    if (!m.includes('gemini')) opts.model = 'gemini-2.5-flash-image-preview';
+                    opts.input_image = refImageBase64;
+                    opts.input_image_mime_type = refImageMime || 'image/png';
+                } else if (m.includes('gpt-image') || m === 'dall-e-3') {
+                    opts.provider = 'openai-image-generation';
+                    if (!m.includes('gpt-image')) opts.model = 'gpt-image-1';
+                    opts.image = refImageBase64;
+                } else {
+                    opts.provider = 'together';
+                    opts.image_base64 = refImageBase64;
+                    opts.prompt_strength = strength;
+                }
+            }
+            const modeLabel = nsfwMode ? '[無審查] ' : '';
+            const refLabel = hasRef ? '[參考圖] ' : '';
+            stxt.textContent = `${modeLabel}${refLabel}使用 ${currentImgModel} 生成中...`;
+            const imgEl = await puter.ai.txt2img(prompt, opts);
+            imgSrc = imgEl.src;
+        }
+
+        const ms = Date.now() - t0;
+        document.getElementById('imgEmpty').classList.add('hidden');
+        document.getElementById('imgResult').classList.remove('hidden');
+        const container = document.getElementById('imgContainer');
+        container.innerHTML = '';
+
+        if (isBatch && Array.isArray(imgSrc)) {
+            // 批次結果：網格顯示
+            container.style.display = 'grid';
+            container.style.gridTemplateColumns = imgSrc.length <= 2 ? 'repeat(2,1fr)' : 'repeat(2,1fr)';
+            container.style.gap = '4px';
+            imgSrc.forEach((src, i) => {
+                const img = new Image();
+                img.src = src;
+                img.style.width = '100%';
+                img.style.maxHeight = '35vh';
+                img.style.objectFit = 'contain';
+                img.style.display = 'block';
+                img.style.cursor = 'pointer';
+                img.title = `點擊選取第 ${i+1} 張`;
+                img.onclick = () => { currentImgElement = img; document.querySelectorAll('#imgContainer img').forEach(x => x.style.outline=''); img.style.outline='2px solid #a855f7'; };
+                container.appendChild(img);
+                if (i === 0) currentImgElement = img;
+                addToGallery({ type: 'image', prompt, model: `Forge batch ${i+1}/${imgSrc.length}`, src, time: new Date().toISOString(), duration_ms: ms });
+            });
+        } else {
+            container.style.display = '';
+            container.style.gridTemplateColumns = '';
+            container.style.gap = '';
+            const img = new Image();
+            img.src = imgSrc;
+            img.style.maxWidth = '100%';
+            img.style.maxHeight = '70vh';
+            img.style.display = 'block';
+            container.appendChild(img);
+            currentImgElement = img;
+            addToGallery({ type: 'image', prompt, model: isForge ? `Forge ${forgeCurrentModel||'Local'}` : isLocal ? 'ComfyUI' : currentImgModel, src: imgSrc, time: new Date().toISOString(), duration_ms: ms });
+        }
+
+        const modelName = isForge ? `Forge ${forgeCurrentModel || 'Local'}` : isLocal ? `ComfyUI` : currentImgModel;
+        const label = `${modelName}${hasRef ? ' [參考圖]' : ''}${isBatch ? ` [×${imgSrc.length}]` : ''}${nsfwMode && !isLocal ? ' [無審查]' : ''}`;
+        document.getElementById('imgMeta').textContent = `${label} · ${currentImgSize} · ${(ms/1000).toFixed(1)}s`;
+        stxt.textContent = `✅ 完成（${(ms/1000).toFixed(1)}s）`;
+        incrementCount();
+    } catch (e) {
+        stxt.textContent = '❌ ' + (e.message || '生成失敗');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i>生成圖片';
+    setTimeout(() => status.classList.add('hidden'), 3000);
+}
+
+// ── 圖片放大 (Upscale) ──
+async function upscaleCurrentImage() {
+    if (!currentImgElement || !currentImgElement.src) { alert('請先生成一張圖片'); return; }
+    const btn = document.getElementById('upscaleBtn');
+    btn.disabled = true; btn.innerHTML = '<div class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>放大中...';
+    try {
+        const r = await fetch('/api/forge/upscale', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ image: currentImgElement.src, upscaler: 'R-ESRGAN 4x+', scale: 2 })
+        });
+        const d = await r.json();
+        if (d.error) throw new Error(d.error);
+        currentImgElement.src = d.image;
+        document.getElementById('imgMeta').textContent += ' → 2x 放大';
+        addToGallery({ type: 'image', prompt: '[Upscale 2x]', model: 'R-ESRGAN 4x+', src: d.image, time: new Date().toISOString(), duration_ms: 0 });
+    } catch(e) {
+        alert('放大失敗：' + (e.message || '需要 Forge 運行中'));
+    }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-expand mr-1"></i>放大 2x';
+}
+
+// ── 圖片生影片 ──
+async function generateI2V() {
+    if (!i2vImageDataUrl) { alert('請先上傳一張圖片'); return; }
+    const isLocalVid = currentI2VModel === '__comfyui_vid__' || localMode;
+    if (!isLocalVid) { if (!canGenerate('video')) return; }
+    let prompt = document.getElementById('i2vPrompt').value.trim() || 'smooth cinematic motion';
+    const btn = document.getElementById('i2vGenBtn');
+    const status = document.getElementById('i2vStatus');
+    const stxt = document.getElementById('i2vStatusText');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>生成中...';
+    status.classList.remove('hidden');
+
+    const t0 = Date.now();
+    try {
+        if (isLocalVid) {
+            // 本地 ComfyUI 影片生成（0 token）
+            if (/[\u4e00-\u9fff]/.test(prompt)) {
+                stxt.textContent = '[本地 Ollama] 翻譯 prompt...';
+                prompt = await translatePromptLocal(prompt);
+            }
+            stxt.textContent = '[本地 ComfyUI] AnimateDiff 影片生成中（0 token・約 2-10 分鐘）...';
+            const fps = 8;
+            const frames = currentI2VDur * fps;
+            const vidDataUrl = await generateLocalVideo(prompt, { width: 512, height: 512, frames, fps, init_image: i2vImageDataUrl });
+            const ms = Date.now() - t0;
+            document.getElementById('i2vEmpty').classList.add('hidden');
+            document.getElementById('i2vResult').classList.remove('hidden');
+            const container = document.getElementById('i2vContainer');
+            container.innerHTML = '';
+            const isGif = vidDataUrl.startsWith('data:image/gif');
+            if (isGif) {
+                const img = new Image(); img.src = vidDataUrl; img.style.width = '100%'; img.style.maxHeight = '70vh'; img.style.display = 'block';
+                container.appendChild(img); currentI2VElement = img;
+            } else {
+                const vid = document.createElement('video'); vid.src = vidDataUrl; vid.style.width = '100%'; vid.style.maxHeight = '70vh'; vid.style.display = 'block'; vid.controls = true; vid.autoplay = true; vid.loop = true;
+                container.appendChild(vid); currentI2VElement = vid;
+            }
+            document.getElementById('i2vMeta').textContent = `ComfyUI 本地 · ${frames} frames · 0 token · ${(ms/1000).toFixed(1)}s`;
+            stxt.textContent = `✅ 本地完成（${(ms/1000).toFixed(1)}s・0 token）`;
+            addToGallery({ type: 'video', prompt: '[I2V 本地] ' + prompt, model: 'ComfyUI Local', src: vidDataUrl, time: new Date().toISOString(), duration_ms: ms });
+            incrementCount();
+        } else {
+            // 雲端模型
+            const modelShort = currentI2VModel.includes('/') ? currentI2VModel.split('/').pop() : currentI2VModel;
+            stxt.textContent = `使用 ${modelShort} 圖片生影片中（${currentI2VRes}・${currentI2VDur}s・約 1-3 分鐘）...`;
+            const i2vOpts = { model: currentI2VModel, seconds: currentI2VDur, image: i2vImageDataUrl };
+            if (currentI2VRes === '1080p') { i2vOpts.size = '1920x1080'; }
+            const vidEl = await puter.ai.txt2vid(prompt, i2vOpts);
+            const ms = Date.now() - t0;
+            document.getElementById('i2vEmpty').classList.add('hidden');
+            document.getElementById('i2vResult').classList.remove('hidden');
+            const container = document.getElementById('i2vContainer');
+            container.innerHTML = '';
+            vidEl.style.width = '100%'; vidEl.style.maxHeight = '70vh'; vidEl.style.display = 'block'; vidEl.controls = true;
+            container.appendChild(vidEl); currentI2VElement = vidEl;
+            document.getElementById('i2vMeta').textContent = `${modelShort} · ${currentI2VRes} · ${currentI2VDur}s · ${(ms/1000).toFixed(1)}s`;
+            stxt.textContent = `✅ 完成（${(ms/1000).toFixed(1)}s）`;
+            addToGallery({ type: 'video', prompt: '[I2V] ' + prompt, model: modelShort, src: vidEl.src, time: new Date().toISOString(), duration_ms: ms });
+            incrementCount();
+        }
+    } catch (e) {
+        stxt.textContent = '❌ ' + (e.message || '生成失敗，請確認圖片格式');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-photo-film"></i>生成影片';
+    setTimeout(() => status.classList.add('hidden'), 5000);
+}
+
+// ── 文字生影片 ──
+async function generateVideo() {
+    let prompt = document.getElementById('vidPrompt').value.trim();
+    if (!prompt) return;
+    const isLocalVid = currentVidModel === '__comfyui_vid__' || localMode;
+    if (!isLocalVid) { if (!canGenerate('video')) return; }
+    const btn = document.getElementById('vidGenBtn');
+    const status = document.getElementById('vidStatus');
+    const stxt = document.getElementById('vidStatusText');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>生成中...';
+    status.classList.remove('hidden');
+    const t0 = Date.now();
+    try {
+        if (isLocalVid) {
+            // 本地 ComfyUI 影片生成（0 token）
+            if (/[\u4e00-\u9fff]/.test(prompt)) {
+                stxt.textContent = '[本地 Ollama] 翻譯 prompt...';
+                prompt = await translatePromptLocal(prompt);
+            }
+            stxt.textContent = '[本地 ComfyUI] AnimateDiff 影片生成中（0 token・約 2-10 分鐘）...';
+            const [vw, vh] = currentVidSize.split('x').map(Number);
+            const fps = 8;
+            const frames = Math.min(currentVidDuration * fps, 32); // AnimateDiff 最多 ~32 frames
+            const vidDataUrl = await generateLocalVideo(prompt, { width: Math.min(vw, 512), height: Math.min(vh, 512), frames, fps });
+            const ms = Date.now() - t0;
+            document.getElementById('vidEmpty').classList.add('hidden');
+            document.getElementById('vidResult').classList.remove('hidden');
+            const container = document.getElementById('vidContainer');
+            container.innerHTML = '';
+            const isGif = vidDataUrl.startsWith('data:image/gif');
+            if (isGif) {
+                const img = new Image(); img.src = vidDataUrl; img.style.width = '100%'; img.style.maxHeight = '70vh'; img.style.display = 'block';
+                container.appendChild(img); currentVidElement = img;
+            } else {
+                const vid = document.createElement('video'); vid.src = vidDataUrl; vid.style.width = '100%'; vid.style.maxHeight = '70vh'; vid.style.display = 'block'; vid.controls = true; vid.autoplay = true; vid.loop = true;
+                container.appendChild(vid); currentVidElement = vid;
+            }
+            document.getElementById('vidMeta').textContent = `ComfyUI 本地 · ${frames} frames · 0 token · ${(ms/1000).toFixed(1)}s`;
+            stxt.textContent = `✅ 本地完成（${(ms/1000).toFixed(1)}s・0 token）`;
+            addToGallery({ type: 'video', prompt, model: 'ComfyUI Local', src: vidDataUrl, time: new Date().toISOString(), duration_ms: ms });
+            incrementCount();
+        } else {
+            // 雲端模型
+            const vidModelShort = currentVidModel.includes('/') ? currentVidModel.split('/').pop() : currentVidModel;
+            stxt.textContent = `使用 ${vidModelShort} 生成中（${currentVidSize}・${currentVidDuration}s・約 1-3 分鐘）...`;
+            const vidEl = await puter.ai.txt2vid(prompt, { model: currentVidModel, seconds: currentVidDuration, size: currentVidSize });
+            const ms = Date.now() - t0;
+            document.getElementById('vidEmpty').classList.add('hidden');
+            document.getElementById('vidResult').classList.remove('hidden');
+            const container = document.getElementById('vidContainer');
+            container.innerHTML = '';
+            vidEl.style.width = '100%'; vidEl.style.maxHeight = '70vh'; vidEl.style.display = 'block'; vidEl.controls = true;
+            container.appendChild(vidEl); currentVidElement = vidEl;
+            document.getElementById('vidMeta').textContent = `${vidModelShort} · ${currentVidSize} · ${currentVidDuration}s · ${(ms/1000).toFixed(1)}s`;
+            stxt.textContent = `✅ 完成（${(ms/1000).toFixed(1)}s）`;
+            addToGallery({ type: 'video', prompt, model: vidModelShort, src: vidEl.src, time: new Date().toISOString(), duration_ms: ms });
+            incrementCount();
+        }
+    } catch (e) {
+        stxt.textContent = '❌ ' + (e.message || '生成失敗');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-film"></i>生成影片';
+    setTimeout(() => status.classList.add('hidden'), 5000);
+}
+
+// ── 下載 ──
+function downloadCurrentImage() {
+    if (!currentImgElement) return;
+    const a = document.createElement('a'); a.href = currentImgElement.src; a.download = 'ai-image-' + Date.now() + '.png'; a.click();
+}
+function downloadCurrentVideo() {
+    if (!currentVidElement) return;
+    const a = document.createElement('a'); a.href = currentVidElement.src; a.download = 'ai-video-' + Date.now() + '.mp4'; a.click();
+}
+function downloadI2V() {
+    if (!currentI2VElement) return;
+    const a = document.createElement('a'); a.href = currentI2VElement.src; a.download = 'ai-i2v-' + Date.now() + '.mp4'; a.click();
+}
+
+// ── 作品庫 ──
+function addToGallery(item) {
+    gallery.unshift(item);
+    if (gallery.length > 100) gallery = gallery.slice(0, 100);
+    localStorage.setItem('ai_studio_gallery', JSON.stringify(gallery));
+}
+function incrementCount() {
+    todayCount++;
+    document.getElementById('todayCount').textContent = todayCount;
+    localStorage.setItem('ai_studio_today_' + new Date().toDateString(), todayCount);
+}
+function renderGallery() {
+    const grid = document.getElementById('galleryGrid');
+    if (gallery.length === 0) {
+        grid.innerHTML = '<div class="text-center text-xs text-slate-600 col-span-full py-12">尚無作品，去生成一些吧！</div>';
+        return;
+    }
+    grid.innerHTML = gallery.map((item, i) => {
+        if (item.type === 'image') {
+            return `<div class="gallery-item rounded-xl overflow-hidden border border-slate-800 bg-slate-900 cursor-pointer" onclick="viewGalleryItem(${i})">
+                <img src="${item.src}" class="w-full aspect-square object-cover" loading="lazy" alt="">
+                <div class="p-2">
+                    <div class="text-[10px] text-slate-400 truncate">${escHtml(item.prompt)}</div>
+                    <div class="text-[9px] text-slate-600 mt-0.5">${item.model} · ${new Date(item.time).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+                </div>
+            </div>`;
+        } else {
+            return `<div class="gallery-item rounded-xl overflow-hidden border border-slate-800 bg-slate-900 cursor-pointer" onclick="viewGalleryItem(${i})">
+                <div class="w-full aspect-video bg-black flex items-center justify-center text-2xl">🎬</div>
+                <div class="p-2">
+                    <div class="text-[10px] text-slate-400 truncate">${escHtml(item.prompt)}</div>
+                    <div class="text-[9px] text-slate-600 mt-0.5">${item.model} · ${new Date(item.time).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+                </div>
+            </div>`;
+        }
+    }).join('');
+}
+function viewGalleryItem(i) {
+    const item = gallery[i];
+    if (item.type === 'image') {
+        switchTab('image');
+        document.getElementById('imgPrompt').value = item.prompt;
+        document.getElementById('imgEmpty').classList.add('hidden');
+        document.getElementById('imgResult').classList.remove('hidden');
+        const container = document.getElementById('imgContainer');
+        container.innerHTML = `<img src="${item.src}" style="max-width:100%;max-height:70vh;display:block">`;
+        currentImgElement = container.querySelector('img');
+    }
+}
+function clearGallery() {
+    if (!confirm('確定清空所有作品？')) return;
+    gallery = [];
+    localStorage.setItem('ai_studio_gallery', '[]');
+    renderGallery();
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── 快捷鍵 ──
+document.getElementById('imgPrompt').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generateImage(); }
+});
+document.getElementById('vidPrompt').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generateVideo(); }
+});
+document.getElementById('i2vPrompt').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generateI2V(); }
+});
+</script>
+</body>
+</html>

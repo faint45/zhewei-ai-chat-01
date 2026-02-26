@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Bridge - 築未科技 AI 協作平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        
+        /* 自定義滾動條 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        /* 動畫 */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(6, 182, 212, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.8); }
+        }
+        .pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+        
+        @keyframes slide-in {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .slide-in { animation: slide-in 0.3s ease-out; }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #22d3ee 0%, #a855f7 50%, #f472b6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+    <!-- 頂部導航 -->
+    <nav class="bg-slate-900/80 backdrop-blur border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center">
+                        <i class="fas fa-bridge text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg gradient-text">Smart Bridge</h1>
+                        <p class="text-xs text-slate-400">兩階段智慧生成 · 即時協作</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="w-2 h-2 rounded-full bg-green-500 pulse-glow"></span>
+                        <span class="text-slate-400">Ollama</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        <span class="text-slate-400">Gemini</span>
+                    </div>
+                </div>
+            </div>
+            <!-- 專案分頁 -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-2">
+                <button onclick="goToHomePage()" class="flex-shrink-0 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-lg text-xs transition font-semibold" title="返回主頁">
+                    <i class="fas fa-home mr-1"></i>主頁
+                </button>
+                <div id="project-tabs" class="flex gap-2 flex-1"></div>
+                <button onclick="exportCurrentProject()" class="flex-shrink-0 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs transition" title="匯出當前專案">
+                    <i class="fas fa-download mr-1"></i>匯出
+                </button>
+                <button onclick="document.getElementById('importFile').click()" class="flex-shrink-0 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs transition" title="匯入專案">
+                    <i class="fas fa-upload mr-1"></i>匯入
+                </button>
+                <input type="file" id="importFile" accept=".json" class="hidden" onchange="handleImportFile(event)">
+                <button onclick="syncProjects()" class="flex-shrink-0 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs transition" title="同步遠端與本地專案資料">
+                    <i class="fas fa-sync-alt mr-1"></i>同步
+                </button>
+                <button onclick="showNewProjectDialog()" class="flex-shrink-0 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs transition">
+                    <i class="fas fa-plus mr-1"></i>新專案
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 新增專案對話框 -->
+    <div id="newProjectDialog" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] hidden items-center justify-center">
+        <div class="bg-slate-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <h3 class="text-xl font-bold mb-4 gradient-text">建立新專案</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-sm text-slate-400 mb-1 block">專案名稱</label>
+                    <input id="newProjectName" type="text" placeholder="例如：AI 聊天機器人" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                    <label class="text-sm text-slate-400 mb-1 block">描述（選填）</label>
+                    <textarea id="newProjectDesc" placeholder="專案簡介..." rows="3" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"></textarea>
+                </div>
+                <div>
+                    <label class="text-sm text-slate-400 mb-1 block">顏色</label>
+                    <div class="flex gap-2">
+                        <button onclick="selectColor('cyan')" class="w-8 h-8 rounded-full bg-cyan-500 hover:ring-2 ring-cyan-400" data-color="cyan"></button>
+                        <button onclick="selectColor('purple')" class="w-8 h-8 rounded-full bg-purple-500 hover:ring-2 ring-purple-400" data-color="purple"></button>
+                        <button onclick="selectColor('pink')" class="w-8 h-8 rounded-full bg-pink-500 hover:ring-2 ring-pink-400" data-color="pink"></button>
+                        <button onclick="selectColor('green')" class="w-8 h-8 rounded-full bg-green-500 hover:ring-2 ring-green-400" data-color="green"></button>
+                        <button onclick="selectColor('orange')" class="w-8 h-8 rounded-full bg-orange-500 hover:ring-2 ring-orange-400" data-color="orange"></button>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="hideNewProjectDialog()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">取消</button>
+                <button onclick="createNewProject()" class="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-500 to-purple-600 hover:shadow-lg rounded-lg text-sm font-semibold transition">建立</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        <!-- 進度概覽 -->
+        <div class="mb-6 glass-panel rounded-xl p-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                    <span id="status-icon" class="text-2xl">⚡</span>
+                    <div>
+                        <div id="stage-label" class="font-medium text-slate-200">就緒</div>
+                        <div id="stage-desc" class="text-xs text-slate-500">等待輸入...</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div id="progress-text" class="text-2xl font-bold gradient-text">0%</div>
+                    <div class="text-xs text-slate-500">完成度</div>
+                </div>
+            </div>
+            <div class="h-3 bg-slate-800 rounded-full overflow-hidden">
+                <div id="progress-bar" class="h-full bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 w-0 transition-all duration-500 ease-out"></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左側：對話區 -->
+            <div class="lg:col-span-2 space-y-4">
+                <div class="glass-panel rounded-xl overflow-hidden flex flex-col" style="height: 600px;">
+                    <div class="bg-slate-800/50 px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                        <h2 class="font-semibold"><i class="fas fa-comments mr-2 text-cyan-400"></i>協作對話 <span id="current-project-name" class="text-xs text-slate-500"></span></h2>
+                        <div class="flex gap-2">
+                            <button onclick="clearChat()" class="text-xs text-slate-500 hover:text-slate-300">
+                                <i class="fas fa-trash mr-1"></i>清除
+                            </button>
+                            <button onclick="deleteCurrentProject()" class="text-xs text-red-500 hover:text-red-400" id="deleteProjectBtn">
+                                <i class="fas fa-times mr-1"></i>刪除專案
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 訊息區 -->
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                        <div class="text-center text-slate-500 py-8">
+                            <i class="fas fa-robot text-4xl mb-3 opacity-50"></i>
+                            <p>嗨！我是你的 AI 程式設計助手</p>
+                            <p class="text-xs mt-2">有什麼我可以幫忙的嗎？</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 輸入區 -->
+                    <div class="p-4 border-t border-slate-700 bg-slate-800/30">
+                        <div class="flex gap-2 mb-2">
+                            <select id="ai-mode" class="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500 font-semibold">
+                                <option value="code_gen">🧠 深度推理模式（DeepSeek-R1 14B）</option>
+                                <option value="two_phase">⚡ 兩階段模式（實驗性）</option>
+                            </select>
+                        </div>
+                        <div class="flex gap-2">
+                            <div class="flex-1 relative">
+                                <input id="message-input" type="text" placeholder="有什麼我可以幫忙的？" 
+                                       class="w-full bg-slate-700 border border-slate-600 rounded-lg pl-4 pr-12 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                                       onkeypress="if(event.key==='Enter')sendMessage()">
+                                <button onclick="sendMessage()" class="absolute right-2 top-1/2 -translate-y-1/2 text-cyan-400 hover:text-cyan-300">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側：運作過程 -->
+            <div class="space-y-4">
+                <!-- AI 運作過程 -->
+                <div class="glass-panel rounded-xl overflow-hidden" style="height: 350px;">
+                    <div class="bg-slate-800/50 px-4 py-3 border-b border-slate-700">
+                        <h2 class="font-semibold text-sm"><i class="fas fa-cogs mr-2 text-purple-400"></i>AI 運作過程</h2>
+                    </div>
+                    <div id="operations-log" class="h-[calc(100%-48px)] overflow-y-auto p-3 space-y-2 text-xs font-mono">
+                        <div class="text-slate-500 text-center py-4">等待連接...</div>
+                    </div>
+                </div>
+
+                <!-- 成本統計 -->
+                <div class="glass-panel rounded-xl p-4">
+                    <h2 class="font-semibold text-sm mb-3"><i class="fas fa-chart-pie mr-2 text-green-400"></i>成本效益</h2>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-slate-400">本次成本</span>
+                            <span id="cost-current" class="text-sm font-mono text-slate-200">-</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-slate-400">節省金額</span>
+                            <span id="cost-saved" class="text-sm font-mono text-green-400">-</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-slate-400">效率提升</span>
+                            <span id="efficiency-rate" class="text-sm font-mono text-cyan-400">-</span>
+                        </div>
+                        <hr class="border-slate-700">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-slate-400">總請求數</span>
+                            <span id="total-requests" class="text-sm font-mono">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 本地模型控制 -->
+                <div class="glass-panel rounded-xl p-4">
+                    <h2 class="font-semibold text-sm mb-3"><i class="fas fa-brain mr-2 text-pink-400"></i>本地模型控制</h2>
+                    <div class="space-y-2">
+                        <button onclick="checkOllamaStatus()" class="w-full bg-slate-700 hover:bg-slate-600 text-xs py-2 px-3 rounded-lg transition-colors text-left">
+                            <i class="fas fa-heartbeat mr-2 text-green-400"></i>檢查 Ollama 狀態
+                        </button>
+                        <button onclick="listModels()" class="w-full bg-slate-700 hover:bg-slate-600 text-xs py-2 px-3 rounded-lg transition-colors text-left">
+                            <i class="fas fa-list mr-2 text-cyan-400"></i>列出可用模型
+                        </button>
+                        <button onclick="startLearning()" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-xs py-2 px-3 rounded-lg transition-colors text-left">
+                            <i class="fas fa-graduation-cap mr-2"></i>啟動學習模式
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 改進點顯示 -->
+        <div id="improvements-panel" class="mt-6 glass-panel rounded-xl p-4 hidden">
+            <h3 class="font-semibold text-sm mb-3"><i class="fas fa-magic mr-2 text-yellow-400"></i>Phase 2 精修改進</h3>
+            <ul id="improvements-list" class="space-y-2 text-sm"></ul>
+        </div>
+    </main>
+
+    <script>
+        // ── 專案管理 ──
+        let currentProject = null;
+        let projects = [];
+        let selectedColor = 'purple';
+
+        async function loadProjects() {
+            try {
+                const res = await fetch('/api/projects');
+                const data = await res.json();
+                projects = data.projects || [];
+                renderProjectTabs();
+                if (projects.length > 0 && !currentProject) {
+                    switchProject(projects[0].id);
+                }
+            } catch (err) {
+                console.error('載入專案失敗:', err);
+            }
+        }
+
+        function renderProjectTabs() {
+            const container = document.getElementById('project-tabs');
+            container.innerHTML = projects.map(p => `
+                <button onclick="switchProject('${p.id}')" 
+                        class="px-4 py-1.5 rounded-lg text-xs transition ${currentProject?.id === p.id ? 'bg-'+p.color+'-600 text-white' : 'bg-slate-700 hover:bg-slate-600'}"
+                        data-project="${p.id}">
+                    <i class="fas fa-${p.icon || 'folder'} mr-1"></i>${p.name}
+                    ${p.stats?.messages ? `<span class="ml-1 text-xs opacity-70">(${p.stats.messages})</span>` : ''}
+                </button>
+            `).join('');
+        }
+
+        async function switchProject(projectId) {
+            try {
+                const res = await fetch(`/api/projects/${projectId}`);
+                const data = await res.json();
+                currentProject = data.project;
+                
+                // 更新 UI
+                renderProjectTabs();
+                document.getElementById('current-project-name').textContent = `(${currentProject.name})`;
+                document.getElementById('deleteProjectBtn').style.display = projectId === 'default' ? 'none' : 'inline-block';
+                
+                // 載入專案對話歷史
+                loadProjectHistory();
+            } catch (err) {
+                console.error('切換專案失敗:', err);
+            }
+        }
+
+        function loadProjectHistory() {
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML = '';
+            
+            if (currentProject.history && currentProject.history.length > 0) {
+                currentProject.history.forEach(msg => {
+                    addMessage(msg.role, msg.content);
+                });
+            } else {
+                chatMessages.innerHTML = `
+                    <div class="text-center text-slate-500 py-8">
+                        <i class="fas fa-robot text-4xl mb-3 opacity-50"></i>
+                        <p>開始對話，AI 會即時顯示運作過程</p>
+                        <p class="text-xs mt-2">Phase 1: 低成本模型 80% | Phase 2: 高品質精修 20%</p>
+                    </div>
+                `;
+            }
+        }
+
+        function showNewProjectDialog() {
+            document.getElementById('newProjectDialog').classList.remove('hidden');
+            document.getElementById('newProjectDialog').classList.add('flex');
+            document.getElementById('newProjectName').value = '';
+            document.getElementById('newProjectDesc').value = '';
+            selectedColor = 'purple';
+        }
+
+        function hideNewProjectDialog() {
+            document.getElementById('newProjectDialog').classList.add('hidden');
+            document.getElementById('newProjectDialog').classList.remove('flex');
+        }
+
+        function selectColor(color) {
+            selectedColor = color;
+            document.querySelectorAll('[data-color]').forEach(btn => {
+                btn.classList.toggle('ring-2', btn.dataset.color === color);
+            });
+        }
+
+        async function createNewProject() {
+            const name = document.getElementById('newProjectName').value.trim();
+            const description = document.getElementById('newProjectDesc').value.trim();
+            
+            if (!name) {
+                alert('請輸入專案名稱');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/projects', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, description, color: selectedColor})
+                });
+                const data = await res.json();
+                
+                if (data.ok) {
+                    hideNewProjectDialog();
+                    await loadProjects();
+                    switchProject(data.project.id);
+                }
+            } catch (err) {
+                alert('建立專案失敗：' + err.message);
+            }
+        }
+
+        async function deleteCurrentProject() {
+            if (!currentProject || currentProject.id === 'default') return;
+            
+            if (!confirm(`確定要刪除專案「${currentProject.name}」嗎？\n此操作無法復原。`)) return;
+            
+            try {
+                const res = await fetch(`/api/projects/${currentProject.id}`, {method: 'DELETE'});
+                if (res.ok) {
+                    await loadProjects();
+                    switchProject('default');
+                }
+            } catch (err) {
+                alert('刪除專案失敗：' + err.message);
+            }
+        }
+
+        async function clearChat() {
+            if (!currentProject) return;
+            
+            if (!confirm('確定要清除此專案的對話歷史嗎？')) return;
+            
+            try {
+                const res = await fetch(`/api/projects/${currentProject.id}/history`, {method: 'DELETE'});
+                if (res.ok) {
+                    await switchProject(currentProject.id);
+                }
+            } catch (err) {
+                alert('清除失敗：' + err.message);
+            }
+        }
+
+        async function syncProjects() {
+            const btn = event.target.closest('button');
+            const icon = btn.querySelector('i');
+            icon.classList.add('fa-spin');
+            btn.disabled = true;
+            
+            try {
+                const res = await fetch('/api/projects/sync', {method: 'POST'});
+                const data = await res.json();
+                
+                if (data.ok) {
+                    await loadProjects();
+                    if (currentProject) {
+                        await switchProject(currentProject.id);
+                    }
+                    addOperation('✅ 專案資料已同步', 'success');
+                }
+            } catch (err) {
+                addOperation('⚠️ 同步失敗: ' + err.message, 'error');
+            } finally {
+                icon.classList.remove('fa-spin');
+                btn.disabled = false;
+            }
+        }
+
+        // 自動同步機制（每 30 秒檢查一次）
+        setInterval(async () => {
+            try {
+                const res = await fetch('/api/projects/sync', {method: 'POST'});
+                const data = await res.json();
+                if (data.ok) {
+                    // 靜默同步，不重新載入當前專案（避免打斷用戶）
+                    const currentId = currentProject?.id;
+                    await loadProjects();
+                    if (currentId && currentId !== currentProject?.id) {
+                        // 僅在當前專案被刪除時才切換
+                        if (!projects.find(p => p.id === currentId)) {
+                            await switchProject('default');
+                        }
+                    }
+                }
+            } catch (err) {
+                console.log('背景同步失敗:', err);
+            }
+        }, 30000);
+
+        // ── 匯入匯出功能 ──
+        async function exportCurrentProject() {
+            if (!currentProject) {
+                alert('請先選擇一個專案');
+                return;
+            }
+            
+            try {
+                const res = await fetch(`/api/projects/${currentProject.id}/export`);
+                const data = await res.json();
+                
+                // 下載為 JSON 檔案
+                const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${currentProject.name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                addOperation(`✅ 已匯出專案「${currentProject.name}」`, 'success');
+            } catch (err) {
+                alert('匯出失敗：' + err.message);
+            }
+        }
+
+        async function exportAllProjects() {
+            try {
+                const res = await fetch('/api/projects/export/all');
+                const data = await res.json();
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `smart_bridge_projects_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                addOperation('✅ 已匯出所有專案', 'success');
+            } catch (err) {
+                alert('匯出失敗：' + err.message);
+            }
+        }
+
+        async function handleImportFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                
+                // 詢問匯入模式
+                const mode = await showImportModeDialog();
+                if (!mode) {
+                    event.target.value = '';
+                    return;
+                }
+                
+                const res = await fetch('/api/projects/import', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({data, mode})
+                });
+                const result = await res.json();
+                
+                if (result.ok) {
+                    const msg = `✅ 匯入完成！\n` +
+                                `- 已匯入：${result.imported.length} 個\n` +
+                                `- 已跳過：${result.skipped.length} 個\n` +
+                                `- 錯誤：${result.errors.length} 個`;
+                    alert(msg);
+                    addOperation(msg.replace(/\n/g, ' '), 'success');
+                    await loadProjects();
+                } else {
+                    alert('匯入失敗：' + result.error);
+                }
+            } catch (err) {
+                alert('匯入失敗：' + err.message);
+            } finally {
+                event.target.value = '';
+            }
+        }
+
+        function showImportModeDialog() {
+            return new Promise((resolve) => {
+                const mode = prompt(
+                    '選擇匯入模式：\n' +
+                    '1. skip - 跳過已存在的專案\n' +
+                    '2. overwrite - 覆蓋已存在的專案\n' +
+                    '3. merge - 合併對話歷史\n\n' +
+                    '請輸入 1、2 或 3：'
+                );
+                
+                const modes = {'1': 'skip', '2': 'overwrite', '3': 'merge'};
+                resolve(modes[mode] || null);
+            });
+        }
+
+        function goToHomePage() {
+            // 返回 Portal 服務選擇頁面
+            window.location.href = 'https://zhe-wei.net/';
+        }
+
+        // 頁面載入時初始化
+        window.addEventListener('load', () => {
+            loadProjects();
+        });
+
+        // WebSocket 連接
+        const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+        
+        ws.onopen = () => {
+            addOperation('🟢 WebSocket 連接成功', 'success');
+        };
+        
+        ws.onclose = () => {
+            addOperation('🔴 WebSocket 連接斷開', 'error');
+        };
+        
+        ws.onerror = (e) => {
+            addOperation('⚠️ WebSocket 錯誤', 'error');
+        };
+        
+        ws.onmessage = (e) => {
+            const msg = JSON.parse(e.data);
+            handleMessage(msg);
+        };
+
+        function handleMessage(msg) {
+            switch(msg.type) {
+                case 'connected':
+                    // Session ID 已連接
+                    addOperation(`✅ ${msg.message}`, 'success');
+                    msg.features.forEach(f => addOperation(`  • ${f}`, 'info'));
+                    break;
+                    
+                case 'operation':
+                    const opColor = msg.stage?.includes('fail') ? 'error' :
+                                    msg.stage?.includes('complete') ? 'success' :
+                                    msg.stage?.includes('start') ? 'start' : 'info';
+                    addOperation(`[${msg.stage}] ${msg.message}`, opColor);
+                    
+                    // 更新進度
+                    if (msg.progress !== undefined) {
+                        updateProgress(msg.progress, msg.stage);
+                    }
+                    break;
+                    
+                case 'response':
+                    addMessage('ai', msg.content);
+                    updateStats(msg.meta);
+                    
+                    // 顯示改進點
+                    if (msg.meta.improvements && msg.meta.improvements.length > 0) {
+                        showImprovements(msg.meta.improvements);
+                    }
+                    updateProgress(100, 'complete');
+                    break;
+                    
+                case 'learn_status':
+                    const status = msg.status === 'online' ? '✅ 線上' : '❌ 離線';
+                    addOperation(`Ollama 狀態: ${status}`, msg.status === 'online' ? 'success' : 'error');
+                    if (msg.models) {
+                        addOperation(`可用模型: ${msg.models.length} 個`, 'info');
+                    }
+                    break;
+                    
+                case 'error':
+                    addOperation(`❌ 錯誤: ${msg.message}`, 'error');
+                    break;
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            const aiMode = document.getElementById('ai-mode').value;
+            
+            if (!text) return;
+            
+            addMessage('user', text);
+            ws.send(JSON.stringify({
+                type: 'chat',
+                text: text,
+                task_type: 'code',  // 預設為 code 類型
+                mode: aiMode
+            }));
+            
+            input.value = '';
+            updateProgress(0, 'waiting');
+            
+            // 隱藏改進點面板
+            document.getElementById('improvements-panel').classList.add('hidden');
+        }
+
+        function addMessage(role, content) {
+            const container = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = `slide-in ${role === 'user' ? 'text-right' : 'text-left'}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = `inline-block max-w-[80%] px-4 py-3 rounded-2xl ${
+                role === 'user' 
+                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-br-md' 
+                    : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-md'
+            }`;
+            
+            // 處理 Markdown 程式碼區塊，加入複製按鈕
+            let codeBlockId = 0;
+            let formattedContent = content
+                .replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+                    const id = `code-${Date.now()}-${codeBlockId++}`;
+                    const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    return `<div class="relative my-2">
+                        <div class="flex items-center justify-between bg-slate-900 px-3 py-1 rounded-t-lg border-b border-slate-700">
+                            <span class="text-xs text-slate-400">${lang || 'code'}</span>
+                            <button onclick="copyCode('${id}')" class="text-xs text-cyan-400 hover:text-cyan-300">
+                                <i class="fas fa-copy mr-1"></i>複製
+                            </button>
+                        </div>
+                        <pre class="bg-slate-950 p-3 rounded-b-lg overflow-x-auto text-xs font-mono"><code id="${id}">${escapedCode}</code></pre>
+                    </div>`;
+                })
+                .replace(/`([^`]+)`/g, '<code class="bg-slate-700 px-1.5 py-0.5 rounded text-xs">$1</code>')
+                .replace(/\n/g, '<br>');
+            
+            bubble.innerHTML = formattedContent;
+            div.appendChild(bubble);
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function copyCode(elementId) {
+            const codeElement = document.getElementById(elementId);
+            const text = codeElement.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                // 顯示複製成功提示
+                const btn = event.target.closest('button');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check mr-1"></i>已複製';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            });
+        }
+
+        function addOperation(text, type) {
+            const container = document.getElementById('operations-log');
+            if (container.children.length === 1 && container.children[0].textContent === '等待連接...') {
+                container.innerHTML = '';
+            }
+            
+            const div = document.createElement('div');
+            const colors = {
+                success: 'text-green-400',
+                error: 'text-red-400',
+                start: 'text-cyan-400',
+                info: 'text-slate-400'
+            };
+            
+            const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+            div.className = `${colors[type] || 'text-slate-400'} slide-in`;
+            div.innerHTML = `<span class="text-slate-600">[${time}]</span> ${text}`;
+            
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function updateProgress(percent, stage) {
+            document.getElementById('progress-bar').style.width = percent + '%';
+            document.getElementById('progress-text').textContent = percent + '%';
+            
+            const stages = {
+                'waiting': { icon: '⏳', label: '等待中', desc: '準備開始...' },
+                'phase1_start': { icon: '🚀', label: 'Phase 1 開始', desc: '低成本模型建立框架...' },
+                'phase1_try': { icon: '🔄', label: 'Phase 1 嘗試', desc: '測試低成本模型...' },
+                'phase1_complete': { icon: '✅', label: 'Phase 1 完成', desc: '框架已建立' },
+                'phase2_start': { icon: '🎯', label: 'Phase 2 開始', desc: '高品質模型精修...' },
+                'phase2_try': { icon: '🎨', label: 'Phase 2 精修', desc: '優化內容品質...' },
+                'complete': { icon: '🎉', label: '完成', desc: '所有階段已完成' },
+            };
+            
+            const s = stages[stage] || { icon: '⚡', label: stage, desc: '處理中...' };
+            document.getElementById('status-icon').textContent = s.icon;
+            document.getElementById('stage-label').textContent = s.label;
+            document.getElementById('stage-desc').textContent = s.desc;
+        }
+
+        function updateStats(meta) {
+            document.getElementById('cost-current').textContent = `$${meta.cost_usd.toFixed(4)}`;
+            document.getElementById('cost-saved').textContent = `$${meta.saved_usd.toFixed(4)}`;
+            
+            const efficiency = meta.saved_usd / (meta.cost_usd + meta.saved_usd) * 100;
+            document.getElementById('efficiency-rate').textContent = `${efficiency.toFixed(1)}%`;
+        }
+
+        function showImprovements(improvements) {
+            const panel = document.getElementById('improvements-panel');
+            const list = document.getElementById('improvements-list');
+            
+            list.innerHTML = improvements.map(imp => 
+                `<li class="flex items-start gap-2">
+                    <i class="fas fa-check-circle text-green-400 mt-0.5"></i>
+                    <span class="text-slate-300">${imp}</span>
+                </li>`
+            ).join('');
+            
+            panel.classList.remove('hidden');
+        }
+
+        function clearChat() {
+            document.getElementById('chat-messages').innerHTML = `
+                <div class="text-center text-slate-500 py-8">
+                    <i class="fas fa-robot text-4xl mb-3 opacity-50"></i>
+                    <p>開始對話，AI 會即時顯示運作過程</p>
+                    <p class="text-xs mt-2">Phase 1: 低成本模型 80% | Phase 2: 高品質精修 20%</p>
+                </div>
+            `;
+        }
+
+        // 本地模型控制
+        function checkOllamaStatus() {
+            ws.send(JSON.stringify({ type: 'learn', action: 'status' }));
+        }
+
+        function listModels() {
+            ws.send(JSON.stringify({ type: 'learn', action: 'status' }));
+        }
+
+        function startLearning() {
+            const topic = prompt('請輸入要學習的主題：');
+            if (topic) {
+                ws.send(JSON.stringify({ 
+                    type: 'learn', 
+                    action: 'learn_topic',
+                    topic: topic
+                }));
+            }
+        }
+
+        // 載入全局成本統計
+        async function loadGlobalStats() {
+            try {
+                const res = await fetch('/api/cost-stats');
+                const data = await res.json();
+                if (data.ok) {
+                    document.getElementById('total-requests').textContent = data.total_requests;
+                }
+            } catch(e) {
+                console.log('載入統計失敗', e);
+            }
+        }
+
+        loadGlobalStats();
+    </script>
+</body>
+</html>

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1e40af">
+  <title>哲維推播測試</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a; color: #e2e8f0; min-height: 100vh;
+      padding: 20px; max-width: 600px; margin: 0 auto;
+    }
+    h1 { font-size: 1.5rem; text-align: center; margin-bottom: 4px; }
+    .subtitle { text-align: center; color: #64748b; font-size: 0.85rem; margin-bottom: 24px; }
+    .card {
+      background: #1e293b; border-radius: 12px; padding: 20px;
+      margin-bottom: 16px; border: 1px solid #334155;
+    }
+    .card h2 { font-size: 1rem; margin-bottom: 12px; color: #93c5fd; }
+    .status-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid #334155;
+    }
+    .status-row:last-child { border-bottom: none; }
+    .status-label { color: #94a3b8; font-size: 0.85rem; }
+    .status-value { font-size: 0.85rem; font-weight: 600; }
+    .status-ok { color: #4ade80; }
+    .status-warn { color: #fbbf24; }
+    .status-err { color: #f87171; }
+    .status-wait { color: #64748b; }
+
+    .input-group { margin-bottom: 12px; }
+    .input-group label { display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px; }
+    .input-group input, .input-group textarea, .input-group select {
+      width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #475569;
+      background: #0f172a; color: #e2e8f0; font-size: 0.9rem; outline: none;
+    }
+    .input-group input:focus, .input-group textarea:focus {
+      border-color: #3b82f6;
+    }
+    textarea { resize: vertical; min-height: 60px; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 10px 20px; border-radius: 8px; border: none; font-size: 0.9rem;
+      font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #475569; cursor: not-allowed; }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+    .btn-secondary:hover { background: #475569; }
+    .btn-success { background: #059669; color: #fff; }
+    .btn-success:hover { background: #047857; }
+    .btn-row { display: flex; gap: 8px; margin-top: 8px; }
+    .btn-row .btn { flex: 1; }
+
+    .log-area {
+      background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+      padding: 12px; max-height: 300px; overflow-y: auto; font-family: monospace;
+      font-size: 0.78rem; line-height: 1.6;
+    }
+    .log-area .log-msg { color: #93c5fd; }
+    .log-area .log-sys { color: #64748b; }
+    .log-area .log-err { color: #f87171; }
+    .log-area .log-ok { color: #4ade80; }
+
+    .msg-card {
+      background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+      padding: 12px; margin-bottom: 8px;
+    }
+    .msg-card .msg-title { font-weight: 600; color: #f1f5f9; margin-bottom: 4px; }
+    .msg-card .msg-body { color: #cbd5e1; font-size: 0.85rem; }
+    .msg-card .msg-time { color: #64748b; font-size: 0.75rem; margin-top: 4px; }
+    .msg-card .msg-tags { margin-top: 4px; }
+    .msg-card .msg-tags span {
+      display: inline-block; background: #1e3a5f; color: #93c5fd;
+      padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; margin-right: 4px;
+    }
+    .empty-state { text-align: center; color: #475569; padding: 24px; font-size: 0.85rem; }
+
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .dot-green { background: #4ade80; }
+    .dot-red { background: #f87171; }
+    .dot-yellow { background: #fbbf24; }
+    .dot-gray { background: #64748b; }
+  </style>
+</head>
+<body>
+
+  <h1>哲維推播測試台</h1>
+  <p class="subtitle">ZheweiPush v1.0 — Ntfy SSE Module</p>
+
+  <!-- 連線狀態 -->
+  <div class="card">
+    <h2>連線狀態</h2>
+    <div class="status-row">
+      <span class="status-label">連線</span>
+      <span id="st-conn" class="status-value status-wait"><span class="dot dot-gray"></span>未連線</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">平台</span>
+      <span id="st-platform" class="status-value status-wait">—</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">通知權限</span>
+      <span id="st-perm" class="status-value status-wait">—</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Topic</span>
+      <span id="st-topic" class="status-value" style="color:#e2e8f0;">—</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Server</span>
+      <span id="st-server" class="status-value" style="color:#e2e8f0;font-size:0.75rem;">—</span>
+    </div>
+  </div>
+
+  <!-- 訂閱設定 -->
+  <div class="card">
+    <h2>訂閱設定</h2>
+    <div class="input-group">
+      <label>Ntfy Server URL</label>
+      <input type="text" id="cfg-server" value="https://notify.zhewei.tech" placeholder="https://notify.zhewei.tech">
+    </div>
+    <div class="input-group">
+      <label>Topic</label>
+      <input type="text" id="cfg-topic" value="zhewei_test" placeholder="project_b_building">
+    </div>
+    <div class="input-group">
+      <label>Client User (唯讀帳號)</label>
+      <input type="text" id="cfg-user" value="client_general" placeholder="client_general">
+    </div>
+    <div class="input-group">
+      <label>Client Password (唯讀密碼)</label>
+      <input type="password" id="cfg-pass" value="" placeholder="ClientPassword123">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-connect" onclick="doConnect()">連線訂閱</button>
+      <button class="btn btn-secondary" id="btn-disconnect" onclick="doDisconnect()" disabled>斷線</button>
+    </div>
+  </div>
+
+  <!-- 發送測試 -->
+  <div class="card">
+    <h2>發送測試推播</h2>
+    <div class="input-group">
+      <label>標題</label>
+      <input type="text" id="send-title" value="工程通知" placeholder="通知標題">
+    </div>
+    <div class="input-group">
+      <label>內容</label>
+      <textarea id="send-message" placeholder="通知內容...">B棟 3F 鋼筋綁紮完成，請安排查驗。</textarea>
+    </div>
+    <div class="input-group">
+      <label>優先級</label>
+      <select id="send-priority">
+        <option value="1">1 — 最低</option>
+        <option value="2">2 — 低</option>
+        <option value="3" selected>3 — 一般</option>
+        <option value="4">4 — 高</option>
+        <option value="5">5 — 緊急</option>
+      </select>
+    </div>
+    <div class="input-group">
+      <label>Tags (逗號分隔)</label>
+      <input type="text" id="send-tags" value="construction,inspection" placeholder="tag1,tag2">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-success" onclick="doSendViaAPI()">透過後端 API 發送</button>
+      <button class="btn btn-secondary" onclick="doLocalTest()">本地測試通知</button>
+    </div>
+  </div>
+
+  <!-- 收到的訊息 -->
+  <div class="card">
+    <h2>收到的訊息 <span id="msg-count" style="color:#64748b;font-size:0.8rem;">(0)</span></h2>
+    <div id="msg-list">
+      <div class="empty-state">尚未收到訊息，連線後等待推播...</div>
+    </div>
+  </div>
+
+  <!-- 日誌 -->
+  <div class="card">
+    <h2>系統日誌</h2>
+    <div id="log-area" class="log-area"></div>
+    <button class="btn btn-secondary" style="margin-top:8px;" onclick="document.getElementById('log-area')?.innerHTML=''">清除日誌</button>
+  </div>
+
+  <script src="/static/modules/mod-ntfy-push.js"></script>
+  <script>
+    var logArea = document.getElementById('log-area');
+    var msgList = document.getElementById('msg-list');
+    var msgCount = document.getElementById('msg-count');
+    var receivedCount = 0;
+
+    function addLog(text, cls) {
+      var div = document.createElement('div');
+      div.className = cls || 'log-sys';
+      div.textContent = new Date().toLocaleTimeString() + ' ' + text;
+      logArea.appendChild(div);
+      logArea.scrollTop = logArea.scrollHeight;
+    }
+
+    function renderMessage(msg) {
+      receivedCount++;
+      msgCount.textContent = '(' + receivedCount + ')';
+
+      // 移除空狀態
+      var empty = msgList.querySelector('.empty-state');
+      if (empty) empty.remove();
+
+      var card = document.createElement('div');
+      card.className = 'msg-card';
+
+      var title = msg.title || '(無標題)';
+      var body = msg.message || '';
+      var time = msg.time instanceof Date ? msg.time.toLocaleString() : new Date().toLocaleString();
+      var tags = msg.tags || [];
+
+      var html = '<div class="msg-title">' + _esc(title) + '</div>';
+      html += '<div class="msg-body">' + _esc(body) + '</div>';
+      if (tags.length > 0) {
+        html += '<div class="msg-tags">';
+        tags.forEach(function(t) { html += '<span>' + _esc(t) + '</span>'; });
+        html += '</div>';
+      }
+      html += '<div class="msg-time">' + _esc(time) + ' | Priority: ' + (msg.priority || 3) + '</div>';
+      card.innerHTML = html;
+
+      msgList.insertBefore(card, msgList.firstChild);
+    }
+
+    function _esc(s) {
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // ── 連線 ──
+    async function doConnect() {
+      var server = document.getElementById('cfg-server')?.value.trim();
+      var topic = document.getElementById('cfg-topic')?.value.trim();
+      var user = document.getElementById('cfg-user')?.value.trim();
+      var pass = document.getElementById('cfg-pass')?.value;
+
+      if (!topic) { addLog('ERROR: Topic 不可為空', 'log-err'); return; }
+
+      addLog('正在連線到 ' + server + '/' + topic + ' ...', 'log-sys');
+
+      var result = await ZheweiPush.init({
+        server: server,
+        topic: topic,
+        user: user,
+        pass: pass,
+        debug: true,
+
+        onMessage: function(msg) {
+          addLog('收到: ' + (msg.title || '') + ' — ' + (msg.message || ''), 'log-msg');
+          renderMessage(msg);
+        },
+
+        onConnect: function(info) {
+          addLog('已連線: ' + info.server + '/' + info.topic, 'log-ok');
+          document.getElementById('st-conn')?.innerHTML = '<span class="dot dot-green"></span>已連線';
+          document.getElementById('st-conn')?.className = 'status-value status-ok';
+          document.getElementById('btn-connect')?.disabled = true;
+          document.getElementById('btn-disconnect')?.disabled = false;
+        },
+
+        onDisconnect: function(info) {
+          addLog('斷線: ' + (info.reason || 'unknown'), 'log-err');
+          document.getElementById('st-conn')?.innerHTML = '<span class="dot dot-red"></span>已斷線';
+          document.getElementById('st-conn')?.className = 'status-value status-err';
+          document.getElementById('btn-connect')?.disabled = false;
+          document.getElementById('btn-disconnect')?.disabled = true;
+        },
+      });
+
+      document.getElementById('st-platform')?.textContent = result.platform || '—';
+      document.getElementById('st-perm')?.textContent = result.permissionGranted ? '已授權' : '未授權';
+      document.getElementById('st-perm')?.className = 'status-value ' + (result.permissionGranted ? 'status-ok' : 'status-warn');
+      document.getElementById('st-topic')?.textContent = topic;
+      document.getElementById('st-server')?.textContent = server;
+
+      addLog('init 結果: ok=' + result.ok + ', platform=' + result.platform + ', permission=' + result.permissionGranted, 'log-sys');
+    }
+
+    // ── 斷線 ──
+    function doDisconnect() {
+      ZheweiPush.disconnect();
+      addLog('手動斷線', 'log-sys');
+    }
+
+    // ── 透過後端 API 發送 ──
+    async function doSendViaAPI() {
+      var topic = document.getElementById('cfg-topic')?.value.trim() || 'zhewei_test';
+      var title = document.getElementById('send-title')?.value.trim();
+      var message = document.getElementById('send-message')?.value.trim();
+      var priority = parseInt(document.getElementById('send-priority')?.value) || 3;
+      var tagsStr = document.getElementById('send-tags')?.value.trim();
+      var tags = tagsStr ? tagsStr.split(',').map(function(t) { return t.trim(); }) : [];
+
+      if (!message) { addLog('ERROR: 訊息內容不可為空', 'log-err'); return; }
+
+      addLog('透過 API 發送: ' + title + ' — ' + message, 'log-sys');
+
+      var result = await ZheweiPush.send({
+        topic: topic,
+        title: title,
+        message: message,
+        priority: priority,
+        tags: tags,
+      });
+
+      if (result.ok) {
+        addLog('發送成功: id=' + (result.id || ''), 'log-ok');
+      } else {
+        addLog('發送失敗: ' + (result.error || JSON.stringify(result)), 'log-err');
+      }
+    }
+
+    // ── 本地測試通知 ──
+    function doLocalTest() {
+      var title = document.getElementById('send-title')?.value.trim() || '測試通知';
+      var message = document.getElementById('send-message')?.value.trim() || '這是本地測試通知';
+      ZheweiPush.testNotification(title, message);
+      addLog('本地測試通知已觸發', 'log-sys');
+    }
+
+    // ── 初始化平台資訊 ──
+    document.getElementById('st-platform')?.textContent = ZheweiPush.platform();
+    addLog('推播測試台已載入 — ZheweiPush v' + ZheweiPush.version, 'log-sys');
+  </script>
+</body>
+</html>

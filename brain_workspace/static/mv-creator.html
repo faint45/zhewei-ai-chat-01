@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>虛擬人物 MV 製作 - Jarvis AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white mb-2">🎬 虛擬人物 MV 製作</h1>
+            <p class="text-gray-300">整合 LivePortrait + Wav2Lip + ComfyUI</p>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Step 1: Create Project -->
+            <div class="card rounded-xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">📁 1. 建立專案</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">專案名稱</label>
+                        <input type="text" id="projectName" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="例如: demo_idol">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">角色圖片路徑</label>
+                        <input type="text" id="characterPath" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="D:\zhe-wei-tech\mv_projects\...\character.png">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">音樂檔案路徑</label>
+                        <input type="text" id="audioPath" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="D:\zhe-wei-tech\mv_projects\...\song.mp3">
+                    </div>
+                    <button onclick="createProject()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition">
+                        建立專案
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Generate Character -->
+            <div class="card rounded-xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">🎨 2. 生成角色</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">正面提示詞</label>
+                        <textarea id="charPrompt" rows="3" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="portrait of virtual idol, anime style, blue hair, cyberpunk outfit..."></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">負面提示詞</label>
+                        <input type="text" id="charNegative" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" value="text, watermark, blurry, low quality, distorted">
+                    </div>
+                    <button onclick="generateCharacter()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition">
+                        生成角色圖片
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Run LivePortrait -->
+            <div class="card rounded-xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">🎭 3. LivePortrait 動畫</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">專案名稱</label>
+                        <input type="text" id="lpProject" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="demo_idol">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">驅動影片路徑（可選）</label>
+                        <input type="text" id="drivingVideo" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="留空則使用預設">
+                    </div>
+                    <button onclick="runLivePortrait()" class="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold py-3 px-4 rounded-lg transition">
+                        執行 LivePortrait
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 4: Run Wav2Lip -->
+            <div class="card rounded-xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">🎤 4. Wav2Lip 對口型</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">專案名稱</label>
+                        <input type="text" id="wlProject" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="demo_idol">
+                    </div>
+                    <button onclick="runWav2Lip()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition">
+                        執行對口型
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 5: Composite -->
+            <div class="card rounded-xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">🎬 5. 合成最終 MV</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">專案名稱</label>
+                        <input type="text" id="compProject" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="demo_idol">
+                    </div>
+                    <button onclick="runComposite()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition">
+                        執行 FFmpeg 合成
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status & Projects -->
+            <div class="card rounded-xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">📊 專案狀態</h2>
+                <button onclick="loadProjects()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition mb-4">
+                    重新整理專案列表
+                </button>
+                <div id="projectList" class="space-y-3 max-h-64 overflow-y-auto">
+                    <p class="text-gray-500 text-center">點擊上方按鈕載入專案</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Output Console -->
+        <div class="mt-8 card rounded-xl p-6 shadow-xl">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">📝 執行輸出</h2>
+            <div id="console" class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm max-h-64 overflow-y-auto">
+                等待指令...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/mv';
+
+        function log(msg, type = 'info') {
+            const console = document.getElementById('console');
+            const colors = {
+                info: 'text-blue-400',
+                success: 'text-green-400',
+                error: 'text-red-400',
+                command: 'text-yellow-400'
+            };
+            const timestamp = new Date().toLocaleTimeString();
+            console.innerHTML += `<div class="${colors[type] || 'text-gray-300'}">[${timestamp}] ${msg}</div>`;
+            console.scrollTop = console.scrollHeight;
+        }
+
+        async function createProject() {
+            const name = document.getElementById('projectName').value;
+            const character = document.getElementById('characterPath').value;
+            const audio = document.getElementById('audioPath').value;
+            
+            if (!name || !character || !audio) {
+                log('請填寫所有欄位', 'error');
+                return;
+            }
+
+            log(`建立專案: ${name}...`);
+            try {
+                const res = await fetch(`${API_BASE}/create`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, character_path: character, audio_path: audio})
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    log(`專案建立成功: ${name}`, 'success');
+                    loadProjects();
+                } else {
+                    log(`錯誤: ${data.error}`, 'error');
+                }
+            } catch (e) {
+                log(`網路錯誤: ${e.message}`, 'error');
+            }
+        }
+
+        async function generateCharacter() {
+            const prompt = document.getElementById('charPrompt').value;
+            const negative = document.getElementById('charNegative').value;
+            
+            if (!prompt) {
+                log('請輸入提示詞', 'error');
+                return;
+            }
+
+            log('生成角色圖片指令...', 'info');
+            try {
+                const res = await fetch(`${API_BASE}/generate-character`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({prompt, negative_prompt: negative})
+                });
+                const data = await res.json();
+                if (data.status === 'ready') {
+                    log('ComfyUI 設定:', 'command');
+                    log(`  提示詞: ${data.prompt}`, 'command');
+                    log(`  尺寸: ${data.settings.width}x${data.settings.height}`, 'command');
+                    log(`  輸出: ${data.output_path}`, 'success');
+                    log('請啟動 ComfyUI 並載入 workflows/mv_background.json', 'info');
+                } else {
+                    log(`錯誤: ${data.error}`, 'error');
+                }
+            } catch (e) {
+                log(`網路錯誤: ${e.message}`, 'error');
+            }
+        }
+
+        async function runLivePortrait() {
+            const project = document.getElementById('lpProject').value;
+            const driving = document.getElementById('drivingVideo').value || null;
+            
+            if (!project) {
+                log('請輸入專案名稱', 'error');
+                return;
+            }
+
+            log(`執行 LivePortrait: ${project}...`);
+            try {
+                const res = await fetch(`${API_BASE}/run-liveportrait`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({project_name: project, driving_video: driving})
+                });
+                const data = await res.json();
+                if (data.status === 'ready_to_run') {
+                    log('執行命令:', 'command');
+                    log(`  ${data.command}`, 'command');
+                    log('請手動執行上述命令', 'info');
+                } else {
+                    log(`錯誤: ${data.error}`, 'error');
+                }
+            } catch (e) {
+                log(`網路錯誤: ${e.message}`, 'error');
+            }
+        }
+
+        async function runWav2Lip() {
+            const project = document.getElementById('wlProject').value;
+            
+            if (!project) {
+                log('請輸入專案名稱', 'error');
+                return;
+            }
+
+            log(`執行 Wav2Lip: ${project}...`);
+            try {
+                const res = await fetch(`${API_BASE}/run-wav2lip`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({project_name: project})
+                });
+                const data = await res.json();
+                if (data.status === 'ready_to_run') {
+                    log('執行命令:', 'command');
+                    log(`  ${data.command}`, 'command');
+                    log('請手動執行上述命令', 'info');
+                } else {
+                    log(`錯誤: ${data.error}`, 'error');
+                }
+            } catch (e) {
+                log(`網路錯誤: ${e.message}`, 'error');
+            }
+        }
+
+        async function runComposite() {
+            const project = document.getElementById('compProject').value;
+            
+            if (!project) {
+                log('請輸入專案名稱', 'error');
+                return;
+            }
+
+            log(`執行 FFmpeg 合成: ${project}...`);
+            try {
+                const res = await fetch(`${API_BASE}/run-composite`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({project_name: project})
+                });
+                const data = await res.json();
+                if (data.status === 'ready_to_run') {
+                    log('執行命令:', 'command');
+                    log(`  ${data.command}`, 'command');
+                    log('請手動執行上述命令', 'info');
+                } else {
+                    log(`錯誤: ${data.error}`, 'error');
+                }
+            } catch (e) {
+                log(`網路錯誤: ${e.message}`, 'error');
+            }
+        }
+
+        async function loadProjects() {
+            log('載入專案列表...');
+            try {
+                const res = await fetch(`${API_BASE}/projects`);
+                const data = await res.json();
+                const container = document.getElementById('projectList');
+                
+                if (data.projects && Object.keys(data.projects).length > 0) {
+                    container.innerHTML = Object.entries(data.projects).map(([name, p]) => `
+                        <div class="p-3 bg-gray-100 rounded-lg">
+                            <div class="font-bold text-gray-800">${name}</div>
+                            <div class="text-sm text-gray-600">狀態: ${p.status || 'unknown'}</div>
+                            <button onclick="checkStatus('${name}')" class="mt-2 text-sm text-blue-600 hover:underline">查看詳情</button>
+                        </div>
+                    `).join('');
+                    log(`已載入 ${Object.keys(data.projects).length} 個專案`, 'success');
+                } else {
+                    container.innerHTML = '<p class="text-gray-500 text-center">尚無專案</p>';
+                    log('無專案', 'info');
+                }
+            } catch (e) {
+                log(`網路錯誤: ${e.message}`, 'error');
+            }
+        }
+
+        async function checkStatus(name) {
+            log(`檢查專案狀態: ${name}...`);
+            try {
+                const res = await fetch(`${API_BASE}/status/${name}`);
+                const data = await res.json();
+                log(`專案狀態:`, 'info');
+                log(`  角色圖片: ${data.character ? '✓' : '✗'}`, 'success');
+                log(`  背景圖數量: ${data.backgrounds}`, 'info');
+                log(`  LivePortrait: ${data.liveportrait ? '✓' : '✗'}`, 'info');
+                log(`  Wav2Lip: ${data.wav2lip ? '✓' : '✗'}`, 'info');
+                log(`  最終輸出: ${data.final ? '✓' : '✗'}`, 'info');
+            } catch (e) {
+                log(`網路錯誤: ${e.message}`, 'error');
+            }
+        }
+
+        // Load projects on page load
+        loadProjects();
+    </script>
+</body>
+</html>

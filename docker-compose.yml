@@ -1,147 +1,160 @@
-<<<<<<< HEAD
-# 築未科技大腦 — Docker Compose
-# 啟動：docker compose up -d
-# 需 .env 內 CLOUDFLARE_TOKEN（tunnel 用）
+# Zhe-Wei Tech — Docker Compose v2.0 (優化版)
+# Start: docker compose up -d
+# Requires CLOUDFLARE_TOKEN in .env
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-common: &common
+  build: .
+  env_file: [.env]
+  restart: unless-stopped
+  logging: *default-logging
+  extra_hosts: ["host.docker.internal:host-gateway"]
 
 services:
-  # 築未大腦核心服務
+  # ── Nginx Gateway (URL Router) ──
+  gateway:
+    image: nginx:alpine
+    container_name: zhewei_gateway
+    ports:
+      - "8888:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./dist:/app/dist:ro
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      brain_server: { condition: service_started }
+      portal: { condition: service_started }
+      cms: { condition: service_started }
+      codesim: { condition: service_started }
+    networks: [default, dify_network]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/nginx-health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Brain Server ──
   brain_server:
-    build: .
+    <<: *common
     container_name: zhewei_brain
     environment:
-      BRAIN_WORKSPACE: /app
+      BRAIN_WORKSPACE: /app/brain_workspace
       ZHEWEI_MEMORY_ROOT: /memory
       BRAIN_WS_PORT: "8000"
+      PORT: "8000"
+      AI_COST_MODE: local_only
+      PIPER_MODEL_PATH: /app/zhewei_memory/models/piper/zh_CN-huayan-medium.onnx
+      OLLAMA_BASE_URL: http://host.docker.internal:11460
+      PHONE_ADB_HOST: ${PHONE_ADB_HOST:-192.168.1.100}
+      PHONE_ADB_PORT: ${PHONE_ADB_PORT:-5555}
+      PHONE_OLLAMA_MODEL: ${PHONE_OLLAMA_MODEL:-qwen3:32b}
+      PHONE_VISION_MODEL: ${PHONE_VISION_MODEL:-moondream}
     volumes:
-      # 使用專案目錄為 /app（本機無 D 槽時相容）；有 D 槽且已複製專案到 D:\brain_workspace 時可改為：D:/brain_workspace:/app
       - .:/app
-      # 本機無 Z 槽時使用專案內 zhewei_memory；有 Z 槽時可改為：Z:/Zhewei_Brain:/memory
       - ./zhewei_memory:/memory
-    ports:
-      - "8000:8000"
-    restart: unless-stopped
+    ports: ["8002:8000"]
+    networks: [default, dify_network]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
-  # Cloudflare 加密隧道通道
+  # ── Smart Bridge ──
+  smart_bridge:
+    <<: *common
+    container_name: zhewei_smart_bridge
+    environment:
+      SMART_BRIDGE_PORT: "8003"
+      SMART_BRIDGE_HOST: "0.0.0.0"
+      OLLAMA_BASE_URL: http://host.docker.internal:11460
+      OLLAMA_MODEL: qwen3:8b
+    volumes:
+      - .:/app
+      - ./bridge_workspace:/app/bridge_workspace
+      - ./zhewei_memory:/memory
+    ports: ["8003:8003"]
+    command: ["python", "smart_bridge.py"]
+    networks: [default, dify_network]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── Portal (PWA 入口) ──
+  portal:
+    <<: *common
+    container_name: zhewei_portal
+    environment:
+      PORTAL_PORT: "8888"
+    volumes:
+      - .:/app
+      - ./portal:/app/portal
+    command: ["python", "portal_server.py"]
+    networks: [default, dify_network]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8888/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── CMS 營建管理系統 ──
+  cms:
+    <<: *common
+    container_name: zhewei_cms
+    volumes:
+      - .:/app
+      - ./construction_mgmt:/app/construction_mgmt
+    command: ["python", "construction_mgmt/app.py"]
+    networks: [default]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8020/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── CodeSim 代碼模擬器 ──
+  codesim:
+    <<: *common
+    container_name: zhewei_codesim
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11460
+    volumes:
+      - .:/app
+      - ./simulator:/app/simulator
+    command: ["python", "simulator/code_simulator.py"]
+    networks: [default]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Cloudflare Tunnel → Gateway ──
   tunnel:
     image: cloudflare/cloudflared:latest
+    container_name: zhewei_tunnel
     restart: always
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TOKEN}
+    logging: *default-logging
+    command: ["tunnel", "--protocol", "http2", "run", "--token", "${CLOUDFLARE_TOKEN}"]
     depends_on:
-      - brain_server
-
-=======
-# 築未科技七階段系統 - Docker Compose 配置
-
-version: '3.8'
-
-services:
-  # 總指揮官 - Gemini Pro 服務
-  commander:
-    build:
-      context: .
-      dockerfile: Dockerfile.commander
-    container_name: zhewei-commander
-    volumes:
-      - ./D:/brain_workspace:/workspace
-      - ./logs:/logs
-    environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - WORKSPACE=/workspace
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    networks:
-      - zhewei-network
-    restart: unless-stopped
-
-  # 首席開發官 - Claude Pro 服務
-  lead-dev:
-    build:
-      context: .
-      dockerfile: Dockerfile.lead-dev
-    container_name: zhewei-lead-dev
-    volumes:
-      - ./D:/brain_workspace:/workspace
-      - ./logs:/logs
-    environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-3-5-sonnet-20241022}
-      - WORKSPACE=/workspace
-    networks:
-      - zhewei-network
-    depends_on:
-      - commander
-    restart: unless-stopped
-
-  # 地端勤務兵 - Ollama 服務
-  local-guard:
-    image: ollama/ollama:latest
-    container_name: zhewei-ollama
-    volumes:
-      - ollama_data:/root/.ollama
-      - ./D:/brain_workspace:/workspace
-    ports:
-      - "11461:11434"
-    environment:
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:latest}
-    networks:
-      - zhewei-network
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    restart: unless-stopped
-
-  # 基礎設施 - 統一API服務器
-  api-server:
-    build:
-      context: .
-      dockerfile: Dockerfile.api
-    container_name: zhewei-api
-    volumes:
-      - ./D:/brain_workspace:/workspace
-      - ./logs:/logs
-    ports:
-      - "8000:8000"
-      - "8001:8001"
-      - "8005:8005"
-    environment:
-      - WORKSPACE=/workspace
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
-    networks:
-      - zhewei-network
-    depends_on:
-      - commander
-      - lead-dev
-      - local-guard
-    restart: unless-stopped
-
-  # 監控服務
-  monitoring:
-    build:
-      context: .
-      dockerfile: Dockerfile.monitoring
-    container_name: zhewei-monitoring
-    volumes:
-      - ./logs:/logs
-      - ./api_monitoring.db:/data/api_monitoring.db
-    ports:
-      - "8002:8001"
-    environment:
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    networks:
-      - zhewei-network
-    depends_on:
-      - api-server
-    restart: unless-stopped
-
-volumes:
-  ollama_data:
-    driver: local
+      gateway: { condition: service_started }
 
 networks:
-  zhewei-network:
-    driver: bridge
->>>>>>> bd6537def53debaba0c16f279817e4a317eed98c
+  dify_network:
+    external: true
+    name: docker_default

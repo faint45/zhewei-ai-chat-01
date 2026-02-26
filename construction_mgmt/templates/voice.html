@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e40af">
+    <title>語音日報 — 營建自動化</title>
+    <link rel="manifest" href="/voice-manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.4); opacity: 0; } }
+        @keyframes recording-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .pulse-ring { animation: pulse-ring 1.5s ease-out infinite; }
+        .recording-dot { animation: recording-dot 1s ease-in-out infinite; }
+        .wave-bar { animation: wave 0.6s ease-in-out infinite alternate; }
+        @keyframes wave { 0% { height: 8px; } 100% { height: 32px; } }
+        body { -webkit-user-select: none; user-select: none; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen" x-data="voiceApp()">
+
+    <!-- 頂部導航 -->
+    <div class="bg-blue-800 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-50">
+        <div class="flex items-center gap-2">
+            <a href="/" class="text-white/70 hover:text-white text-sm">← 返回</a>
+            <h1 class="font-bold text-lg">🎙️ 語音日報</h1>
+        </div>
+        <div class="text-xs text-blue-200" x-text="currentProject ? currentProject.project_name : '未選擇工程'"></div>
+    </div>
+
+    <!-- 工程選擇 -->
+    <div x-show="!currentProject" class="p-4">
+        <div class="bg-white rounded-xl shadow p-6 text-center">
+            <svg class="w-16 h-16 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            <p class="text-gray-500 mb-4">請先選擇工程</p>
+            <div class="space-y-2">
+                <template x-for="p in projects" :key="p.id">
+                    <button @click="selectProject(p)" class="w-full px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg text-left hover:bg-blue-100 transition-colors">
+                        <div class="font-medium text-blue-800" x-text="p.project_name"></div>
+                        <div class="text-xs text-gray-500" x-text="p.contract_number || ''"></div>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主介面 -->
+    <div x-show="currentProject" class="pb-32">
+
+        <!-- 模式選擇 -->
+        <div class="px-4 pt-4">
+            <div class="grid grid-cols-4 gap-2">
+                <button @click="mode = 'daily_log'" :class="mode === 'daily_log' ? 'bg-blue-600 text-white shadow-lg scale-105' : 'bg-white text-gray-600 border'" class="px-2 py-3 rounded-xl text-center transition-all transform">
+                    <div class="text-xl mb-1">📋</div>
+                    <div class="text-xs font-medium">施工日誌</div>
+                </button>
+                <button @click="mode = 'inspection'" :class="mode === 'inspection' ? 'bg-green-600 text-white shadow-lg scale-105' : 'bg-white text-gray-600 border'" class="px-2 py-3 rounded-xl text-center transition-all transform">
+                    <div class="text-xl mb-1">✅</div>
+                    <div class="text-xs font-medium">自主檢查</div>
+                </button>
+                <button @click="mode = 'photo'" :class="mode === 'photo' ? 'bg-purple-600 text-white shadow-lg scale-105' : 'bg-white text-gray-600 border'" class="px-2 py-3 rounded-xl text-center transition-all transform">
+                    <div class="text-xl mb-1">📸</div>
+                    <div class="text-xs font-medium">拍照記錄</div>
+                </button>
+                <button @click="mode = 'material'" :class="mode === 'material' ? 'bg-orange-600 text-white shadow-lg scale-105' : 'bg-white text-gray-600 border'" class="px-2 py-3 rounded-xl text-center transition-all transform">
+                    <div class="text-xl mb-1">🧱</div>
+                    <div class="text-xs font-medium">材料進場</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- 提示文字 -->
+        <div class="px-4 mt-3">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700">
+                <template x-if="mode === 'daily_log'">
+                    <span>💡 請說明：今天天氣、施工內容、人力機具、材料使用、安全品質事項</span>
+                </template>
+                <template x-if="mode === 'inspection'">
+                    <span>💡 請說明：檢查項目名稱、位置、檢查結果（合格/不合格）、缺失說明</span>
+                </template>
+                <template x-if="mode === 'photo'">
+                    <span>💡 請說明：拍攝位置、工項名稱、設計值、實測值、照片說明</span>
+                </template>
+                <template x-if="mode === 'material'">
+                    <span>💡 請說明：材料名稱、規格、數量、單位、供應商</span>
+                </template>
+            </div>
+        </div>
+
+        <!-- 辨識結果 -->
+        <div x-show="transcript" class="px-4 mt-3">
+            <div class="bg-white rounded-xl shadow p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-medium text-gray-700 text-sm">🎯 辨識結果</h3>
+                    <span class="text-xs text-gray-400" x-text="recognitionDuration + 's'"></span>
+                </div>
+                <p class="text-sm text-gray-800 leading-relaxed bg-gray-50 rounded-lg p-3" x-text="transcript"></p>
+            </div>
+        </div>
+
+        <!-- AI 結構化結果 -->
+        <div x-show="structuredData" class="px-4 mt-3">
+            <div class="bg-white rounded-xl shadow p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-medium text-gray-700 text-sm">🤖 AI 結構化結果</h3>
+                    <div class="flex gap-2">
+                        <button @click="confirmDraft()" class="px-3 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700" :disabled="confirming">
+                            <span x-show="!confirming">✓ 確認送出</span>
+                            <span x-show="confirming">處理中...</span>
+                        </button>
+                        <button @click="structuredData = null; transcript = ''; draftId = null" class="px-3 py-1 bg-gray-200 text-gray-600 text-xs rounded-lg hover:bg-gray-300">✕ 取消</button>
+                    </div>
+                </div>
+
+                <!-- 日報表結構化 -->
+                <template x-if="mode === 'daily_log' && structuredData">
+                    <div class="space-y-2 text-sm">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div><span class="text-gray-500">日期：</span><span class="font-medium" x-text="structuredData.log_date"></span></div>
+                            <div><span class="text-gray-500">狀態：</span><span class="font-medium" x-text="structuredData.day_status"></span></div>
+                            <div><span class="text-gray-500">上午天氣：</span><span x-text="structuredData.weather_am"></span></div>
+                            <div><span class="text-gray-500">下午天氣：</span><span x-text="structuredData.weather_pm"></span></div>
+                        </div>
+                        <div x-show="structuredData.work_description">
+                            <span class="text-gray-500">施工概況：</span>
+                            <p class="mt-1 bg-gray-50 rounded p-2 text-xs" x-text="structuredData.work_description"></p>
+                        </div>
+                        <div x-show="structuredData.workers && structuredData.workers.length > 0">
+                            <span class="text-gray-500">人力：</span>
+                            <template x-for="w in structuredData.workers"><span class="inline-block bg-blue-100 text-blue-700 rounded px-2 py-0.5 text-xs mr-1 mt-1" x-text="w.trade + ' ' + w.count + '人'"></span></template>
+                        </div>
+                        <div x-show="structuredData.equipment && structuredData.equipment.length > 0">
+                            <span class="text-gray-500">機具：</span>
+                            <template x-for="e in structuredData.equipment"><span class="inline-block bg-green-100 text-green-700 rounded px-2 py-0.5 text-xs mr-1 mt-1" x-text="e.equipment_name + ' ' + e.count + '台'"></span></template>
+                        </div>
+                        <div x-show="structuredData.materials && structuredData.materials.length > 0">
+                            <span class="text-gray-500">材料：</span>
+                            <template x-for="m in structuredData.materials"><span class="inline-block bg-orange-100 text-orange-700 rounded px-2 py-0.5 text-xs mr-1 mt-1" x-text="m.material_name + ' ' + m.quantity + m.unit"></span></template>
+                        </div>
+                        <div x-show="structuredData.safety_notes"><span class="text-gray-500">安全：</span><span class="text-xs" x-text="structuredData.safety_notes"></span></div>
+                        <div x-show="structuredData.quality_notes"><span class="text-gray-500">品質：</span><span class="text-xs" x-text="structuredData.quality_notes"></span></div>
+                    </div>
+                </template>
+
+                <!-- 檢查表結構化 -->
+                <template x-if="mode === 'inspection' && structuredData">
+                    <div class="space-y-2 text-sm">
+                        <div><span class="text-gray-500">檢查表：</span><span class="font-medium" x-text="structuredData.checklist_name"></span></div>
+                        <div><span class="text-gray-500">位置：</span><span x-text="structuredData.inspection_location"></span></div>
+                        <div x-show="structuredData.items && structuredData.items.length > 0">
+                            <span class="text-gray-500">檢查項目：</span>
+                            <template x-for="item in structuredData.items">
+                                <div class="flex items-center gap-2 mt-1 text-xs bg-gray-50 rounded p-2">
+                                    <span :class="item.check_result === 'V' ? 'text-green-600' : item.check_result === 'X' ? 'text-red-600' : 'text-gray-400'" x-text="item.check_result === 'V' ? '✅' : item.check_result === 'X' ? '❌' : '⬜'"></span>
+                                    <span x-text="item.item_name"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 拍照/材料結構化 -->
+                <template x-if="(mode === 'photo' || mode === 'material') && structuredData">
+                    <div class="text-sm">
+                        <pre class="bg-gray-50 rounded p-3 text-xs overflow-x-auto whitespace-pre-wrap" x-text="JSON.stringify(structuredData, null, 2)"></pre>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- 草稿列表 -->
+        <div class="px-4 mt-4">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="font-medium text-gray-700 text-sm">📝 待檢核草稿</h3>
+                <button @click="loadDrafts()" class="text-xs text-blue-600 hover:text-blue-800">重新整理</button>
+            </div>
+            <div x-show="drafts.length === 0" class="text-center py-6 text-gray-400 text-sm">
+                尚無語音草稿
+            </div>
+            <div class="space-y-2">
+                <template x-for="d in drafts" :key="d.id">
+                    <div class="bg-white rounded-lg shadow-sm border p-3" :class="d.status === 'confirmed' ? 'opacity-60' : ''">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg" x-text="d.mode === 'daily_log' ? '📋' : d.mode === 'inspection' ? '✅' : d.mode === 'photo' ? '📸' : '🧱'"></span>
+                                <div>
+                                    <div class="text-sm font-medium" x-text="d.mode === 'daily_log' ? '施工日誌' : d.mode === 'inspection' ? '自主檢查' : d.mode === 'photo' ? '拍照記錄' : '材料進場'"></div>
+                                    <div class="text-xs text-gray-400" x-text="d.created_at"></div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs px-2 py-0.5 rounded-full" :class="d.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : d.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'" x-text="d.status === 'pending' ? '待檢核' : d.status === 'confirmed' ? '已確認' : d.status"></span>
+                                <button x-show="d.status === 'pending'" @click="reviewDraft(d)" class="text-xs text-blue-600 hover:text-blue-800">檢視</button>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1 line-clamp-2" x-text="d.transcript"></p>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部錄音按鈕 -->
+    <div x-show="currentProject" class="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t px-4 py-4 z-50" style="-webkit-backdrop-filter: blur(10px);">
+        <div class="flex items-center justify-center gap-4">
+            <!-- 文字輸入切換 -->
+            <button @click="showTextInput = !showTextInput" class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </button>
+
+            <!-- 錄音按鈕 -->
+            <div class="relative">
+                <div x-show="isRecording" class="absolute inset-0 rounded-full bg-red-400/30 pulse-ring"></div>
+                <button @click="toggleRecording()" class="relative w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-all transform active:scale-95"
+                    :class="isRecording ? 'bg-red-500 scale-110' : 'bg-blue-600 hover:bg-blue-700'">
+                    <template x-if="!isRecording && !isProcessing">
+                        <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                    </template>
+                    <template x-if="isRecording">
+                        <div class="flex items-center gap-1">
+                            <div class="w-1 bg-white rounded-full wave-bar" style="animation-delay: 0s;"></div>
+                            <div class="w-1 bg-white rounded-full wave-bar" style="animation-delay: 0.15s;"></div>
+                            <div class="w-1 bg-white rounded-full wave-bar" style="animation-delay: 0.3s;"></div>
+                            <div class="w-1 bg-white rounded-full wave-bar" style="animation-delay: 0.45s;"></div>
+                            <div class="w-1 bg-white rounded-full wave-bar" style="animation-delay: 0.6s;"></div>
+                        </div>
+                    </template>
+                    <template x-if="isProcessing">
+                        <svg class="w-8 h-8 text-white animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    </template>
+                </button>
+            </div>
+
+            <!-- 錄音時間 -->
+            <div class="w-12 text-center">
+                <span x-show="isRecording" class="text-red-500 text-sm font-mono recording-dot" x-text="recordingTime + 's'"></span>
+            </div>
+        </div>
+
+        <!-- 文字輸入框 -->
+        <div x-show="showTextInput" x-transition class="mt-3">
+            <div class="flex gap-2">
+                <input x-model="textInput" @keyup.enter="submitText()" class="flex-1 px-3 py-2 border rounded-lg text-sm" placeholder="輸入口述內容（測試用）...">
+                <button @click="submitText()" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700" :disabled="isProcessing || !textInput.trim()">送出</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知 Toast -->
+    <div x-show="toast" x-transition class="fixed top-16 left-4 right-4 z-50">
+        <div class="rounded-lg shadow-lg px-4 py-3 text-sm text-white" :class="toastType === 'success' ? 'bg-green-600' : toastType === 'error' ? 'bg-red-600' : 'bg-blue-600'" x-text="toast"></div>
+    </div>
+
+    <script>
+    function voiceApp() {
+        return {
+            projects: [],
+            currentProject: null,
+            mode: 'daily_log',
+            isRecording: false,
+            isProcessing: false,
+            recordingTime: 0,
+            recordingTimer: null,
+            mediaRecorder: null,
+            audioChunks: [],
+            transcript: '',
+            structuredData: null,
+            draftId: null,
+            drafts: [],
+            confirming: false,
+            showTextInput: false,
+            textInput: '',
+            toast: '',
+            toastType: 'info',
+            recognitionDuration: 0,
+
+            async init() {
+                await this.loadProjects();
+                // 自動選擇第一個工程
+                if (this.projects.length === 1) {
+                    this.selectProject(this.projects[0]);
+                }
+            },
+
+            async loadProjects() {
+                try {
+                    const res = await fetch('/api/projects');
+                    const data = await res.json();
+                    if (data.success) this.projects = data.data;
+                } catch (e) { console.error(e); }
+            },
+
+            selectProject(p) {
+                this.currentProject = p;
+                this.loadDrafts();
+            },
+
+            async loadDrafts() {
+                if (!this.currentProject) return;
+                try {
+                    const res = await fetch(`/api/projects/${this.currentProject.id}/voice/drafts`);
+                    const data = await res.json();
+                    if (data.success) this.drafts = data.data;
+                } catch (e) { console.error(e); }
+            },
+
+            async toggleRecording() {
+                if (this.isProcessing) return;
+                if (this.isRecording) {
+                    this.stopRecording();
+                } else {
+                    this.startRecording();
+                }
+            },
+
+            async startRecording() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
+                    });
+                    this.audioChunks = [];
+                    // 優先使用 webm/opus，fallback 到瀏覽器支援的格式
+                    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' :
+                                     MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
+                                     MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
+                    const options = mimeType ? { mimeType } : {};
+                    this.mediaRecorder = new MediaRecorder(stream, options);
+                    this.mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) this.audioChunks.push(e.data);
+                    };
+                    this.mediaRecorder.onstop = () => {
+                        stream.getTracks().forEach(t => t.stop());
+                        this.uploadAudio();
+                    };
+                    this.mediaRecorder.start(250);
+                    this.isRecording = true;
+                    this.recordingTime = 0;
+                    this.recordingTimer = setInterval(() => { this.recordingTime++; }, 1000);
+                    this.transcript = '';
+                    this.structuredData = null;
+                } catch (e) {
+                    this.showToast('無法存取麥克風：' + e.message, 'error');
+                }
+            },
+
+            stopRecording() {
+                if (this.mediaRecorder && this.isRecording) {
+                    this.mediaRecorder.stop();
+                    this.isRecording = false;
+                    clearInterval(this.recordingTimer);
+                }
+            },
+
+            async uploadAudio() {
+                if (this.audioChunks.length === 0) return;
+                this.isProcessing = true;
+                this.showToast('正在辨識語音...', 'info');
+
+                const mimeType = this.mediaRecorder.mimeType || 'audio/webm';
+                const ext = mimeType.includes('mp4') ? '.m4a' : '.webm';
+                const blob = new Blob(this.audioChunks, { type: mimeType });
+                const formData = new FormData();
+                formData.append('audio', blob, `recording${ext}`);
+                formData.append('mode', this.mode);
+                formData.append('language', 'auto');
+
+                try {
+                    const res = await fetch(`/api/projects/${this.currentProject.id}/voice/transcribe`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.transcript = data.transcript;
+                        this.structuredData = data.structured_data;
+                        this.draftId = data.draft_id;
+                        this.recognitionDuration = data.duration;
+                        this.showToast('辨識完成！請檢核結果', 'success');
+                        this.loadDrafts();
+                    } else {
+                        this.showToast(data.message || '辨識失敗', 'error');
+                    }
+                } catch (e) {
+                    this.showToast('上傳失敗：' + e.message, 'error');
+                } finally {
+                    this.isProcessing = false;
+                }
+            },
+
+            async submitText() {
+                if (!this.textInput.trim() || this.isProcessing) return;
+                this.isProcessing = true;
+                this.showToast('AI 結構化處理中...', 'info');
+
+                try {
+                    const res = await fetch(`/api/projects/${this.currentProject.id}/voice/transcribe-text`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: this.textInput, mode: this.mode })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.transcript = data.transcript;
+                        this.structuredData = data.structured_data;
+                        this.draftId = data.draft_id;
+                        this.textInput = '';
+                        this.showToast('結構化完成！請檢核結果', 'success');
+                        this.loadDrafts();
+                    } else {
+                        this.showToast(data.message || '處理失敗', 'error');
+                    }
+                } catch (e) {
+                    this.showToast('處理失敗：' + e.message, 'error');
+                } finally {
+                    this.isProcessing = false;
+                }
+            },
+
+            async confirmDraft() {
+                if (!this.draftId || this.confirming) return;
+                this.confirming = true;
+                try {
+                    const res = await fetch(`/api/projects/${this.currentProject.id}/voice/drafts/${this.draftId}/confirm`, { method: 'POST' });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.showToast(data.message, 'success');
+                        this.transcript = '';
+                        this.structuredData = null;
+                        this.draftId = null;
+                        this.loadDrafts();
+                    } else {
+                        this.showToast(data.message || '確認失敗', 'error');
+                    }
+                } catch (e) {
+                    this.showToast('確認失敗：' + e.message, 'error');
+                } finally {
+                    this.confirming = false;
+                }
+            },
+
+            reviewDraft(d) {
+                this.transcript = d.transcript;
+                this.structuredData = d.structured_data;
+                this.draftId = d.id;
+                this.mode = d.mode;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+
+            showToast(msg, type = 'info') {
+                this.toast = msg;
+                this.toastType = type;
+                setTimeout(() => { this.toast = ''; }, 3000);
+            }
+        };
+    }
+    </script>
+</body>
+</html>

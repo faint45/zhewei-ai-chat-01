@@ -1,0 +1,1 @@
+{"timestamp": "2026-02-10T23:42:50.176055", "request": "test multi agent flow", "engine_type": "conversation", "quality_score": 0.0, "quality_passed": false, "retry_count": 1, "tool_calls": 0, "tool_errors": 0, "duration_seconds": 0.067}

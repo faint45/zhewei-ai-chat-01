@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>築未科技｜健康儀表板</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #0b1020; color: #e5e7eb; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 20px; }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    .meta { color: #9ca3af; font-size: 13px; margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 14px; }
+    .title { font-size: 14px; color: #93c5fd; margin-bottom: 10px; }
+    .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #1f2937; font-size: 13px; }
+    .row:last-child { border-bottom: none; }
+    .ok { color: #22c55e; font-weight: 700; }
+    .bad { color: #ef4444; font-weight: 700; }
+    .na { color: #f59e0b; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>築未科技 健康儀表板</h1>
+    <div class="meta">
+      來源：<code>/api/health/summary</code> | 更新週期：5 秒
+      <span id="updated"></span>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="title">核心狀態</div>
+        <div id="core"></div>
+      </div>
+      <div class="card">
+        <div class="title">語音模組</div>
+        <div id="voice"></div>
+      </div>
+      <div class="card">
+        <div class="title">外部依賴</div>
+        <div id="deps"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const byId = (id) => document.getElementById(id);
+    const okBad = (v) => v ? '<span class="ok">OK</span>' : '<span class="bad">FAIL</span>';
+    const okBadNa = (v, na=false) => na ? '<span class="na">N/A</span>' : okBad(v);
+    const row = (k, v) => `<div class="row"><span>${k}</span><span>${v}</span></div>`;
+
+    async function refresh() {
+      try {
+        const res = await fetch('/api/health/summary', { cache: 'no-store' });
+        const h = await res.json();
+        const core = [
+          row('status', h.status || '-'),
+          row('mode', h.mode || '-'),
+          row('engine', h.engine || '-'),
+          row('ollama', okBad(!!h.ollama)),
+          row('venv_vision', okBad(!!h.venv_vision)),
+          row('static_dir', okBad(!!h.static_dir)),
+          row('progress_dir', okBad(!!h.progress_dir)),
+        ].join('');
+        byId('core').innerHTML = core;
+
+        const v = h.voice || {};
+        const whisperNa = (v.whisper_required === false);
+        const voice = [
+          row('stt_provider', v.stt_provider || '-'),
+          row('tts_provider', v.tts_provider || '-'),
+          row('whisper_available', okBadNa(!!v.whisper_available, whisperNa)),
+          row('piper_available', okBad(!!v.piper_available)),
+          row('piper_model_exists', okBad(!!v.piper_model_exists)),
+        ].join('');
+        byId('voice').innerHTML = voice;
+
+        const d = h.dependencies || {};
+        const deps = Object.keys(d).sort().map((k) => {
+          const item = d[k];
+          if (item && typeof item === 'object') {
+            const isNa = String(item.status || '').toLowerCase() === 'skipped';
+            return row(k, okBadNa(!!item.ok, isNa));
+          }
+          return row(k, okBad(!!item));
+        }).join('');
+        byId('deps').innerHTML = deps || row('dependencies', '-');
+      } catch (e) {
+        byId('core').innerHTML = row('error', `<span class="bad">${String(e)}</span>`);
+      }
+      byId('updated').textContent = ` | 最後更新：${new Date().toLocaleString()}`;
+    }
+
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+{
+  "id": "line_notification_workflow",
+  "name": "LINE 任務通知與回覆工作流",
+  "description": "開啟 LINE、讀取重點訊息，並可執行回覆/通知流程。",
+  "category": "business",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "title": "開啟 LINE 桌面版",
+      "execution": "host_script",
+      "job_type": "line_open",
+      "provider": "desktop",
+      "args": {}
+    },
+    {
+      "title": "VLM 判讀 LINE 最近訊息",
+      "execution": "host_script",
+      "job_type": "line_read_vlm",
+      "provider": "desktop",
+      "args": {
+        "question": "最後一則訊息是誰發的？內容是什麼？是否提到緊急或修改？請輸出 JSON。",
+        "keywords": [
+          "緊急",
+          "修改",
+          "urgent",
+          "change"
+        ]
+      }
+    },
+    {
+      "title": "Smart GUI 執行回覆/通知",
+      "execution": "host_script",
+      "job_type": "smart_gui_agent",
+      "provider": "desktop",
+      "args": {
+        "instruction": "切到指定 LINE 群組，貼上摘要訊息並送出。",
+        "execute": true,
+        "max_actions": 8,
+        "retry_count": 3
+      }
+    }
+  ]
+}
+

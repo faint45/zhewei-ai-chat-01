@@ -12,9 +12,15 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable, Coroutine, TypedDict
 
 from agent_tools import TOOLS, generate_voice_report
+
+try:
+    from langgraph.graph import END, StateGraph
+except Exception:
+    END = None
+    StateGraph = None
 
 LOG_FILE = os.environ.get("BRAIN_LOG_FILE", "D:/brain_workspace/brain_system.log")
 try:
@@ -24,15 +30,16 @@ except Exception:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 MAX_TURNS = 10
+LANGGRAPH_REPAIR_MAX = int((os.environ.get("LANGGRAPH_REPAIR_MAX", "3").strip() or "3"))
 Z_DRIVE_PATH = Path(os.environ.get("ZHEWEI_MEMORY_ROOT", "Z:/Zhewei_Brain"))
 RULES_FILE = Z_DRIVE_PATH / "Rules" / "master_rules.md"
 EXPERIENCE_FILE = Z_DRIVE_PATH / "Experience" / "Experience_Logs.jsonl"
 
 SYSTEM_PROMPT = """你是築未科技自主工程師。必須嚴格輸出 JSON 格式：
-- 執行工具：{"thought": "...", "tool": "run_command|read_file|write_file|list_dir|vision_analyze|run_vision_engine|manage_construction_log|generate_progress_report|generate_voice_report|generate_media|deploy_service|update_web_admin", "args": {...}}
+- 執行工具：{"thought": "...", "tool": "run_command|read_file|write_file|list_dir|vision_analyze|run_vision_engine|manage_construction_log|generate_progress_report|generate_voice_report|generate_media|deploy_service|update_web_admin|search_graph_rag|ingest_graph_rag_pdf", "args": {...}}
 - 任務完成：{"done": true, "result": "..."}
 
-可用工具：run_command(command)、read_file(path)、write_file(path, content)、list_dir(path)、vision_analyze(image_path)、run_vision_engine(image_path)、manage_construction_log(content)、generate_progress_report(detected)、generate_voice_report(transcript)、generate_media(prompt, type=image|video)、deploy_service(service_name)、update_web_admin(data，進度可含 LaTeX 如 $95\\%$)。所有檔案路徑限 D:\\ 或 Z:\\。"""
+可用工具：run_command(command)、read_file(path)、write_file(path, content)、list_dir(path)、vision_analyze(image_path)、run_vision_engine(image_path)、manage_construction_log(content)、generate_progress_report(detected)、generate_voice_report(transcript)、generate_media(prompt, type=image|video)、deploy_service(service_name)、update_web_admin(data，進度可含 LaTeX 如 $95\\%$)、search_graph_rag(query, limit=5)、ingest_graph_rag_pdf(pdf_path, source_name)。所有檔案路徑限 D:\\ 或 Z:\\。圖表相關：先 search_graph_rag 查詢連續壁/配筋/搭接等。"""
 
 VISION_KEYWORDS = ("分析", "jpg", "png", "辨識", "影片", "lpc")
 COMPLEX_KEYWORDS = ("架構", "設計", "優化", "debug", "修復", "部署")
@@ -109,6 +116,7 @@ class AgentManager:
         self.claude = claude_service
         self.send_message = send_message
         self.max_turns = max_turns
+        self.use_langgraph = (os.environ.get("AGENT_USE_LANGGRAPH", "1").strip() or "1") in ("1", "true", "yes", "on")
         self.memory_path = RULES_FILE
         self.experience_path = EXPERIENCE_FILE
         try:
@@ -116,6 +124,123 @@ class AgentManager:
             self.experience_path.parent.mkdir(parents=True, exist_ok=True)
         except Exception as e:
             logging.warning("Z 槽目錄初始化: %s", e)
+
+    async def _run_with_langgraph(self, user_request: str, send: Callable[..., Coroutine[Any, Any, None]] | None) -> str:
+        """
+        LangGraph 版流程（較精簡進度回報）：
+        receive -> classify -> execute -> finalize
+        """
+        if StateGraph is None or END is None:
+            return await self._run_legacy(user_request, send)
+
+        class AgentState(TypedDict, total=False):
+            user_request: str
+            history: list[dict[str, str]]
+            engine_type: str
+            final_result: str
+            last_vision_observation: dict[str, Any] | None
+
+        async def _node_receive(state: AgentState) -> AgentState:
+            if send:
+                await send({"type": "step", "content": "LangGraph：接收需求"})
+            history = self._load_long_term_memory()
+            history.append({"role": "system", "content": SYSTEM_PROMPT})
+            history.append({"role": "user", "content": state["user_request"]})
+            return {"history": history}
+
+        async def _node_classify(state: AgentState) -> AgentState:
+            et = self._classify_task(state["user_request"])
+            if send:
+                await send({"type": "info", "content": f"LangGraph：任務分類 `{et}`"})
+            return {"engine_type": et}
+
+        async def _node_execute(state: AgentState) -> AgentState:
+            history = list(state.get("history", []))
+            engine_type = str(state.get("engine_type", "conversation"))
+            engine = self.gemini if engine_type in {"vision", "complex"} else self.ollama
+            final_result = ""
+            last_vision_observation = None
+            repair_count = 0
+            max_repairs = max(1, LANGGRAPH_REPAIR_MAX)
+            model_marked_done = False
+
+            for _ in range(max(1, self.max_turns)):
+                response_text = await engine.chat(history)
+                decision = extract_json_from_markdown(response_text)
+                if decision is None:
+                    try:
+                        decision = json.loads(response_text)
+                    except json.JSONDecodeError:
+                        history.append({"role": "assistant", "content": response_text})
+                        continue
+
+                if decision.get("done"):
+                    final_result = decision.get("result", "任務已完成")
+                    model_marked_done = True
+                    break
+
+                tool_name = decision.get("tool")
+                tool_args = decision.get("args") or {}
+                observation = await self._execute_tool(tool_name, tool_args)
+                if tool_name == "run_vision_engine":
+                    last_vision_observation = observation
+                history.append({"role": "assistant", "content": response_text})
+                history.append({"role": "user", "content": f"Observation: {json.dumps(observation, ensure_ascii=False)}"})
+                if self._observation_has_error(observation):
+                    repair_count += 1
+                    engine = self.gemini
+                    if repair_count <= max_repairs:
+                        # LangGraph 核心循環：先內部自我修正，再決定是否回報使用者
+                        history.append(
+                            {
+                                "role": "user",
+                                "content": (
+                                    f"修正回合 {repair_count}/{max_repairs}：上一輪工具執行失敗。"
+                                    "請根據 Observation 重新規劃，輸出新的最小可行工具步驟。"
+                                ),
+                            }
+                        )
+                        continue
+                    final_result = (
+                        "LangGraph 自我修正已達上限，仍未成功。"
+                        f"已重試 {max_repairs} 次；請補充更明確的輸入/目標後再試。"
+                    )
+                    break
+
+            if engine_type == "vision" and model_marked_done and last_vision_observation is not None and final_result:
+                cross = await self._cross_validate_results(last_vision_observation)
+                if cross.get("status") == "dispute":
+                    final_result = f"{final_result}\n【階段 7】{cross.get('note', '需要元寶或千問介入裁決')}"
+                else:
+                    final_result = cross.get("result") or final_result
+
+            return {"history": history, "final_result": final_result, "last_vision_observation": last_vision_observation}
+
+        async def _node_finalize(state: AgentState) -> AgentState:
+            final_result = str(state.get("final_result") or "")
+            if final_result:
+                self._learn_from_success(state["user_request"], final_result)
+                if send:
+                    await send({"type": "result", "content": "LangGraph：任務完成，進度 $100\\%$"})
+                return {"final_result": final_result}
+            msg = f"LangGraph：已執行 {self.max_turns} 輪未完成，請縮小需求。"
+            if send:
+                await send({"type": "result", "content": msg})
+            return {"final_result": msg}
+
+        graph = StateGraph(AgentState)
+        graph.add_node("receive", _node_receive)
+        graph.add_node("classify", _node_classify)
+        graph.add_node("execute", _node_execute)
+        graph.add_node("finalize", _node_finalize)
+        graph.set_entry_point("receive")
+        graph.add_edge("receive", "classify")
+        graph.add_edge("classify", "execute")
+        graph.add_edge("execute", "finalize")
+        graph.add_edge("finalize", END)
+        compiled = graph.compile()
+        out = await compiled.ainvoke({"user_request": user_request})
+        return str((out or {}).get("final_result") or "LangGraph 執行完成。")
 
     def _is_logical_gap(self, val1: str, val2: str) -> bool:
         """數值或邏輯比對：兩結論分歧超過門檻則回傳 True（需裁決）。"""
@@ -232,7 +357,7 @@ class AgentManager:
         except Exception as e:
             logging.warning("經驗寫入失敗: %s", e)
 
-    async def run(self, user_request: str, send_message: Callable[..., Coroutine[Any, Any, None]] | None = None) -> str:
+    async def _run_legacy(self, user_request: str, send_message: Callable[..., Coroutine[Any, Any, None]] | None = None) -> str:
         """
         核心執行引擎：標準 8 階段流程。
         1. 需求接收 2. 整合理解 3. 安排(引擎分流) 4. 執行 5~7. 確認與修正(ReAct) 8. 完成與經驗學習。
@@ -330,6 +455,12 @@ class AgentManager:
             if send:
                 await send({"type": "error", "content": f"核心錯誤: {str(e)}，請檢查主機 Log。"})
             return f"核心錯誤: {str(e)}"
+
+    async def run(self, user_request: str, send_message: Callable[..., Coroutine[Any, Any, None]] | None = None) -> str:
+        send = send_message or self.send_message
+        if self.use_langgraph and StateGraph is not None and END is not None:
+            return await self._run_with_langgraph(user_request, send)
+        return await self._run_legacy(user_request, send)
 
 
 if __name__ == "__main__":

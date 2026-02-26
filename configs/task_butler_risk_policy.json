@@ -1,0 +1,21 @@
+{
+  "id": "task_butler_risk_policy",
+  "name": "智能管家風險分級與執行策略",
+  "description": "低風險自動執行，高風險需使用者確認（auto_safe_escalate）",
+  "version": "1.0.0",
+  "default_policy": "auto_safe_escalate",
+  "risk_levels": {
+    "low": {"label": "低風險", "auto_execute": true, "examples": ["整理摘要", "回覆草稿", "派工通知", "標記已讀", "內部備註"]},
+    "normal": {"label": "一般", "auto_execute": true, "examples": ["回覆客戶一般詢問", "轉發內部", "建立待辦"]},
+    "high": {"label": "高風險", "auto_execute": false, "require_confirm": true, "examples": ["對外正式回覆", "承諾交期", "報價", "刪除/修改資料", "付款相關"]},
+    "critical": {"label": "關鍵", "auto_execute": false, "require_confirm": true, "examples": ["法律承諾", "金流", "個資對外"]}
+  },
+  "keyword_hints": {"high": ["報價", "合約", "交期", "承諾", "正式回覆", "對外"], "critical": ["付款", "轉帳", "個資", "法律"]},
+  "command_whitelist": {
+    "enabled": true,
+    "allowed_builtins": ["dir", "cd", "where", "type", "echo", "echo."],
+    "allowed_extensions": [".bat", ".cmd", ".exe"],
+    "allowed_script_dirs": ["scripts", "ops"],
+    "allowed_executables": ["python.exe", "cmd.exe", "powershell.exe", "calc.exe", "notepad.exe"]
+  }
+}

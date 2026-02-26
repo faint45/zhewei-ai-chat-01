@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "updated_at": "2026-02-10T23:55:24",
+  "root": "/memory/Knowledge/tw_laws",
+  "db_path": "/memory/Knowledge/tw_laws/tw_laws.sqlite",
+  "downloaded": {
+    "CF": "/memory/Knowledge/tw_laws/raw/CF.zip",
+    "CM": "/memory/Knowledge/tw_laws/raw/CM.zip"
+  },
+  "extracted_files": 6,
+  "indexed_docs": 11745,
+  "total_docs": 11745,
+  "by_kind": {
+    "CF": 1343,
+    "CM": 10402
+  },
+  "duration_seconds": 61.497
+}

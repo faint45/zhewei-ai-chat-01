@@ -1,0 +1,31 @@
+# 築未科技 — OpenHands (原 OpenDevin) Docker Compose
+# 用途：AI 自動寫程式、跑測試、自動修 Bug 的沙盒環境
+# 啟動：docker compose -f docker-compose.openhands.yml up -d
+# 介面：http://localhost:3000
+
+services:
+  openhands:
+    image: docker.openhands.dev/openhands/openhands:1.3
+    container_name: openhands
+    environment:
+      # 沙盒代理伺服器映像
+      AGENT_SERVER_IMAGE_REPOSITORY: ghcr.io/openhands/agent-server
+      AGENT_SERVER_IMAGE_TAG: 1.10.0-python
+      LOG_ALL_EVENTS: "true"
+      # 掛載專案目錄到沙盒（Docker on Windows 需 Linux 路徑格式）
+      SANDBOX_VOLUMES: "${OPENHANDS_WORKSPACE:-/d/zhe-wei-tech}:/workspace:rw"
+    volumes:
+      # Docker socket（讓 OpenHands 能啟動沙盒容器）
+      - /var/run/docker.sock:/var/run/docker.sock
+      # 持久化設定與對話紀錄
+      - openhands-data:/.openhands
+    ports:
+      - "3001:3000"
+    extra_hosts:
+      # 讓容器能連到本機 Ollama
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  openhands-data:
+    name: openhands-data

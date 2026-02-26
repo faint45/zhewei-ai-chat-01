@@ -1,0 +1,76 @@
+{
+  "services": [
+    {
+      "name": "Portal",
+      "subdomain": "",
+      "domain": "zhe-wei.net",
+      "port": 8888,
+      "target": "host.docker.internal:8888",
+      "description": "主入口網站 PWA",
+      "enabled": true
+    },
+    {
+      "name": "Portal WWW",
+      "subdomain": "www",
+      "domain": "zhe-wei.net",
+      "port": 8888,
+      "target": "host.docker.internal:8888",
+      "description": "WWW 別名",
+      "enabled": true
+    },
+    {
+      "name": "Jarvis AI",
+      "subdomain": "jarvis",
+      "domain": "zhe-wei.net",
+      "port": 8000,
+      "target": "brain_server:8000",
+      "description": "AI 大腦系統",
+      "enabled": true
+    },
+    {
+      "name": "Smart Bridge",
+      "subdomain": "bridge",
+      "domain": "zhe-wei.net",
+      "port": 8003,
+      "target": "host.docker.internal:8003",
+      "description": "智慧對話橋接",
+      "enabled": true
+    },
+    {
+      "name": "Dify",
+      "subdomain": "dify",
+      "domain": "zhe-wei.net",
+      "port": 8080,
+      "target": "host.docker.internal:8080",
+      "description": "AI 工作流",
+      "enabled": true
+    },
+    {
+      "name": "CMS",
+      "subdomain": "cms",
+      "domain": "zhe-wei.net",
+      "port": 8020,
+      "target": "host.docker.internal:8020",
+      "description": "營建管理系統",
+      "enabled": true
+    },
+    {
+      "name": "Vision",
+      "subdomain": "vision",
+      "domain": "zhe-wei.net",
+      "port": 8030,
+      "target": "host.docker.internal:8030",
+      "description": "AI 視覺辨識",
+      "enabled": true
+    },
+    {
+      "name": "Code Simulator",
+      "subdomain": "codesim",
+      "domain": "zhe-wei.net",
+      "port": 8001,
+      "target": "host.docker.internal:8001",
+      "description": "代碼模擬器",
+      "enabled": true
+    }
+  ]
+}

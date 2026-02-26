@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API 用量監控 - Jarvis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; }
+        .card { @apply bg-slate-800/50 rounded-xl border border-slate-700/40; }
+        .stat-value { @apply text-3xl font-bold text-white; }
+        .provider-deepseek { @apply bg-cyan-500/20 text-cyan-400; }
+        .provider-minimax { @apply bg-purple-500/20 text-purple-400; }
+        .provider-gemini { @apply bg-blue-500/20 text-blue-400; }
+        .provider-claude { @apply bg-orange-500/20 text-orange-400; }
+        .provider-ollama { @apply bg-green-500/20 text-green-400; }
+    </style>
+</head>
+<body class="bg-[#0a0a0f] text-slate-200 min-h-screen">
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-white">API 用量監控</h1>
+                <p class="text-slate-400 mt-1">追蹤 AI API 調用與成本消耗</p>
+            </div>
+            <button onclick="refreshData()" class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition">
+                重新整理
+            </button>
+        </div>
+
+        <!-- 今日統計 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="card p-6">
+                <p class="text-slate-400 text-sm">今日總請求數</p>
+                <p class="stat-value" id="totalRequests">-</p>
+            </div>
+            <div class="card p-6">
+                <p class="text-slate-400 text-sm">今日總成本</p>
+                <p class="stat-value text-green-400" id="totalCost">-</p>
+            </div>
+            <div class="card p-6">
+                <p class="text-slate-400 text-sm">輸入 Tokens</p>
+                <p class="stat-value" id="inputTokens">-</p>
+            </div>
+            <div class="card p-6">
+                <p class="text-slate-400 text-sm">輸出 Tokens</p>
+                <p class="stat-value" id="outputTokens">-</p>
+            </div>
+        </div>
+
+        <!-- 各提供者詳情 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8" id="providerStats">
+            <!-- DeepSeek -->
+            <div class="card p-6 provider-deepseek">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">DeepSeek</h3>
+                        <p class="text-xs text-slate-400">滿血版 671B MoE</p>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">請求次數</span>
+                        <span id="deepseekRequests" class="font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">成本</span>
+                        <span id="deepseekCost" class="font-mono text-green-400">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MiniMax -->
+            <div class="card p-6 provider-minimax">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">MiniMax</h3>
+                        <p class="text-xs text-slate-400">M2.5 推理模型</p>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">請求次數</span>
+                        <span id="minimaxRequests" class="font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">成本</span>
+                        <span id="minimaxCost" class="font-mono text-green-400">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gemini -->
+            <div class="card p-6 provider-gemini">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">Gemini</h3>
+                        <p class="text-xs text-slate-400">2.5 Flash</p>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">請求次數</span>
+                        <span id="geminiRequests" class="font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">成本</span>
+                        <span id="geminiCost" class="font-mono text-green-400">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Claude -->
+            <div class="card p-6 provider-claude">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">Claude</h3>
+                        <p class="text-xs text-slate-400">3.5 Sonnet</p>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">請求次數</span>
+                        <span id="claudeRequests" class="font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">成本</span>
+                        <span id="claudeCost" class="font-mono text-green-400">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ollama -->
+            <div class="card p-6 provider-ollama">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">Ollama</h3>
+                        <p class="text-xs text-slate-400">本地模型（免費）</p>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">請求次數</span>
+                        <span id="ollamaRequests" class="font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">成本</span>
+                        <span class="font-mono text-green-400">$0.00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 成本配置 -->
+        <div class="card p-6 mb-8">
+            <h2 class="text-lg font-semibold text-white mb-4">成本配置 (USD/1M tokens)</h2>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                <div>
+                    <p class="text-slate-400">DeepSeek</p>
+                    <p class="text-white">$0.55 in / $2.19 out</p>
+                </div>
+                <div>
+                    <p class="text-slate-400">MiniMax</p>
+                    <p class="text-white">$0.15 in / $1.20 out</p>
+                </div>
+                <div>
+                    <p class="text-slate-400">Gemini</p>
+                    <p class="text-white">$0.075 in / $0.30 out</p>
+                </div>
+                <div>
+                    <p class="text-slate-400">Claude</p>
+                    <p class="text-white">$3.00 in / $15.00 out</p>
+                </div>
+                <div>
+                    <p class="text-slate-400">Ollama</p>
+                    <p class="text-white">$0.00 (本地免費)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 最近的 API 調用 -->
+        <div class="card p-6">
+            <h2 class="text-lg font-semibold text-white mb-4">最近的 API 調用</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-slate-400 border-b border-slate-700">
+                            <th class="text-left py-3 px-4">時間</th>
+                            <th class="text-left py-3 px-4">提供者</th>
+                            <th class="text-left py-3 px-4">模型</th>
+                            <th class="text-right py-3 px-4">輸入 Tokens</th>
+                            <th class="text-right py-3 px-4">輸出 Tokens</th>
+                            <th class="text-right py-3 px-4">成本</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentCalls">
+                        <tr>
+                            <td colspan="6" class="text-center py-8 text-slate-400">載入中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE = window.location.origin;
+
+        async function refreshData() {
+            try {
+                const res = await fetch(`${BASE}/api/usage/today`);
+                const data = await res.json();
+                updateDashboard(data);
+            } catch (e) {
+                console.error('載入失敗:', e);
+            }
+        }
+
+        function updateDashboard(data) {
+            // 總計
+            document.getElementById('totalRequests').textContent = data.total_requests?.toLocaleString() || '0';
+            document.getElementById('totalCost').textContent = `$${data.total_cost?.toFixed(4) || '0.0000'}`;
+            
+            let totalInput = 0, totalOutput = 0;
+            const providers = data.providers || {};
+            
+            // 各提供者
+            const providerMap = {
+                'deepseek': ['deepseekRequests', 'deepseekCost'],
+                'minimax': ['minimaxRequests', 'minimaxCost'],
+                'gemini': ['geminiRequests', 'geminiCost'],
+                'claude': ['claudeRequests', 'claudeCost'],
+                'ollama': ['ollamaRequests', 'ollamaCost']
+            };
+            
+            for (const [provider, [reqId, costId]] of Object.entries(providerMap)) {
+                const p = providers[provider] || {};
+                document.getElementById(reqId).textContent = (p.requests || 0).toLocaleString();
+                document.getElementById(costId).textContent = `$${(p.cost || 0).toFixed(4)}`;
+                totalInput += p.input_tokens || 0;
+                totalOutput += p.output_tokens || 0;
+            }
+            
+            document.getElementById('inputTokens').textContent = totalInput.toLocaleString();
+            document.getElementById('outputTokens').textContent = totalOutput.toLocaleString();
+        }
+
+        // 初始載入
+        refreshData();
+        
+        // 每 30 秒自動更新
+        setInterval(refreshData, 30000);
+    </script>
+</body>
+</html>

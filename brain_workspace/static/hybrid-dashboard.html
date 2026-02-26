@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>混合部署監控儀表板 — 築未科技</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .header .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .status-badge.gpu {
+            background: #10b981;
+            color: white;
+        }
+
+        .status-badge.cpu {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .status-badge.offline {
+            background: #ef4444;
+            color: white;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card .icon {
+            font-size: 24px;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .metric-value {
+            font-weight: bold;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .metric-value.success {
+            color: #10b981;
+        }
+
+        .metric-value.warning {
+            color: #f59e0b;
+        }
+
+        .metric-value.error {
+            color: #ef4444;
+        }
+
+        .model-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .model-tag {
+            background: #f3f4f6;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert.info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .alert.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .alert.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .alert.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .last-update {
+            text-align: center;
+            color: white;
+            font-size: 12px;
+            margin-top: 20px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                🎯 混合部署監控儀表板
+                <span id="currentMode" class="status-badge">載入中...</span>
+            </h1>
+            <p class="subtitle">即時監控雲端與本地 GPU 服務狀態</p>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <div id="loadingIndicator" class="card loading">
+            <div class="spinner"></div>
+            <p>正在載入監控資料...</p>
+        </div>
+
+        <div id="dashboardContent" style="display: none;">
+            <div class="grid">
+                <!-- GPU Ollama 卡片 -->
+                <div class="card">
+                    <h2>
+                        <span class="icon">🖥️</span>
+                        本地 GPU Ollama
+                    </h2>
+                    <div class="metric">
+                        <span class="metric-label">狀態</span>
+                        <span id="gpuStatus" class="metric-value">-</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">URL</span>
+                        <span id="gpuUrl" class="metric-value" style="font-size: 12px;">-</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">請求次數</span>
+                        <span id="gpuRequests" class="metric-value">-</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">最後成功</span>
+                        <span id="gpuLastSuccess" class="metric-value" style="font-size: 12px;">-</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">可用模型</span>
+                    </div>
+                    <div id="gpuModels" class="model-list"></div>
+                </div>
+
+                <!-- CPU Ollama 卡片 -->
+                <div class="card">
+                    <h2>
+                        <span class="icon">☁️</span>
+                        雲端 CPU Ollama
+                    </h2>
+                    <div class="metric">
+                        <span class="metric-label">狀態</span>
+                        <span id="cpuStatus" class="metric-value">-</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">URL</span>
+                        <span id="cpuUrl" class="metric-value" style="font-size: 12px;">-</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">請求次數</span>
+                        <span id="cpuRequests" class="metric-value">-</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">最後成功</span>
+                        <span id="cpuLastSuccess" class="metric-value" style="font-size: 12px;">-</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">可用模型</span>
+                    </div>
+                    <div id="cpuModels" class="model-list"></div>
+                </div>
+
+                <!-- 推薦模型卡片 -->
+                <div class="card">
+                    <h2>
+                        <span class="icon">💡</span>
+                        推薦模型
+                    </h2>
+                    <div class="metric">
+                        <span class="metric-label">通用任務</span>
+                        <span id="modelGeneral" class="metric-value">-</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">代碼任務</span>
+                        <span id="modelCode" class="metric-value">-</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">視覺任務</span>
+                        <span id="modelVision" class="metric-value">-</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">輕量任務</span>
+                        <span id="modelLightweight" class="metric-value">-</span>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn" onclick="refreshRouter()">🔄 刷新路由器</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="last-update">
+            最後更新: <span id="lastUpdate">-</span> | 自動刷新: 30 秒
+        </div>
+    </div>
+
+    <script>
+        let autoRefreshInterval;
+
+        async function loadDashboard() {
+            try {
+                // 載入路由器狀態
+                const statusRes = await fetch('/api/ollama/router/status');
+                const statusData = await statusRes.json();
+
+                if (!statusData.success) {
+                    throw new Error(statusData.error || '無法載入路由器狀態');
+                }
+
+                const status = statusData.data;
+
+                // 更新當前模式
+                const modeBadge = document.getElementById('currentMode');
+                modeBadge.textContent = status.current_mode + ' 模式';
+                modeBadge.className = 'status-badge ' + (status.current_mode === 'GPU' ? 'gpu' : 'cpu');
+
+                // 更新 GPU 資訊
+                document.getElementById('gpuStatus').textContent = status.gpu.available ? '✅ 可用' : '❌ 不可用';
+                document.getElementById('gpuStatus').className = 'metric-value ' + (status.gpu.available ? 'success' : 'error');
+                document.getElementById('gpuUrl').textContent = status.gpu.url;
+                document.getElementById('gpuRequests').textContent = status.gpu.requests;
+                document.getElementById('gpuLastSuccess').textContent = status.gpu.last_success ? 
+                    new Date(status.gpu.last_success).toLocaleString('zh-TW') : '從未成功';
+
+                // 更新 GPU 模型列表
+                const gpuModelsDiv = document.getElementById('gpuModels');
+                gpuModelsDiv.innerHTML = '';
+                if (status.gpu.models && status.gpu.models.length > 0) {
+                    status.gpu.models.forEach(model => {
+                        const tag = document.createElement('span');
+                        tag.className = 'model-tag';
+                        tag.textContent = model;
+                        gpuModelsDiv.appendChild(tag);
+                    });
+                } else {
+                    gpuModelsDiv.innerHTML = '<span class="model-tag">無可用模型</span>';
+                }
+
+                // 更新 CPU 資訊
+                document.getElementById('cpuStatus').textContent = '✅ 可用';
+                document.getElementById('cpuStatus').className = 'metric-value success';
+                document.getElementById('cpuUrl').textContent = status.cpu.url;
+                document.getElementById('cpuRequests').textContent = status.cpu.requests;
+                document.getElementById('cpuLastSuccess').textContent = status.cpu.last_success ? 
+                    new Date(status.cpu.last_success).toLocaleString('zh-TW') : '從未成功';
+
+                // 更新 CPU 模型列表
+                const cpuModelsDiv = document.getElementById('cpuModels');
+                cpuModelsDiv.innerHTML = '';
+                if (status.cpu.models && status.cpu.models.length > 0) {
+                    status.cpu.models.forEach(model => {
+                        const tag = document.createElement('span');
+                        tag.className = 'model-tag';
+                        tag.textContent = model;
+                        cpuModelsDiv.appendChild(tag);
+                    });
+                } else {
+                    cpuModelsDiv.innerHTML = '<span class="model-tag">無可用模型</span>';
+                }
+
+                // 載入推薦模型
+                await loadRecommendedModels();
+
+                // 顯示警告（如果 GPU 不可用）
+                const alertContainer = document.getElementById('alertContainer');
+                alertContainer.innerHTML = '';
+                if (!status.gpu.available) {
+                    const alert = document.createElement('div');
+                    alert.className = 'alert warning';
+                    alert.innerHTML = '⚠️ 本地 GPU Ollama 不可用，系統已自動降級為雲端 CPU 模式。功能受限：視覺辨識、大模型推理不可用。';
+                    alertContainer.appendChild(alert);
+                } else {
+                    const alert = document.createElement('div');
+                    alert.className = 'alert success';
+                    alert.innerHTML = '✅ 本地 GPU Ollama 運行中，系統處於最佳性能模式！';
+                    alertContainer.appendChild(alert);
+                }
+
+                // 隱藏載入指示器，顯示儀表板
+                document.getElementById('loadingIndicator').style.display = 'none';
+                document.getElementById('dashboardContent').style.display = 'block';
+
+                // 更新最後更新時間
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleString('zh-TW');
+
+            } catch (error) {
+                console.error('載入失敗:', error);
+                const alertContainer = document.getElementById('alertContainer');
+                alertContainer.innerHTML = `
+                    <div class="alert error">
+                        ❌ 載入失敗: ${error.message}
+                    </div>
+                `;
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        }
+
+        async function loadRecommendedModels() {
+            const tasks = ['general', 'code', 'vision', 'lightweight'];
+            for (const task of tasks) {
+                try {
+                    const res = await fetch(`/api/ollama/models/recommended?task_type=${task}`);
+                    const data = await res.json();
+                    if (data.success) {
+                        const elementId = 'model' + task.charAt(0).toUpperCase() + task.slice(1);
+                        document.getElementById(elementId).textContent = data.model;
+                    }
+                } catch (error) {
+                    console.error(`載入 ${task} 推薦模型失敗:`, error);
+                }
+            }
+        }
+
+        async function refreshRouter() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '🔄 刷新中...';
+
+            try {
+                const res = await fetch('/api/ollama/router/refresh', { method: 'POST' });
+                const data = await res.json();
+
+                if (data.success) {
+                    const alert = document.createElement('div');
+                    alert.className = 'alert success';
+                    alert.innerHTML = '✅ 路由器已刷新！';
+                    document.getElementById('alertContainer').appendChild(alert);
+                    
+                    setTimeout(() => alert.remove(), 3000);
+                    await loadDashboard();
+                } else {
+                    throw new Error(data.error || '刷新失敗');
+                }
+            } catch (error) {
+                const alert = document.createElement('div');
+                alert.className = 'alert error';
+                alert.innerHTML = `❌ 刷新失敗: ${error.message}`;
+                document.getElementById('alertContainer').appendChild(alert);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 刷新路由器';
+            }
+        }
+
+        // 初始載入
+        loadDashboard();
+
+        // 自動刷新（每 30 秒）
+        autoRefreshInterval = setInterval(loadDashboard, 30000);
+    </script>
+</body>
+</html>

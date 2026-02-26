@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>簡單計時器</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white h-screen flex justify-center items-center flex-col">
+    <h1 class="text-3xl mb-4">簡單計時器</h1>
+    <div class="flex justify-center mb-4">
+        <input type="number" id="hour" class="w-12 text-center bg-slate-800 text-white py-2 px-4 rounded" placeholder="小時">
+        <input type="number" id="minute" class="w-12 text-center bg-slate-800 text-white py-2 px-4 rounded mx-2" placeholder="分鐘">
+        <input type="number" id="second" class="w-12 text-center bg-slate-800 text-white py-2 px-4 rounded" placeholder="秒">
+    </div>
+    <button id="start" class="bg-slate-700 text-white py-2 px-4 rounded mb-2">開始</button>
+    <button id="stop" class="bg-slate-700 text-white py-2 px-4 rounded mb-2" disabled>停止</button>
+    <button id="reset" class="bg-slate-700 text-white py-2 px-4 rounded" disabled>重置</button>
+    <p id="time" class="text-2xl mb-4">00:00:00</p>
+    <script>
+        let hour = 0;
+        let minute = 0;
+        let second = 0;
+        let timer = null;
+        let isRunning = false;
+
+        document.getElementById('start').addEventListener('click', () => {
+            hour = parseInt(document.getElementById('hour').value) || 0;
+            minute = parseInt(document.getElementById('minute').value) || 0;
+            second = parseInt(document.getElementById('second').value) || 0;
+            if (hour === 0 && minute === 0 && second === 0) {
+                alert('請輸入時間');
+                return;
+            }
+            isRunning = true;
+            document.getElementById('start').disabled = true;
+            document.getElementById('stop').disabled = false;
+            document.getElementById('reset').disabled = false;
+            timer = setInterval(() => {
+                second--;
+                if (second < 0) {
+                    minute--;
+                    second = 59;
+                }
+                if (minute < 0) {
+                    hour--;
+                    minute = 59;
+                }
+                if (hour < 0) {
+                    hour = 0;
+                    minute = 0;
+                    second = 0;
+                    clearInterval(timer);
+                    isRunning = false;
+                    document.getElementById('start').disabled = false;
+                    document.getElementById('stop').disabled = true;
+                    document.getElementById('reset').disabled = true;
+                }
+                document.getElementById('time').innerText = `${padZero(hour)}:${padZero(minute)}:${padZero(second)}`;
+            }, 1000);
+        });
+
+        document.getElementById('stop').addEventListener('click', () => {
+            clearInterval(timer);
+            isRunning = false;
+            document.getElementById('start').disabled = false;
+            document.getElementById('stop').disabled = true;
+        });
+
+        document.getElementById('reset').addEventListener('click', () => {
+            clearInterval(timer);
+            isRunning = false;
+            hour = 0;
+            minute = 0;
+            second = 0;
+            document.getElementById('time').innerText = '00:00:00';
+            document.getElementById('start').disabled = false;
+            document.getElementById('stop').disabled = true;
+            document.getElementById('reset').disabled = true;
+        });
+
+        function padZero(num) {
+            return num.toString().padStart(2, '0');
+        }
+    </script>
+</body>
+</html>

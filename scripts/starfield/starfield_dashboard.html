@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tapo C230 星空攝影</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0a0a1a; color: #e0e0f0; font-family: system-ui, sans-serif; }
+  .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
+  .tab-btn.active { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; }
+  .tab-btn { transition: all 0.2s; }
+  .tab-btn:hover:not(.active) { background: rgba(255,255,255,0.1); }
+  .slider-track { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: #333; outline: none; }
+  .slider-track::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #8b5cf6; cursor: pointer; }
+  #streamCanvas { image-rendering: auto; background: #111; border-radius: 8px; }
+  .stat-card { background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1)); }
+  .btn-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+  .btn-primary:hover { filter: brightness(1.15); }
+  .btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
+  .btn-secondary { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); }
+  .btn-secondary:hover { background: rgba(255,255,255,0.18); }
+  .progress-bar { background: linear-gradient(90deg, #6366f1, #a78bfa); transition: width 0.3s; }
+  select, input[type="number"] { background: #1a1a2e; border: 1px solid #333; color: #e0e0f0; border-radius: 6px; padding: 6px 10px; }
+  .fade-in { animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Header -->
+<header class="glass sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <span class="text-2xl">🌟</span>
+    <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+      Tapo C230 星空攝影
+    </h1>
+  </div>
+  <div class="flex items-center gap-4 text-sm">
+    <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>
+    <span id="statusText" class="text-gray-400">未連線</span>
+    <span id="fpsText" class="text-gray-500">0 FPS</span>
+  </div>
+</header>
+
+<!-- Tabs -->
+<nav class="flex gap-2 px-6 py-3 overflow-x-auto">
+  <button class="tab-btn active px-4 py-2 rounded-lg text-sm font-medium" data-tab="live">📹 即時預覽</button>
+  <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="capture">📸 擷取</button>
+  <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="stack">🔭 疊圖</button>
+  <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="timelapse">🎬 縮時/星軌</button>
+  <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="gallery">🖼️ 成果</button>
+  <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="settings">⚙️ 設定</button>
+</nav>
+
+<main class="px-6 pb-8">
+
+<!-- ==================== Tab: 即時預覽 ==================== -->
+<section id="tab-live" class="tab-content fade-in">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- 串流畫面 -->
+    <div class="lg:col-span-2">
+      <div class="glass rounded-xl p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-semibold">即時串流</h2>
+          <div class="flex gap-2">
+            <button onclick="takeSnapshot()" class="btn-secondary px-3 py-1 rounded-lg text-sm">📷 截圖</button>
+            <button onclick="toggleStream()" id="streamToggle" class="btn-primary px-3 py-1 rounded-lg text-sm">▶ 開始</button>
+          </div>
+        </div>
+        <div class="relative">
+          <img id="streamImg" class="w-full rounded-lg bg-gray-900" style="min-height:360px"
+               src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='480'%3E%3Crect fill='%23111'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23555' font-size='20'%3E等待串流...%3C/text%3E%3C/svg%3E">
+          <div id="brightnessOverlay" class="absolute bottom-3 left-3 bg-black/60 px-2 py-1 rounded text-xs text-gray-300">
+            亮度: --
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 參數面板 -->
+    <div class="space-y-4">
+      <div class="glass rounded-xl p-4">
+        <h3 class="font-semibold mb-3">🎛️ 虛擬參數</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-gray-400 flex justify-between"><span>亮度</span><span id="valBrightness">0</span></label>
+            <input type="range" class="slider-track w-full" min="-100" max="100" value="0" data-param="brightness" oninput="onSlider(this)">
+          </div>
+          <div>
+            <label class="text-xs text-gray-400 flex justify-between"><span>對比</span><span id="valContrast">1.0</span></label>
+            <input type="range" class="slider-track w-full" min="50" max="200" value="100" data-param="contrast" oninput="onSlider(this)">
+          </div>
+          <div>
+            <label class="text-xs text-gray-400 flex justify-between"><span>伽瑪</span><span id="valGamma">1.0</span></label>
+            <input type="range" class="slider-track w-full" min="50" max="200" value="100" data-param="gamma" oninput="onSlider(this)">
+          </div>
+          <div>
+            <label class="text-xs text-gray-400 flex justify-between"><span>飽和度</span><span id="valSaturation">1.0</span></label>
+            <input type="range" class="slider-track w-full" min="0" max="200" value="100" data-param="saturation" oninput="onSlider(this)">
+          </div>
+          <div>
+            <label class="text-xs text-gray-400 flex justify-between"><span>銳利度</span><span id="valSharpen">0</span></label>
+            <input type="range" class="slider-track w-full" min="0" max="100" value="0" data-param="sharpen" oninput="onSlider(this)">
+          </div>
+        </div>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <h3 class="font-semibold mb-3">🤖 AI 輔助</h3>
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" data-param="denoise" onchange="onToggle(this)" class="accent-purple-500">
+            <span class="text-sm">降噪 (NLMeans)</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" data-param="clahe" onchange="onToggle(this)" class="accent-purple-500">
+            <span class="text-sm">CLAHE 自適應對比</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" data-param="star_mode" onchange="onToggle(this)" class="accent-purple-500">
+            <span class="text-sm">⭐ 星空增強模式</span>
+          </label>
+        </div>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <h3 class="font-semibold mb-2">📊 即時數據</h3>
+        <div class="grid grid-cols-2 gap-2 text-sm">
+          <div class="stat-card rounded-lg p-2 text-center">
+            <div class="text-xs text-gray-400">幀數</div>
+            <div id="statFrames" class="font-bold text-indigo-300">0</div>
+          </div>
+          <div class="stat-card rounded-lg p-2 text-center">
+            <div class="text-xs text-gray-400">FPS</div>
+            <div id="statFps" class="font-bold text-purple-300">0</div>
+          </div>
+          <div class="stat-card rounded-lg p-2 text-center">
+            <div class="text-xs text-gray-400">亮度</div>
+            <div id="statBright" class="font-bold text-blue-300">--</div>
+          </div>
+          <div class="stat-card rounded-lg p-2 text-center">
+            <div class="text-xs text-gray-400">狀態</div>
+            <div id="statStatus" class="font-bold text-green-300">--</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== Tab: 擷取 ==================== -->
+<section id="tab-capture" class="tab-content hidden fade-in">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="glass rounded-xl p-6">
+      <h2 class="font-semibold text-lg mb-4">📸 擷取星空幀</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="text-sm text-gray-400">擷取幀數</label>
+          <input type="number" id="captureCount" value="100" min="1" max="10000" class="w-full mt-1">
+        </div>
+        <div>
+          <label class="text-sm text-gray-400">擷取間隔（秒）</label>
+          <input type="number" id="captureInterval" value="2" min="0.5" max="60" step="0.5" class="w-full mt-1">
+        </div>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="captureUseParams" checked class="accent-purple-500">
+          <span class="text-sm">套用目前虛擬參數</span>
+        </label>
+        <div class="flex gap-3">
+          <button onclick="startCapture()" id="btnStartCapture" class="btn-primary px-6 py-2 rounded-lg font-medium flex-1">
+            🚀 開始擷取
+          </button>
+          <button onclick="stopCapture()" id="btnStopCapture" class="btn-danger px-6 py-2 rounded-lg font-medium hidden">
+            ⏹ 停止
+          </button>
+        </div>
+      </div>
+      <!-- 進度 -->
+      <div id="captureProgress" class="mt-4 hidden">
+        <div class="flex justify-between text-sm text-gray-400 mb-1">
+          <span>擷取進度</span>
+          <span id="captureProgressText">0/0</span>
+        </div>
+        <div class="w-full bg-gray-800 rounded-full h-3">
+          <div id="captureProgressBar" class="progress-bar h-3 rounded-full" style="width:0%"></div>
+        </div>
+        <p id="captureDir" class="text-xs text-gray-500 mt-2"></p>
+      </div>
+    </div>
+    <div class="glass rounded-xl p-6">
+      <h2 class="font-semibold text-lg mb-4">📂 已擷取目錄</h2>
+      <div id="frameDirList" class="space-y-2 max-h-96 overflow-y-auto">
+        <p class="text-gray-500 text-sm">載入中...</p>
+      </div>
+      <button onclick="refreshFrameDirs()" class="btn-secondary px-4 py-2 rounded-lg text-sm mt-4">🔄 重新整理</button>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== Tab: 疊圖 ==================== -->
+<section id="tab-stack" class="tab-content hidden fade-in">
+  <div class="glass rounded-xl p-6 max-w-2xl">
+    <h2 class="font-semibold text-lg mb-4">🔭 進階疊圖</h2>
+    <div class="space-y-4">
+      <div>
+        <label class="text-sm text-gray-400">選擇幀目錄</label>
+        <select id="stackDir" class="w-full mt-1"><option value="">載入中...</option></select>
+      </div>
+      <div>
+        <label class="text-sm text-gray-400">疊圖方法</label>
+        <select id="stackMethod" class="w-full mt-1">
+          <option value="sigma_clip">Sigma Clipping（去除異常值，推薦）</option>
+          <option value="median">Median（中位數）</option>
+          <option value="mean">Mean（平均值）</option>
+          <option value="star_trails">Star Trails（星軌 Max）</option>
+          <option value="star_trails_fade">Star Trails Fade（漸變星軌）</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-sm text-gray-400">Sigma 閾值</label>
+          <input type="number" id="stackSigma" value="2.5" min="1" max="5" step="0.1" class="w-full mt-1">
+        </div>
+        <div>
+          <label class="text-sm text-gray-400">星軌衰減</label>
+          <input type="number" id="stackDecay" value="0.95" min="0.8" max="0.99" step="0.01" class="w-full mt-1">
+        </div>
+        <div>
+          <label class="text-sm text-gray-400">最大亮度閾值</label>
+          <input type="number" id="stackMaxBright" value="80" min="0" max="255" class="w-full mt-1">
+        </div>
+        <div>
+          <label class="text-sm text-gray-400">最小亮度閾值</label>
+          <input type="number" id="stackMinBright" value="5" min="0" max="100" class="w-full mt-1">
+        </div>
+      </div>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" id="stackAlign" class="accent-purple-500">
+        <span class="text-sm">啟用星點對齊（補償地球自轉）</span>
+      </label>
+      <button onclick="runStack()" id="btnStack" class="btn-primary px-6 py-2 rounded-lg font-medium w-full">
+        🚀 開始疊圖
+      </button>
+      <div id="stackResult" class="hidden mt-4">
+        <h3 class="text-sm font-semibold text-green-400 mb-2">✅ 疊圖完成</h3>
+        <img id="stackResultImg" class="w-full rounded-lg">
+        <p id="stackResultPath" class="text-xs text-gray-500 mt-1"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== Tab: 縮時/星軌 ==================== -->
+<section id="tab-timelapse" class="tab-content hidden fade-in">
+  <div class="glass rounded-xl p-6 max-w-2xl">
+    <h2 class="font-semibold text-lg mb-4">🎬 縮時攝影 & 星軌影片</h2>
+    <div class="space-y-4">
+      <div>
+        <label class="text-sm text-gray-400">選擇幀目錄</label>
+        <select id="tlDir" class="w-full mt-1"><option value="">載入中...</option></select>
+      </div>
+      <div>
+        <label class="text-sm text-gray-400">模式</label>
+        <select id="tlMode" class="w-full mt-1">
+          <option value="timelapse">縮時攝影（幀序列→影片）</option>
+          <option value="startrail">星軌生成過程影片</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-sm text-gray-400">FPS</label>
+          <input type="number" id="tlFps" value="24" min="1" max="60" class="w-full mt-1">
+        </div>
+        <div>
+          <label class="text-sm text-gray-400">最大亮度過濾</label>
+          <input type="number" id="tlMaxBright" value="0" min="0" max="255" class="w-full mt-1">
+        </div>
+      </div>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" id="tlTimestamp" class="accent-purple-500">
+        <span class="text-sm">加入幀編號浮水印</span>
+      </label>
+      <button onclick="runTimelapse()" id="btnTL" class="btn-primary px-6 py-2 rounded-lg font-medium w-full">
+        🎬 開始合成
+      </button>
+      <div id="tlResult" class="hidden mt-4">
+        <h3 class="text-sm font-semibold text-green-400 mb-2">✅ 合成完成</h3>
+        <video id="tlResultVideo" controls class="w-full rounded-lg"></video>
+        <p id="tlResultInfo" class="text-xs text-gray-500 mt-1"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== Tab: 成果 ==================== -->
+<section id="tab-gallery" class="tab-content hidden fade-in">
+  <div class="glass rounded-xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-lg">🖼️ 成果瀏覽</h2>
+      <button onclick="refreshOutputs()" class="btn-secondary px-3 py-1 rounded-lg text-sm">🔄 重新整理</button>
+    </div>
+    <div id="galleryGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <p class="text-gray-500 text-sm col-span-3">載入中...</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== Tab: 設定 ==================== -->
+<section id="tab-settings" class="tab-content hidden fade-in">
+  <div class="glass rounded-xl p-6 max-w-lg">
+    <h2 class="font-semibold text-lg mb-4">⚙️ 連線設定</h2>
+    <div class="space-y-4">
+      <div>
+        <label class="text-sm text-gray-400">RTSP URL</label>
+        <input type="text" id="rtspUrl" placeholder="rtsp://帳號:密碼@IP:554/stream1"
+               class="w-full mt-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div class="flex gap-3">
+        <button onclick="connectCamera()" class="btn-primary px-6 py-2 rounded-lg font-medium flex-1">🔗 連線</button>
+        <button onclick="disconnectCamera()" class="btn-danger px-6 py-2 rounded-lg font-medium">斷線</button>
+      </div>
+      <div id="connResult" class="text-sm"></div>
+    </div>
+    <hr class="border-gray-800 my-6">
+    <div>
+      <h3 class="font-semibold mb-2">系統資訊</h3>
+      <div id="sysInfo" class="text-sm text-gray-400 space-y-1">
+        <p>服務版本：1.0.0</p>
+        <p>Port：<span id="sysPort">--</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+const API = window.location.origin;
+let ws = null;
+let streaming = false;
+let captureTimer = null;
+
+// --- Tabs ---
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(s => s.classList.add('hidden'));
+    const tab = document.getElementById('tab-' + btn.dataset.tab);
+    if (tab) { tab.classList.remove('hidden'); tab.classList.add('fade-in'); }
+    if (btn.dataset.tab === 'capture') refreshFrameDirs();
+    if (btn.dataset.tab === 'stack' || btn.dataset.tab === 'timelapse') refreshDirSelects();
+    if (btn.dataset.tab === 'gallery') refreshOutputs();
+  });
+});
+
+// --- Params ---
+let paramDebounce = null;
+function onSlider(el) {
+  const param = el.dataset.param;
+  const raw = parseFloat(el.value);
+  let val, display;
+  if (param === 'brightness') { val = raw; display = raw; }
+  else if (param === 'contrast') { val = 0.5 + (raw - 50) / 100; display = val.toFixed(2); }
+  else if (param === 'gamma') { val = 0.5 + (raw - 50) / 100; display = val.toFixed(2); }
+  else if (param === 'saturation') { val = raw / 100; display = val.toFixed(2); }
+  else if (param === 'sharpen') { val = raw / 100; display = raw; }
+  const label = document.getElementById('val' + param.charAt(0).toUpperCase() + param.slice(1));
+  if (label) label.textContent = display;
+  clearTimeout(paramDebounce);
+  paramDebounce = setTimeout(() => sendParams({ [param]: val }), 80);
+}
+function onToggle(el) {
+  sendParams({ [el.dataset.param]: el.checked });
+}
+function sendParams(data) {
+  fetch(API + '/api/params', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+}
+
+// --- Stream ---
+function toggleStream() {
+  if (streaming) stopStream(); else startStream();
+}
+function startStream() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto + '//' + location.host + '/ws/stream');
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'frame') {
+      document.getElementById('streamImg').src = 'data:image/jpeg;base64,' + msg.data;
+      document.getElementById('statFrames').textContent = msg.frame_id;
+      document.getElementById('statFps').textContent = msg.fps;
+      document.getElementById('statBright').textContent = msg.brightness;
+      document.getElementById('fpsText').textContent = msg.fps + ' FPS';
+      document.getElementById('brightnessOverlay').textContent = '亮度: ' + msg.brightness;
+    }
+  };
+  ws.onopen = () => {
+    streaming = true;
+    document.getElementById('streamToggle').textContent = '⏹ 停止';
+    document.getElementById('streamToggle').classList.remove('btn-primary');
+    document.getElementById('streamToggle').classList.add('btn-danger');
+    document.getElementById('statusDot').classList.replace('bg-red-500', 'bg-green-500');
+    document.getElementById('statusText').textContent = '串流中';
+    document.getElementById('statStatus').textContent = '串流中';
+  };
+  ws.onclose = () => {
+    streaming = false;
+    document.getElementById('streamToggle').textContent = '▶ 開始';
+    document.getElementById('streamToggle').classList.remove('btn-danger');
+    document.getElementById('streamToggle').classList.add('btn-primary');
+  };
+}
+function stopStream() {
+  if (ws) ws.close();
+  streaming = false;
+}
+
+// --- Snapshot ---
+async function takeSnapshot() {
+  const r = await fetch(API + '/api/snapshot');
+  const d = await r.json();
+  if (d.base64) {
+    const a = document.createElement('a');
+    a.href = 'data:image/png;base64,' + d.base64;
+    a.download = 'snapshot_' + Date.now() + '.jpg';
+    a.click();
+  }
+}
+
+// --- Camera Connect ---
+async function connectCamera() {
+  const url = document.getElementById('rtspUrl').value.trim();
+  if (!url) return;
+  const r = await fetch(API + '/api/connect?url=' + encodeURIComponent(url), { method: 'POST' });
+  const d = await r.json();
+  document.getElementById('connResult').innerHTML = d.success
+    ? '<span class="text-green-400">✅ ' + d.message + '</span>'
+    : '<span class="text-red-400">❌ ' + d.message + '</span>';
+  if (d.success) {
+    document.getElementById('statusDot').classList.replace('bg-red-500', 'bg-yellow-500');
+    document.getElementById('statusText').textContent = '已連線';
+  }
+}
+async function disconnectCamera() {
+  await fetch(API + '/api/disconnect', { method: 'POST' });
+  document.getElementById('statusDot').className = 'w-2.5 h-2.5 rounded-full bg-red-500 inline-block';
+  document.getElementById('statusText').textContent = '未連線';
+  document.getElementById('connResult').innerHTML = '<span class="text-gray-400">已斷線</span>';
+  stopStream();
+}
+
+// --- Capture ---
+async function startCapture() {
+  const count = parseInt(document.getElementById('captureCount').value);
+  const interval = parseFloat(document.getElementById('captureInterval').value);
+  const useParams = document.getElementById('captureUseParams').checked;
+  const r = await fetch(API + `/api/capture/start?count=${count}&interval=${interval}&use_params=${useParams}`, { method: 'POST' });
+  const d = await r.json();
+  if (d.success) {
+    document.getElementById('btnStartCapture').classList.add('hidden');
+    document.getElementById('btnStopCapture').classList.remove('hidden');
+    document.getElementById('captureProgress').classList.remove('hidden');
+    document.getElementById('captureDir').textContent = d.dir;
+    captureTimer = setInterval(pollCapture, 1000);
+  } else {
+    alert(d.error || '擷取失敗');
+  }
+}
+async function stopCapture() {
+  await fetch(API + '/api/capture/stop', { method: 'POST' });
+  clearInterval(captureTimer);
+  document.getElementById('btnStartCapture').classList.remove('hidden');
+  document.getElementById('btnStopCapture').classList.add('hidden');
+}
+async function pollCapture() {
+  const r = await fetch(API + '/api/status');
+  const d = await r.json();
+  const cap = d.capturing;
+  if (cap) {
+    const pct = cap.total > 0 ? (cap.current / cap.total * 100) : 0;
+    document.getElementById('captureProgressBar').style.width = pct + '%';
+    document.getElementById('captureProgressText').textContent = cap.current + '/' + cap.total;
+    if (!cap.active && cap.current > 0) {
+      clearInterval(captureTimer);
+      document.getElementById('btnStartCapture').classList.remove('hidden');
+      document.getElementById('btnStopCapture').classList.add('hidden');
+      document.getElementById('captureProgressText').textContent = '✅ 完成 ' + cap.current + ' 幀';
+    }
+  }
+}
+
+// --- Frame Dirs ---
+async function refreshFrameDirs() {
+  const r = await fetch(API + '/api/frames');
+  const d = await r.json();
+  const el = document.getElementById('frameDirList');
+  if (!d.dirs || d.dirs.length === 0) {
+    el.innerHTML = '<p class="text-gray-500 text-sm">尚無擷取資料</p>';
+    return;
+  }
+  el.innerHTML = d.dirs.map(dir =>
+    `<div class="flex justify-between items-center bg-gray-800/50 rounded-lg px-3 py-2">
+      <span class="text-sm font-mono">${dir.name}</span>
+      <span class="text-xs text-gray-400">${dir.count} 幀</span>
+    </div>`
+  ).join('');
+}
+async function refreshDirSelects() {
+  const r = await fetch(API + '/api/frames');
+  const d = await r.json();
+  const opts = (d.dirs || []).map(dir => `<option value="${dir.name}">${dir.name} (${dir.count} 幀)</option>`).join('');
+  const empty = '<option value="">-- 選擇目錄 --</option>';
+  document.getElementById('stackDir').innerHTML = empty + opts;
+  document.getElementById('tlDir').innerHTML = empty + opts;
+}
+
+// --- Stack ---
+async function runStack() {
+  const dir = document.getElementById('stackDir').value;
+  if (!dir) { alert('請選擇幀目錄'); return; }
+  document.getElementById('btnStack').textContent = '⏳ 疊圖中...';
+  document.getElementById('btnStack').disabled = true;
+  const body = {
+    input_dir: dir,
+    method: document.getElementById('stackMethod').value,
+    sigma: parseFloat(document.getElementById('stackSigma').value),
+    trail_decay: parseFloat(document.getElementById('stackDecay').value),
+    max_brightness: parseFloat(document.getElementById('stackMaxBright').value),
+    min_brightness: parseFloat(document.getElementById('stackMinBright').value),
+    align: document.getElementById('stackAlign').checked,
+  };
+  const r = await fetch(API + '/api/stack', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const d = await r.json();
+  document.getElementById('btnStack').textContent = '🚀 開始疊圖';
+  document.getElementById('btnStack').disabled = false;
+  if (d.error) { alert('疊圖失敗：' + d.error); return; }
+  document.getElementById('stackResult').classList.remove('hidden');
+  const filename = d.output ? d.output.split(/[/\\]/).pop() : '';
+  document.getElementById('stackResultImg').src = API + '/output/' + filename;
+  document.getElementById('stackResultPath').textContent = d.output || '';
+}
+
+// --- Timelapse ---
+async function runTimelapse() {
+  const dir = document.getElementById('tlDir').value;
+  if (!dir) { alert('請選擇幀目錄'); return; }
+  document.getElementById('btnTL').textContent = '⏳ 合成中...';
+  document.getElementById('btnTL').disabled = true;
+  const body = {
+    input_dir: dir,
+    mode: document.getElementById('tlMode').value,
+    fps: parseInt(document.getElementById('tlFps').value),
+    max_brightness: parseFloat(document.getElementById('tlMaxBright').value),
+    timestamp: document.getElementById('tlTimestamp').checked,
+  };
+  const r = await fetch(API + '/api/timelapse', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const d = await r.json();
+  document.getElementById('btnTL').textContent = '🎬 開始合成';
+  document.getElementById('btnTL').disabled = false;
+  if (d.error) { alert('合成失敗：' + d.error); return; }
+  document.getElementById('tlResult').classList.remove('hidden');
+  const filename = d.output ? d.output.split(/[/\\]/).pop() : '';
+  document.getElementById('tlResultVideo').src = API + '/output/' + filename;
+  document.getElementById('tlResultInfo').textContent = `${d.frames_written || d.frames} 幀 @ ${body.fps}fps = ${d.duration_sec}s`;
+}
+
+// --- Gallery ---
+async function refreshOutputs() {
+  const r = await fetch(API + '/api/outputs');
+  const d = await r.json();
+  const el = document.getElementById('galleryGrid');
+  if (!d.outputs || d.outputs.length === 0) {
+    el.innerHTML = '<p class="text-gray-500 text-sm col-span-3">尚無成果檔案</p>';
+    return;
+  }
+  el.innerHTML = d.outputs.map(f => {
+    const isVideo = f.name.endsWith('.mp4');
+    return `<div class="glass rounded-xl overflow-hidden">
+      ${isVideo
+        ? `<video src="${API}/output/${f.name}" controls class="w-full h-48 object-cover bg-black"></video>`
+        : `<img src="${API}/output/${f.name}" class="w-full h-48 object-cover bg-black">`}
+      <div class="p-3">
+        <p class="text-sm font-mono truncate">${f.name}</p>
+        <p class="text-xs text-gray-500">${f.size_mb} MB</p>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// --- Init ---
+fetch(API + '/api/status').then(r => r.json()).then(d => {
+  if (d.connected) {
+    document.getElementById('statusDot').classList.replace('bg-red-500', 'bg-yellow-500');
+    document.getElementById('statusText').textContent = '已連線';
+    document.getElementById('statStatus').textContent = '就緒';
+  }
+}).catch(() => {});
+</script>
+</body>
+</html>

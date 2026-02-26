@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📱 檔案傳輸站 - 電腦端</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        .drop-zone { border: 3px dashed #6366f1; transition: all 0.3s; }
+        .drop-zone.dragover { border-color: #22c55e; background: #f0fdf4; }
+        .file-card { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white mb-2">📱 檔案傳輸站</h1>
+            <p class="text-white/80">從電腦傳送檔案到你的手機</p>
+        </div>
+
+        <!-- QR Code 配對區 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                <span>🔗</span> 配對手機
+            </h2>
+            <div class="flex flex-col md:flex-row gap-6">
+                <div class="flex-1">
+                    <div id="qrcode" class="bg-white p-4 rounded-lg inline-block"></div>
+                    <p class="text-sm text-gray-500 mt-2">掃描 QR Code 配對手機</p>
+                </div>
+                <div class="flex-1">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-sm font-medium text-gray-700">傳輸代碼</label>
+                            <div class="flex gap-2 mt-1">
+                                <input type="text" id="transferCode" placeholder="輸入6位代碼" maxlength="6" class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                <button onclick="pairDevice()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">配對</button>
+                            </div>
+                        </div>
+                        <div id="pairStatus" class="text-sm"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 上傳區 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                <span>📤</span> 上傳檔案
+            </h2>
+            <div id="dropZone" class="drop-zone rounded-xl p-8 text-center cursor-pointer">
+                <div class="text-6xl mb-4">📁</div>
+                <p class="text-lg text-gray-600">拖放檔案到這裡，或點擊選擇</p>
+                <p class="text-sm text-gray-400 mt-2">支援圖片、影片、文件、任何檔案</p>
+                <input type="file" id="fileInput" multiple class="hidden">
+            </div>
+
+            <!-- 預覽區 -->
+            <div id="previewArea" class="mt-6 hidden">
+                <h3 class="font-medium mb-3">待傳送檔案</h3>
+                <div id="fileList" class="space-y-2"></div>
+                <div class="flex gap-3 mt-4">
+                    <button onclick="uploadFiles()" id="uploadBtn" class="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:opacity-90">
+                        🚀 開始傳送
+                    </button>
+                    <button onclick="clearFiles()" class="px-6 py-3 border border-gray-300 rounded-xl hover:bg-gray-100">清除</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 傳送文字/連結 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                <span>💬</span> 傳送文字/連結
+            </h2>
+            <textarea id="textInput" placeholder="輸入要傳送到手機的文字或連結..." rows="3" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500"></textarea>
+            <button onclick="sendText()" class="mt-3 w-full py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-xl font-semibold hover:opacity-90">
+                📲 傳送文字
+            </button>
+        </div>
+
+        <!-- 已傳送記錄 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                <span>📋</span> 傳送記錄
+            </h2>
+            <div id="historyList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFiles = [];
+        let deviceId = null;
+
+        // 初始化 QR Code
+        function initQR() {
+            const transferId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            document.getElementById('qrcode').innerHTML = '';
+            new QRCode(document.getElementById('qrcode'), {
+                text: `${window.location.origin}/transfer-receive.html#${transferId}`,
+                width: 150,
+                height: 150
+            });
+        }
+
+        // 配對設備
+        async function pairDevice() {
+            const code = document.getElementById('transferCode').value.toUpperCase();
+            if (code.length !== 6) {
+                alert('請輸入6位傳輸代碼');
+                return;
+            }
+            try {
+                const res = await fetch('/api/transfer/pair', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pairCode: code })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    deviceId = data.deviceId;
+                    document.getElementById('pairStatus').innerHTML = '<span class="text-green-600">✅ 已配對：' + data.deviceName + '</span>';
+                } else {
+                    document.getElementById('pairStatus').innerHTML = '<span class="text-red-600">❌ ' + data.error + '</span>';
+                }
+            } catch (e) {
+                document.getElementById('pairStatus').innerHTML = '<span class="text-red-600">❌ 連線失敗</span>';
+            }
+        }
+
+        // 拖放上傳
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.onclick = () => fileInput.click();
+        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('dragover'); };
+        dropZone.ondragleave = () => dropZone.classList.remove('dragover');
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        };
+        fileInput.onchange = (e) => handleFiles(e.target.files);
+
+        function handleFiles(files) {
+            selectedFiles = [...selectedFiles, ...Array.from(files)];
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const previewArea = document.getElementById('previewArea');
+            const fileList = document.getElementById('fileList');
+            previewArea.classList.remove('hidden');
+            fileList.innerHTML = selectedFiles.map((file, i) => `
+                <div class="file-card flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <span class="text-2xl">${getFileIcon(file.type)}</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium truncate">${file.name}</p>
+                        <p class="text-sm text-gray-500">${formatSize(file.size)}</p>
+                    </div>
+                    <button onclick="removeFile(${i})" class="text-red-500 hover:text-red-700">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function removeFile(i) {
+            selectedFiles.splice(i, 1);
+            updatePreview();
+        }
+
+        function clearFiles() {
+            selectedFiles = [];
+            updatePreview();
+        }
+
+        async function uploadFiles() {
+            if (selectedFiles.length === 0) return alert('請選擇檔案');
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ 傳送中...';
+
+            const formData = new FormData();
+            selectedFiles.forEach(f => formData.append('files', f));
+            formData.append('deviceId', deviceId || 'any');
+
+            try {
+                const res = await fetch('/api/transfer/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    alert('✅ 傳送成功！手機將收到通知');
+                    clearFiles();
+                    loadHistory();
+                } else {
+                    alert('❌ ' + data.error);
+                }
+            } catch (e) {
+                alert('❌ 傳送失敗');
+            }
+            btn.disabled = false;
+            btn.innerHTML = '🚀 開始傳送';
+        }
+
+        async function sendText() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) return alert('請輸入文字');
+            try {
+                const res = await fetch('/api/transfer/text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, deviceId: deviceId || 'any' })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('✅ 已傳送！');
+                    document.getElementById('textInput').value = '';
+                    loadHistory();
+                }
+            } catch (e) {
+                alert('❌ 傳送失敗');
+            }
+        }
+
+        async function loadHistory() {
+            const res = await fetch('/api/transfer/history');
+            const data = await res.json();
+            document.getElementById('historyList').innerHTML = data.items.map(item => `
+                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <span class="text-xl">${item.type === 'text' ? '💬' : '📎'}</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium truncate">${item.name || item.text.substring(0, 30)}</p>
+                        <p class="text-sm text-gray-500">${new Date(item.createdAt).toLocaleString()}</p>
+                    </div>
+                </div>
+            `).join('') || '<p class="text-gray-500 text-center py-4">暂无傳送記錄</p>';
+        }
+
+        function getFileIcon(type) {
+            if (type?.includes('image')) return '🖼️';
+            if (type?.includes('video')) return '🎬';
+            if (type?.includes('audio')) return '🎵';
+            if (type?.includes('pdf')) return '📕';
+            if (type?.includes('text')) return '📄';
+            return '📁';
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        initQR();
+        loadHistory();
+    </script>
+</body>
+</html>

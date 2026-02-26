@@ -14,6 +14,158 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {}
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "請填入你的BraveSearchAPIKey"
+      }
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "env": {}
+    },
+    "filesystem-restricted": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "D:/Site_Data",
+        "D:/brain_workspace/Reports",
+        "D:/zhe-wei-tech/Jarvis_Training/reports"
+      ],
+      "env": {}
+    },
+    "sqlite-local": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sqlite",
+        "D:/zhe-wei-tech/Jarvis_Training/jarvis_ops.db"
+      ],
+      "env": {}
+    },
+    "google-maps": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-google-maps"],
+      "env": {
+        "GOOGLE_MAPS_API_KEY": "請填入你的GoogleMapsAPIKey"
+      }
+    },
+    "osm-geocode-mcp": {
+      "command": "D:/zhe-wei-tech/Jarvis_Training/.venv312/Scripts/python.exe",
+      "args": ["D:/zhe-wei-tech/mcp_servers/osm_geocode_mcp.py"],
+      "env": {}
+    },
+    "osrm-route-mcp": {
+      "command": "D:/zhe-wei-tech/Jarvis_Training/.venv312/Scripts/python.exe",
+      "args": ["D:/zhe-wei-tech/mcp_servers/osrm_route_mcp.py"],
+      "env": {}
+    },
+    "construction-law-mcp": {
+      "command": "D:/zhe-wei-tech/Jarvis_Training/.venv312/Scripts/python.exe",
+      "args": ["D:/zhe-wei-tech/mcp_servers/construction_law_mcp.py"],
+      "env": {
+        "JARVIS_DB_PATH": "D:/zhe-wei-tech/Jarvis_Training/chroma_db",
+        "JARVIS_COLLECTION": "jarvis_training"
+      }
+    },
+    "docker-mcp": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-docker"],
+      "env": {}
+    },
+    "git": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-git", "D:/zhe-wei-tech"],
+      "env": {}
+    },
+    "fetch": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch"],
+      "env": {}
+    },
+    "postgres-dify": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres:postgres@localhost:5432/dify"
+      ],
+      "env": {}
+    },
+    "redis-local": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-redis", "redis://localhost:6379"],
+      "env": {}
+    },
+    "weaviate-mcp": {
+      "command": "D:/zhe-wei-tech/Jarvis_Training/.venv312/Scripts/python.exe",
+      "args": ["D:/zhe-wei-tech/mcp_servers/weaviate_mcp.py"],
+      "env": {
+        "WEAVIATE_URL": "http://localhost:8080"
+      }
+    },
+    "dify-mcp": {
+      "command": "D:/zhe-wei-tech/Jarvis_Training/.venv312/Scripts/python.exe",
+      "args": ["D:/zhe-wei-tech/mcp_servers/dify_mcp.py"],
+      "env": {
+        "DIFY_API_URL": "http://localhost:8080/v1",
+        "DIFY_API_KEY": "app-sFOPFMyMyzWmJR8cyL4uB8Sp"
+      }
+    },
+    "qdrant-mcp": {
+      "command": "D:/zhe-wei-tech/Jarvis_Training/.venv312/Scripts/python.exe",
+      "args": ["D:/zhe-wei-tech/mcp_servers/qdrant_mcp.py"],
+      "env": {
+        "QDRANT_URL": "http://localhost:6333"
+      }
+    },
+    "sentry-mcp": {
+      "command": "D:/zhe-wei-tech/Jarvis_Training/.venv312/Scripts/python.exe",
+      "args": ["D:/zhe-wei-tech/mcp_servers/sentry_mcp.py"],
+      "env": {
+        "LOG_DIR": "D:/zhe-wei-tech/reports"
+      }
+    },
+    "yahoo-finance": {
+      "command": "D:/zhe-wei-tech/Jarvis_Training/.venv312/Scripts/python.exe",
+      "args": ["D:/zhe-wei-tech/mcp_servers/yahoo_finance_mcp.py"],
+      "env": {}
+    },
+    "ffmpeg-video": {
+      "command": "D:/zhe-wei-tech/Jarvis_Training/.venv312/Scripts/python.exe",
+      "args": ["D:/zhe-wei-tech/mcp_servers/ffmpeg_video_mcp.py"],
+      "env": {
+        "FFMPEG_WORK_DIR": "D:/zhe-wei-tech/brain_workspace/media"
+      }
+    },
+    "open-web-search": {
+      "command": "npx",
+      "args": ["-y", "@aas-ee/open-websearch-mcp"],
+      "env": {}
+    },
+    "memory-service": {
+      "command": "npx",
+      "args": ["-y", "@doobidoo/mcp-memory-service"],
+      "env": {}
+    },
+    "arxiv-research": {
+      "command": "npx",
+      "args": ["-y", "arxiv-mcp-server"],
+      "env": {}
+    },
+    "puppeteer": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
+      "env": {}
+    },
+    "token-saver": {
+      "command": "D:/zhe-wei-tech/Jarvis_Training/.venv312/Scripts/python.exe",
+      "args": ["D:/zhe-wei-tech/mcp_servers/token_saver_mcp.py"],
+      "env": {}
     }
   }
 }

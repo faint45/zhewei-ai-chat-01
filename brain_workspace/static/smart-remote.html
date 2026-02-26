@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>智慧遙控 - 手機端</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Noto Sans TC', sans-serif; }
+        .btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        .msg-user { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .msg-bot { background: #f3f4f6; }
+        .loading { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .quick-btn { transition: all 0.2s; }
+        .quick-btn:active { transform: scale(0.95); }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen pb-20">
+    <!-- 頂部 Header -->
+    <header class="fixed top-0 left-0 right-0 bg-gray-800 border-b border-gray-700 z-50 px-4 py-3">
+        <div class="flex items-center justify-between">
+            <h1 class="text-lg font-bold">🤖 智慧遙控</h1>
+            <div class="flex items-center gap-2">
+                <span id="status" class="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400">就緒</span>
+                <button onclick="showSettings()" class="p-2 rounded hover:bg-gray-700">⚙️</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要內容區 -->
+    <main class="pt-16 px-4">
+        <!-- 快速指令 -->
+        <div class="mb-4">
+            <p class="text-xs text-gray-400 mb-2">快速指令</p>
+            <div class="flex flex-wrap gap-2">
+                <button onclick="sendQuick('開啟記事本')" class="quick-btn text-xs px-3 py-2 rounded-full bg-blue-600/30 border border-blue-500/50">📝 記事本</button>
+                <button onclick="sendQuick('開啟終端機')" class="quick-btn text-xs px-3 py-2 rounded-full bg-green-600/30 border border-green-500/50">💻 終端機</button>
+                <button onclick="sendQuick('搜尋桌面 *.txt 檔案')" class="quick-btn text-xs px-3 py-2 rounded-full bg-yellow-600/30 border border-yellow-500/50">🔍 找檔案</button>
+                <button onclick="sendQuick('分析當前螢幕')" class="quick-btn text-xs px-3 py-2 rounded-full bg-purple-600/30 border border-purple-500/50">👁️ 螢幕分析</button>
+                <button onclick="sendQuick('開啟 Chrome 並前往 google.com')" class="quick-btn text-xs px-3 py-2 rounded-full bg-red-600/30 border border-red-500/50">🌐 Chrome</button>
+            </div>
+        </div>
+
+        <!-- 對話區 -->
+        <div id="chat" class="space-y-3 mb-4">
+            <div class="msg-bot p-3 rounded-lg text-sm">
+                <p class="text-gray-400">👋 你好！我是智慧遙控助手。</p>
+                <p class="mt-1">可以說：</p>
+                <ul class="mt-1 text-gray-500 text-xs list-disc list-inside">
+                    <li>「開啟 VS Code」</li>
+                    <li>「搜尋 D:\ 的 Python 檔案」</li>
+                    <li>「開終端機並執行 dir」</li>
+                    <li>「分析螢幕找出可點擊的按鈕」</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 截圖預覽 -->
+        <div id="screenshot-container" class="hidden mb-4">
+            <p class="text-xs text-gray-400 mb-1">最新截圖</p>
+            <img id="screenshot" class="w-full rounded-lg border border-gray-700" />
+        </div>
+
+        <!-- 分析結果 -->
+        <div id="analysis-result" class="hidden mb-4 p-3 rounded-lg bg-gray-800 border border-gray-700 text-sm">
+        </div>
+    </main>
+
+    <!-- 底部輸入區 -->
+    <footer class="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-4">
+        <div class="flex gap-2">
+            <input id="instruction" type="text" placeholder="輸入指令..." 
+                class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                onkeypress="if(event.key==='Enter') execute()">
+            <button onclick="execute()" class="btn bg-blue-600 hover:bg-blue-700 px-6 rounded-lg font-bold">
+                ➤
+            </button>
+        </div>
+        <div class="flex justify-between mt-2 text-xs text-gray-500">
+            <span id="provider">Provider: gemini</span>
+            <span id="exec-mode">Execute: true</span>
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE = '';
+        let token = localStorage.getItem('jarvis_token') || '';
+        let history = [];
+
+        function getHeaders() {
+            const h = { 'Content-Type': 'application/json' };
+            if (token) h['Authorization'] = `Bearer ${token}`;
+            return h;
+        }
+
+        function addMessage(role, content, extra = '') {
+            const div = document.createElement('div');
+            div.className = role === 'user' ? 'msg-user p-3 rounded-lg text-sm' : 'msg-bot p-3 rounded-lg text-sm';
+            div.innerHTML = content + (extra ? `<div class="mt-2 text-xs text-gray-400">${extra}</div>` : '');
+            document.getElementById('chat').appendChild(div);
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+
+        function showStatus(msg) {
+            document.getElementById('status').textContent = msg;
+        }
+
+        async function execute() {
+            const input = document.getElementById('instruction');
+            const instruction = input.value.trim();
+            if (!instruction) return;
+
+            addMessage('user', instruction);
+            input.value = '';
+            showStatus('執行中...');
+
+            try {
+                const res = await fetch(`${API_BASE}/api/smart/execute`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ instruction, execute: true })
+                });
+                const data = await res.json();
+
+                if (data.ok) {
+                    const r = data.result;
+                    let content = '';
+                    if (r.parsed) {
+                        content += `<p class="font-bold">📋 解析結果：${r.parsed.intent}</p>`;
+                        content += `<p class="text-xs text-gray-400">類型：${r.parsed.type} | 信心度：${(r.parsed.confidence * 100).toFixed(0)}%</p>`;
+                    }
+                    if (r.steps && r.steps.length > 0) {
+                        content += `<p class="mt-2">✅ 執行 ${r.steps_executed} 步驟</p>`;
+                    }
+                    if (r.vlm_analysis && r.vlm_analysis.elements) {
+                        content += `<p class="mt-2 text-blue-400">👁️ 發現 ${r.vlm_analysis.elements.length} 個可互動元素</p>`;
+                    }
+                    if (r.error) {
+                        content += `<p class="text-red-400 mt-2">❌ ${r.error}</p>`;
+                    }
+                    addMessage('bot', content, `耗時 ${r.duration_seconds} 秒`);
+                } else {
+                    addMessage('bot', `<p class="text-red-400">❌ ${data.error}</p>`);
+                }
+            } catch (e) {
+                addMessage('bot', `<p class="text-red-400">❌ 錯誤：${e.message}</p>`);
+            }
+
+            showStatus('就緒');
+        }
+
+        async function sendQuick(cmd) {
+            document.getElementById('instruction').value = cmd;
+            execute();
+        }
+
+        async function analyzeScreen() {
+            showStatus('分析中...');
+            try {
+                const res = await fetch(`${API_BASE}/api/smart/analyze`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ focus_area: '全螢幕' })
+                });
+                const data = await res.json();
+
+                if (data.ok) {
+                    const a = data.analysis;
+                    let html = `<p class="font-bold">👁️ 螢幕分析</p>`;
+                    if (a.elements) {
+                        html += `<div class="mt-2 space-y-1">`;
+                        a.elements.forEach(el => {
+                            html += `<p class="text-xs">• ${el.type}: ${el.text || '無文字'} (${el.x}, ${el.y})</p>`;
+                        });
+                        html += `</div>`;
+                    }
+                    if (a.plan) {
+                        html += `<p class="mt-2 text-green-400">📝 建議動作：${a.plan.length} 步</p>`;
+                    }
+                    document.getElementById('analysis-result').innerHTML = html;
+                    document.getElementById('analysis-result').classList.remove('hidden');
+                }
+            } catch (e) {
+                alert('分析失敗：' + e.message);
+            }
+            showStatus('就緒');
+        }
+
+        async function ask() {
+            const q = prompt('輸入問題：');
+            if (!q) return;
+            showStatus('思考中...');
+            try {
+                const res = await fetch(`${API_BASE}/api/smart/ask`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ question: q })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    addMessage('bot', `<p>${data.answer}</p>`, '問答模式');
+                }
+            } catch (e) {
+                alert('錯誤：' + e.message);
+            }
+            showStatus('就緒');
+        }
+
+        function showSettings() {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-gray-800 rounded-lg p-6 w-full max-w-sm">
+                    <h2 class="text-lg font-bold mb-4">⚙️ 設定</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-xs text-gray-400">Provider</label>
+                            <select id="provider-select" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 mt-1">
+                                <option value="gemini">Gemini</option>
+                                <option value="claude">Claude</option>
+                                <option value="ollama">Ollama</option>
+                                <option value="deepseek">DeepSeek</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400">執行模式</label>
+                            <select id="exec-select" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 mt-1">
+                                <option value="true">立即執行</option>
+                                <option value="false">僅規劃</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400">Token (可選)</label>
+                            <input type="password" id="token-input" value="${token}" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 mt-1">
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mt-6">
+                        <button onclick="saveSettings()" class="flex-1 bg-blue-600 py-2 rounded">儲存</button>
+                        <button onclick="this.parentElement.parentElement.remove()" class="flex-1 bg-gray-700 py-2 rounded">取消</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function saveSettings() {
+            const provider = document.getElementById('provider-select').value;
+            const exec = document.getElementById('exec-select').value;
+            token = document.getElementById('token-input').value;
+            if (token) localStorage.setItem('jarvis_token', token);
+            document.getElementById('provider').textContent = `Provider: ${provider}`;
+            document.getElementById('exec-mode').textContent = `Execute: ${exec}`;
+            document.querySelector('.modal')?.remove();
+        }
+
+        // 檢查狀態
+        async function checkStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/api/smart/status`);
+                const data = await res.json();
+                if (data.ok) {
+                    showStatus('就緒');
+                } else {
+                    showStatus('離線');
+                }
+            } catch (e) {
+                showStatus('離線');
+            }
+        }
+
+        checkStatus();
+        setInterval(checkStatus, 30000);
+    </script>
+</body>
+</html>

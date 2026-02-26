@@ -19,10 +19,13 @@ venv/
 venv38/
 venv312/
 .venv/
+.venv*/
 env/
 ENV/
 *.egg-info/
 build/
+**/venv*/
+**/.venv*/
 
 # --- Node.js ---
 node_modules/
@@ -45,16 +48,20 @@ zhewei_remote_master.csv
 search_log.csv
 ai_brain_log.txt
 
-# --- 大型模型 / 二進制 ---
+# --- 大型模型 / 二進制 / 文件 ---
 vosk-model-small-cn/
 vosk-model-small-cn.zip
 yolov8n.pt
 ffmpeg-8.0.1.tar.xz
 *.onnx
+*.onnx.json
 *.engine
 *.gguf
 *.safetensors
 ai_engines/models/
+*.pdf
+zhewei_memory/Knowledge/tw_laws/xml/
+zhewei_memory/models/
 
 # --- AI 學習數據 ---
 brain_learn.json
@@ -78,6 +85,15 @@ Wav2Lip/
 DeepDiagram/
 metagpt/
 memU/
+
+# --- 大型本地目錄（不推到 GitHub）---
+Jarvis_Training/
+ai_engines/
+chroma_db/
+mcpo/
+mv_projects/
+input/
+workspace/
 
 # --- Phone Agent ---
 phone_agent_data/

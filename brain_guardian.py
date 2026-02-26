@@ -64,19 +64,21 @@ def check_z_drive() -> bool:
 
 def is_process_running(script_name: str) -> bool:
     """檢查該 Python 腳本是否在執行（依指令列是否含腳本名）"""
+    # Phase 1.2 安全修復：使用列表形式，避免 shell 注入
     try:
         out = subprocess.check_output(
-            'wmic process where "name=\'python.exe\'" get commandline 2>nul',
-            shell=True,
+            ["wmic", "process", "where", "name='python.exe'", "get", "commandline"],
+            shell=False,
             encoding="utf-8",
             errors="replace",
+            stderr=subprocess.DEVNULL,
         )
         return script_name in (out or "")
     except Exception:
         try:
             out = subprocess.check_output(
-                'tasklist /FI "IMAGENAME eq python.exe" /V',
-                shell=True,
+                ["tasklist", "/FI", "IMAGENAME eq python.exe", "/V"],
+                shell=False,
                 encoding="cp950",
                 errors="replace",
             )

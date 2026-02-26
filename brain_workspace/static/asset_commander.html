@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asset Commander - 收入指揮中心</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body{font-family:'Noto Sans TC',sans-serif;margin:0}
+        .glass{background:rgba(15,23,42,.65);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid rgba(148,163,184,.08)}
+        .glow-green{box-shadow:0 0 40px rgba(16,185,129,.12);border-color:rgba(16,185,129,.25)}
+        .glow-pink{box-shadow:0 0 30px rgba(236,72,153,.1);border-color:rgba(236,72,153,.2)}
+        .glow-blue{box-shadow:0 0 30px rgba(59,130,246,.1);border-color:rgba(59,130,246,.2)}
+        .glow-amber{box-shadow:0 0 30px rgba(245,158,11,.1);border-color:rgba(245,158,11,.2)}
+        .tab-active{background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(139,92,246,.15));border-color:rgba(99,102,241,.4);color:#c7d2fe}
+        .tab-btn{transition:all .15s;cursor:pointer;border:1px solid transparent;white-space:nowrap}
+        .tab-btn:hover{background:rgba(255,255,255,.04)}
+        .bar{height:6px;border-radius:3px;transition:width .6s ease}
+        .goal-bar{background:linear-gradient(90deg,#10b981,#06b6d4)}
+        .goal-bg{background:rgba(255,255,255,.06);border-radius:3px}
+        .product-card{transition:all .2s}
+        .product-card:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,0,0,.3)}
+        @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+        .pulse-dot{animation:pulse-dot 2s infinite}
+        .gradient-text{background:linear-gradient(135deg,#10b981,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    </style>
+</head>
+<body class="bg-slate-950 min-h-screen text-slate-100">
+<div class="max-w-7xl mx-auto px-4 py-5">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-5">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-lg font-bold">$</div>
+            <div>
+                <h1 class="text-xl font-bold">Asset Commander</h1>
+                <p class="text-[11px] text-slate-500">三線並行收入指揮中心 · i7-14700 / 64GB / RTX 4060 Ti / 15TB</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-[10px] text-slate-500" id="last-update">-</span>
+            <button onclick="loadAll()" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition"><i class="fas fa-sync-alt mr-1"></i>刷新</button>
+        </div>
+    </header>
+
+    <!-- 月目標進度 -->
+    <div class="glass glow-green rounded-2xl p-5 mb-5">
+        <div class="flex items-center justify-between mb-3">
+            <div>
+                <span class="text-sm text-slate-400">月收入目標</span>
+                <span class="text-2xl font-bold gradient-text ml-2">NT$ 10,000</span>
+            </div>
+            <div class="text-right">
+                <div id="goal-pct" class="text-3xl font-bold text-emerald-400">0%</div>
+            </div>
+        </div>
+        <div class="goal-bg overflow-hidden mb-3">
+            <div id="goal-bar" class="bar goal-bar" style="width:0%"></div>
+        </div>
+        <div class="grid grid-cols-3 gap-4 text-center text-xs">
+            <div><div class="text-slate-500">本月累計</div><div id="goal-current" class="font-bold text-white mt-0.5">NT$ 0</div></div>
+            <div><div class="text-slate-500">預估月底</div><div id="goal-projected" class="font-bold text-cyan-400 mt-0.5">NT$ 0</div></div>
+            <div><div class="text-slate-500">差額</div><div id="goal-gap" class="font-bold text-amber-400 mt-0.5">NT$ 10,000</div></div>
+        </div>
+    </div>
+
+    <!-- 6 收入源卡片 -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+        <div class="glass rounded-xl p-3 product-card glow-pink">
+            <div class="flex items-center gap-1.5 mb-1.5"><span class="text-lg">🎨</span><span class="text-[10px] text-slate-400">AI 創作</span></div>
+            <div id="rev-creator" class="text-lg font-bold text-pink-400">$0</div>
+            <div class="text-[10px] text-slate-500"><span id="rev-creator-subs">0</span> 訂閱</div>
+        </div>
+        <div class="glass rounded-xl p-3 product-card glow-amber">
+            <div class="flex items-center gap-1.5 mb-1.5"><span class="text-lg">🏗️</span><span class="text-[10px] text-slate-400">營建 AI</span></div>
+            <div id="rev-cms" class="text-lg font-bold text-amber-400">$0</div>
+            <div class="text-[10px] text-slate-500"><span id="rev-cms-subs">0</span> 訂閱</div>
+        </div>
+        <div class="glass rounded-xl p-3 product-card glow-blue">
+            <div class="flex items-center gap-1.5 mb-1.5"><span class="text-lg">🧠</span><span class="text-[10px] text-slate-400">大模型 API</span></div>
+            <div id="rev-api" class="text-lg font-bold text-blue-400">$0</div>
+            <div class="text-[10px] text-slate-500"><span id="rev-api-keys">0</span> Key</div>
+        </div>
+        <div class="glass rounded-xl p-3 product-card">
+            <div class="flex items-center gap-1.5 mb-1.5"><span class="text-lg">🎮</span><span class="text-[10px] text-slate-400">GPU 出租</span></div>
+            <div id="rev-gpu" class="text-lg font-bold text-emerald-400">$0</div>
+            <div class="text-[10px] text-slate-500" id="rev-gpu-platform">-</div>
+        </div>
+        <div class="glass rounded-xl p-3 product-card">
+            <div class="flex items-center gap-1.5 mb-1.5"><span class="text-lg">🌐</span><span class="text-[10px] text-slate-400">頻寬</span></div>
+            <div id="rev-bw" class="text-lg font-bold text-purple-400">~$400</div>
+            <div class="text-[10px] text-slate-500">Grass+Honeygain</div>
+        </div>
+        <div class="glass rounded-xl p-3 product-card">
+            <div class="flex items-center gap-1.5 mb-1.5"><span class="text-lg">💾</span><span class="text-[10px] text-slate-400">HDD 15TB</span></div>
+            <div id="rev-hdd" class="text-lg font-bold text-teal-400">$0</div>
+            <div class="text-[10px] text-slate-500">Storj 10TB</div>
+        </div>
+    </div>
+
+    <!-- Tab 導航 -->
+    <div class="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+        <button class="tab-btn tab-active rounded-lg px-3 py-1.5 text-xs font-medium" data-tab="overview"><i class="fas fa-chart-pie mr-1"></i>總覽</button>
+        <button class="tab-btn rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400" data-tab="products"><i class="fas fa-boxes-stacked mr-1"></i>三大產品</button>
+        <button class="tab-btn rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400" data-tab="api-proxy"><i class="fas fa-key mr-1"></i>API 管理</button>
+        <button class="tab-btn rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400" data-tab="gpu-rental"><i class="fas fa-microchip mr-1"></i>GPU/被動</button>
+        <button class="tab-btn rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400" data-tab="growth"><i class="fas fa-rocket mr-1"></i>成長策略</button>
+        <button class="tab-btn rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400" data-tab="config"><i class="fas fa-cog mr-1"></i>設定</button>
+    </div>
+
+    <!-- Tab: 總覽 -->
+    <div id="tab-overview" class="tab-content">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="glass rounded-xl p-5">
+                <h3 class="font-bold text-sm mb-3"><i class="fas fa-chart-bar mr-1 text-emerald-400"></i>收入結構</h3>
+                <div id="income-breakdown" class="space-y-2.5"></div>
+            </div>
+            <div class="glass rounded-xl p-5">
+                <h3 class="font-bold text-sm mb-3"><i class="fas fa-server mr-1 text-cyan-400"></i>硬體狀態</h3>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div><div class="text-[10px] text-slate-500 uppercase tracking-wider">CPU</div><div class="font-medium text-xs mt-0.5">i7-14700 20C/28T</div></div>
+                    <div><div class="text-[10px] text-slate-500 uppercase tracking-wider">RAM</div><div class="font-medium text-xs mt-0.5">64 GB DDR5</div></div>
+                    <div><div class="text-[10px] text-slate-500 uppercase tracking-wider">GPU</div><div id="hw-gpu" class="font-medium text-xs mt-0.5">RTX 4060 Ti 8GB</div></div>
+                    <div><div class="text-[10px] text-slate-500 uppercase tracking-wider">儲存</div><div class="font-medium text-xs mt-0.5">15 TB (SSD 1TB + HDD 14TB)</div></div>
+                    <div><div class="text-[10px] text-slate-500 uppercase tracking-wider">GPU 功率</div><div id="hw-power" class="font-medium text-xs mt-0.5">160 W</div></div>
+                    <div><div class="text-[10px] text-slate-500 uppercase tracking-wider">每日電費</div><div id="hw-cost" class="font-medium text-xs mt-0.5 text-red-400">-</div></div>
+                    <div><div class="text-[10px] text-slate-500 uppercase tracking-wider">本地模型</div><div class="font-medium text-xs mt-0.5">7 個 (qwen3/gemma3/moondream)</div></div>
+                    <div><div class="text-[10px] text-slate-500 uppercase tracking-wider">生圖引擎</div><div class="font-medium text-xs mt-0.5">Forge + ComfyUI + 12 雲端</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: 三大產品 -->
+    <div id="tab-products" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- AI 創作工作室 -->
+            <div class="glass rounded-xl overflow-hidden glow-pink">
+                <div class="bg-gradient-to-r from-pink-600/20 to-violet-600/20 p-4 border-b border-pink-500/10">
+                    <div class="flex items-center gap-2 mb-1"><span class="text-2xl">🎨</span><h3 class="font-bold">AI 創作工作室</h3></div>
+                    <p class="text-[11px] text-slate-400">無限生圖 · 圖片生影片 · 成人模式</p>
+                    <a href="/ai-studio" target="_blank" class="inline-block mt-2 text-[10px] text-pink-400 hover:text-pink-300"><i class="fas fa-external-link-alt mr-1"></i>開啟工作室</a>
+                </div>
+                <div class="p-4 space-y-3">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">方案</div>
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between text-xs"><span class="text-slate-300">免費體驗</span><span class="text-slate-500">20 圖/月</span><span class="font-medium">$0</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-slate-300">基礎版</span><span class="text-slate-500">200 圖/月</span><span class="font-medium text-pink-400">$299</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-slate-300">專業版</span><span class="text-slate-500">無限+NSFW</span><span class="font-bold text-pink-400">$799</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-slate-300">無限版</span><span class="text-slate-500">全部無限</span><span class="font-bold text-pink-400">$1,999</span></div>
+                    </div>
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wider mt-3 mb-1">功能</div>
+                    <ul class="text-[11px] text-slate-400 space-y-0.5">
+                        <li><i class="fas fa-check text-pink-500 mr-1 text-[9px]"></i>DALL·E 3 / GPT Image / Flux / Imagen 4</li>
+                        <li><i class="fas fa-check text-pink-500 mr-1 text-[9px]"></i>Sora 2 圖片/文字生影片</li>
+                        <li><i class="fas fa-check text-pink-500 mr-1 text-[9px]"></i>本地 Forge NoobAI-XL 無審查</li>
+                        <li><i class="fas fa-check text-pink-500 mr-1 text-[9px]"></i>作品庫 + 下載</li>
+                    </ul>
+                    <div class="pt-2 border-t border-slate-800">
+                        <div class="text-[10px] text-slate-500">達標路徑</div>
+                        <div class="text-xs text-pink-400 font-medium">10 Pro + 5 Ultra = <b>$17,985/月</b></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 營建 AI 助手 -->
+            <div class="glass rounded-xl overflow-hidden glow-amber">
+                <div class="bg-gradient-to-r from-amber-600/20 to-orange-600/20 p-4 border-b border-amber-500/10">
+                    <div class="flex items-center gap-2 mb-1"><span class="text-2xl">🏗️</span><h3 class="font-bold">營建 AI 助手</h3></div>
+                    <p class="text-[11px] text-slate-400">14,600+ 筆知識庫 · 9 種角色 · 語音日報</p>
+                    <a href="/cms" target="_blank" class="inline-block mt-2 text-[10px] text-amber-400 hover:text-amber-300"><i class="fas fa-external-link-alt mr-1"></i>開啟 CMS</a>
+                </div>
+                <div class="p-4 space-y-3">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">方案</div>
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between text-xs"><span class="text-slate-300">免費體驗</span><span class="text-slate-500">100 筆 KB</span><span class="font-medium">$0</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-slate-300">專業版</span><span class="text-slate-500">50K KB+語音</span><span class="font-bold text-amber-400">$1,500</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-slate-300">企業版</span><span class="text-slate-500">無限+全角色</span><span class="font-bold text-amber-400">$8,000</span></div>
+                    </div>
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wider mt-3 mb-1">護城河</div>
+                    <ul class="text-[11px] text-slate-400 space-y-0.5">
+                        <li><i class="fas fa-shield-halved text-amber-500 mr-1 text-[9px]"></i>14,600+ 筆台灣營建法規</li>
+                        <li><i class="fas fa-shield-halved text-amber-500 mr-1 text-[9px]"></i>9 種專業角色知識庫</li>
+                        <li><i class="fas fa-shield-halved text-amber-500 mr-1 text-[9px]"></i>Whisper 語音辨識自動填報</li>
+                        <li><i class="fas fa-shield-halved text-amber-500 mr-1 text-[9px]"></i>AI 視覺安全偵測</li>
+                        <li><i class="fas fa-shield-halved text-amber-500 mr-1 text-[9px]"></i>台灣市場幾乎零競爭</li>
+                    </ul>
+                    <div class="pt-2 border-t border-slate-800">
+                        <div class="text-[10px] text-slate-500">達標路徑</div>
+                        <div class="text-xs text-amber-400 font-medium">2 Pro + 1 Enterprise = <b>$11,000/月</b></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 大模型 API -->
+            <div class="glass rounded-xl overflow-hidden glow-blue">
+                <div class="bg-gradient-to-r from-blue-600/20 to-indigo-600/20 p-4 border-b border-blue-500/10">
+                    <div class="flex items-center gap-2 mb-1"><span class="text-2xl">🧠</span><h3 class="font-bold">大模型 API</h3></div>
+                    <p class="text-[11px] text-slate-400">OpenAI 相容 · 64GB 跑 70B · 便宜 80%</p>
+                    <a href="/v1/models" target="_blank" class="inline-block mt-2 text-[10px] text-blue-400 hover:text-blue-300"><i class="fas fa-external-link-alt mr-1"></i>模型列表</a>
+                </div>
+                <div class="p-4 space-y-3">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">方案</div>
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between text-xs"><span class="text-slate-300">免費</span><span class="text-slate-500">50K tok</span><span class="font-medium">$0</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-slate-300">入門</span><span class="text-slate-500">500K tok</span><span class="font-medium text-blue-400">$299</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-slate-300">專業</span><span class="text-slate-500">5M tok</span><span class="font-bold text-blue-400">$999</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-slate-300">商務</span><span class="text-slate-500">50M tok</span><span class="font-bold text-blue-400">$4,999</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-slate-300">無限</span><span class="text-slate-500">無限</span><span class="font-bold text-blue-400">$9,999</span></div>
+                    </div>
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wider mt-3 mb-1">優勢</div>
+                    <ul class="text-[11px] text-slate-400 space-y-0.5">
+                        <li><i class="fas fa-bolt text-blue-500 mr-1 text-[9px]"></i>64GB RAM 跑 70B 模型</li>
+                        <li><i class="fas fa-bolt text-blue-500 mr-1 text-[9px]"></i>Qwen3 8B/4B + Gemma3 4B</li>
+                        <li><i class="fas fa-bolt text-blue-500 mr-1 text-[9px]"></i>比 GPT-4 便宜 80%</li>
+                        <li><i class="fas fa-bolt text-blue-500 mr-1 text-[9px]"></i>Embedding 768 維</li>
+                    </ul>
+                    <div class="pt-2 border-t border-slate-800">
+                        <div class="text-[10px] text-slate-500">達標路徑</div>
+                        <div class="text-xs text-blue-400 font-medium">3 Pro + 1 Business = <b>$7,996/月</b></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: API 管理 -->
+    <div id="tab-api-proxy" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
+            <div class="glass rounded-xl p-4">
+                <div class="text-[10px] text-slate-500 uppercase">本月 API 收入</div>
+                <div id="api-month-rev" class="text-xl font-bold text-emerald-400 mt-1">NT$ 0</div>
+            </div>
+            <div class="glass rounded-xl p-4">
+                <div class="text-[10px] text-slate-500 uppercase">訂閱收入</div>
+                <div id="api-sub-rev" class="text-xl font-bold text-blue-400 mt-1">NT$ 0</div>
+            </div>
+            <div class="glass rounded-xl p-4">
+                <div class="text-[10px] text-slate-500 uppercase">活躍用戶</div>
+                <div id="api-active" class="text-xl font-bold text-violet-400 mt-1">0</div>
+            </div>
+        </div>
+        <div class="glass rounded-xl p-5 mb-4">
+            <h3 class="font-bold text-sm mb-3"><i class="fas fa-key mr-1 text-amber-400"></i>API Key 管理</h3>
+            <div class="flex flex-wrap gap-2 mb-3">
+                <input id="new-key-owner" placeholder="擁有者名稱" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs flex-1 min-w-[120px] focus:outline-none focus:border-blue-500/50">
+                <input id="new-key-email" placeholder="Email" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs flex-1 min-w-[120px] focus:outline-none focus:border-blue-500/50">
+                <select id="new-key-plan" aria-label="選擇方案" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs">
+                    <option value="free">免費</option>
+                    <option value="starter">入門 $299</option>
+                    <option value="pro">專業 $999</option>
+                    <option value="business">商務 $4999</option>
+                    <option value="unlimited">無限 $9999</option>
+                </select>
+                <button onclick="generateKey()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-xs font-medium transition"><i class="fas fa-plus mr-1"></i>生成</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead><tr class="text-slate-500 border-b border-slate-800">
+                        <th class="text-left py-2">Key</th><th class="text-left py-2">擁有者</th>
+                        <th class="text-left py-2">方案</th><th class="text-right py-2">操作</th>
+                    </tr></thead>
+                    <tbody id="keys-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="glass rounded-xl p-5">
+            <h3 class="font-bold text-sm mb-3"><i class="fas fa-tags mr-1 text-cyan-400"></i>模型定價</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead><tr class="text-slate-500 border-b border-slate-800">
+                        <th class="text-left py-2">模型</th>
+                        <th class="text-right py-2">輸入 (NT$/1K)</th>
+                        <th class="text-right py-2">輸出 (NT$/1K)</th>
+                    </tr></thead>
+                    <tbody id="pricing-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: GPU/被動 -->
+    <div id="tab-gpu-rental" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+            <div class="glass rounded-xl p-5">
+                <h3 class="font-bold text-sm mb-3"><i class="fas fa-microchip mr-1 text-emerald-400"></i>GPU 平臺</h3>
+                <table class="w-full text-xs">
+                    <thead><tr class="text-slate-500 border-b border-slate-800">
+                        <th class="text-left py-2">平臺</th><th class="text-left py-2">狀態</th>
+                        <th class="text-right py-2">時淨利</th>
+                    </tr></thead>
+                    <tbody id="gpu-platform-table"></tbody>
+                </table>
+                <div id="gpu-best" class="mt-3 text-center text-xs"></div>
+                <div class="flex gap-2 mt-3">
+                    <button onclick="toggleSystem()" id="toggle-btn" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded-lg text-xs font-medium transition flex-1">▶️ 啟動</button>
+                    <button onclick="refreshAsset()" class="bg-slate-700 hover:bg-slate-600 px-4 py-1.5 rounded-lg text-xs transition">🔄</button>
+                    <button onclick="switchBest()" class="bg-violet-600 hover:bg-violet-500 px-4 py-1.5 rounded-lg text-xs transition">🔀 最佳</button>
+                </div>
+            </div>
+            <div class="glass rounded-xl p-5">
+                <h3 class="font-bold text-sm mb-3"><i class="fas fa-coins mr-1 text-amber-400"></i>被動收入</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-2.5 bg-slate-900/50 rounded-lg">
+                        <div class="flex items-center gap-2"><span>🎮</span><div><div class="text-xs font-medium">GPU 算力出租</div><div class="text-[10px] text-slate-500">IO.net / Salad / Nosana</div></div></div>
+                        <div class="text-right"><div class="text-xs font-bold text-emerald-400">~$1,500/月</div></div>
+                    </div>
+                    <div class="flex items-center justify-between p-2.5 bg-slate-900/50 rounded-lg">
+                        <div class="flex items-center gap-2"><span>🌐</span><div><div class="text-xs font-medium">頻寬出租</div><div class="text-[10px] text-slate-500">Grass.io + Honeygain</div></div></div>
+                        <div class="text-right"><div class="text-xs font-bold text-purple-400">~$400/月</div></div>
+                    </div>
+                    <div class="flex items-center justify-between p-2.5 bg-slate-900/50 rounded-lg">
+                        <div class="flex items-center gap-2"><span>💾</span><div><div class="text-xs font-medium">HDD 儲存出租</div><div class="text-[10px] text-slate-500">Storj 10TB · $1.5/TB/月</div></div></div>
+                        <div class="text-right"><div class="text-xs font-bold text-teal-400">~$750/月</div></div>
+                    </div>
+                    <div class="border-t border-slate-800 pt-2 flex justify-between">
+                        <span class="text-xs text-slate-400">被動收入小計</span>
+                        <span class="text-sm font-bold text-emerald-400">~$2,650/月</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: 成長策略 -->
+    <div id="tab-growth" class="tab-content hidden">
+        <div class="glass rounded-xl p-5 mb-4">
+            <h3 class="font-bold text-sm mb-3"><i class="fas fa-bullseye mr-1 text-red-400"></i>最快達標路徑</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead><tr class="text-slate-500 border-b border-slate-800">
+                        <th class="text-left py-2">收入源</th><th class="text-left py-2">目標</th><th class="text-right py-2">月收入</th>
+                    </tr></thead>
+                    <tbody>
+                        <tr class="border-b border-slate-800/50"><td class="py-2">🎨 AI 創作</td><td class="py-2 text-slate-400">5 Pro + 2 Ultra</td><td class="py-2 text-right font-bold text-pink-400">$7,993</td></tr>
+                        <tr class="border-b border-slate-800/50"><td class="py-2">🏗️ 營建 AI</td><td class="py-2 text-slate-400">2 Pro + 1 Enterprise</td><td class="py-2 text-right font-bold text-amber-400">$11,000</td></tr>
+                        <tr class="border-b border-slate-800/50"><td class="py-2">🧠 大模型 API</td><td class="py-2 text-slate-400">3 Pro + 1 Business</td><td class="py-2 text-right font-bold text-blue-400">$7,996</td></tr>
+                        <tr class="border-b border-slate-800/50"><td class="py-2">🎮🌐💾 被動</td><td class="py-2 text-slate-400">GPU+頻寬+HDD</td><td class="py-2 text-right font-bold text-emerald-400">$2,650</td></tr>
+                        <tr class="bg-emerald-950/20"><td class="py-2 font-bold" colspan="2">任一產品線 + 被動收入即可達標</td><td class="py-2 text-right font-bold text-lg text-emerald-400">$10,000+</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="glass rounded-xl p-5">
+            <h3 class="font-bold text-sm mb-3"><i class="fas fa-lightbulb mr-1 text-yellow-400"></i>行動建議</h3>
+            <div id="suggestions" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <!-- Tab: 設定 -->
+    <div id="tab-config" class="tab-content hidden">
+        <div class="glass rounded-xl p-5 mb-4">
+            <h3 class="font-bold text-sm mb-3"><i class="fas fa-bolt mr-1 text-yellow-400"></i>電費與門檻</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase" for="cfg-elec">電費 (NT$/kWh)</label>
+                    <input type="number" id="cfg-elec" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500/50" step="0.1" value="4.0">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1 uppercase" for="cfg-threshold">最低淨利門檻 (NT$/天)</label>
+                    <input type="number" id="cfg-threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500/50" step="0.1" value="0.5">
+                </div>
+            </div>
+            <button onclick="saveConfig()" class="mt-3 bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-lg text-xs font-medium transition"><i class="fas fa-save mr-1"></i>儲存</button>
+        </div>
+        <div class="glass rounded-xl p-5">
+            <h3 class="font-bold text-sm mb-3"><i class="fas fa-link mr-1 text-cyan-400"></i>服務連結</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                <a href="/ai-studio" target="_blank" class="p-2.5 bg-slate-900/50 rounded-lg hover:bg-slate-800 transition flex items-center gap-2"><span>🎨</span>AI 創作工作室<i class="fas fa-external-link-alt ml-auto text-slate-600"></i></a>
+                <a href="/cms" target="_blank" class="p-2.5 bg-slate-900/50 rounded-lg hover:bg-slate-800 transition flex items-center gap-2"><span>🏗️</span>營建管理系統<i class="fas fa-external-link-alt ml-auto text-slate-600"></i></a>
+                <a href="/v1/models" target="_blank" class="p-2.5 bg-slate-900/50 rounded-lg hover:bg-slate-800 transition flex items-center gap-2"><span>🧠</span>大模型 API<i class="fas fa-external-link-alt ml-auto text-slate-600"></i></a>
+                <a href="/payment" target="_blank" class="p-2.5 bg-slate-900/50 rounded-lg hover:bg-slate-800 transition flex items-center gap-2"><span>💳</span>付款頁面<i class="fas fa-external-link-alt ml-auto text-slate-600"></i></a>
+                <a href="/admin-commercial" target="_blank" class="p-2.5 bg-slate-900/50 rounded-lg hover:bg-slate-800 transition flex items-center gap-2"><span>📊</span>商用管理後台<i class="fas fa-external-link-alt ml-auto text-slate-600"></i></a>
+                <a href="/jarvis" target="_blank" class="p-2.5 bg-slate-900/50 rounded-lg hover:bg-slate-800 transition flex items-center gap-2"><span>🤖</span>Jarvis 主系統<i class="fas fa-external-link-alt ml-auto text-slate-600"></i></a>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const TOKEN = localStorage.getItem('jarvis_token') || '';
+const HDR = { 'Content-Type': 'application/json' };
+if (TOKEN) HDR['Authorization'] = `Bearer ${TOKEN}`;
+
+let assetState = null, apiRevenue = null, apiKeys = [], models = [], revSummary = null;
+
+async function api(url, opts = {}) {
+    try {
+        const r = await fetch(url, { ...opts, headers: { ...HDR, ...opts.headers } });
+        return await r.json();
+    } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('tab-active'); b.classList.add('text-slate-400'); });
+        btn.classList.add('tab-active'); btn.classList.remove('text-slate-400');
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+        document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+    });
+});
+
+async function loadAll() {
+    const [stateR, revR, keysR, modelsR, summaryR] = await Promise.all([
+        api('/api/asset/state'),
+        api('/api/proxy/revenue'),
+        api('/api/proxy/keys'),
+        api('/v1/models'),
+        api('/api/revenue/summary'),
+    ]);
+    assetState = stateR.ok !== false ? stateR : null;
+    apiRevenue = revR.ok !== false ? revR : null;
+    apiKeys = keysR.ok !== false ? (keysR.keys || []) : [];
+    models = modelsR.ok !== false ? (modelsR.models || []) : [];
+    revSummary = summaryR.ok ? summaryR : null;
+    render();
+    document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+}
+
+function render() {
+    renderGoal();
+    renderCards();
+    renderOverview();
+    renderApiProxy();
+    renderGpu();
+    renderSuggestions();
+}
+
+function renderGoal() {
+    const apiMonth = apiRevenue ? (apiRevenue.month_total_revenue || 0) : 0;
+    const creatorMonth = revSummary ? (revSummary.by_product?.ai_creator?.revenue || 0) : 0;
+    const cmsMonth = revSummary ? (revSummary.by_product?.construction_ai?.revenue || 0) : 0;
+    const passiveMonth = 2650;
+    const total = apiMonth + creatorMonth + cmsMonth + passiveMonth;
+    const goal = 10000;
+    const pct = Math.min((total / goal) * 100, 100);
+    const dayOfMonth = new Date().getDate();
+    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    const projected = dayOfMonth > 0 ? (total / dayOfMonth) * daysInMonth : 0;
+    document.getElementById('goal-pct').textContent = pct.toFixed(1) + '%';
+    document.getElementById('goal-bar').style.width = pct + '%';
+    document.getElementById('goal-current').textContent = 'NT$ ' + total.toLocaleString();
+    document.getElementById('goal-projected').textContent = 'NT$ ' + Math.round(projected).toLocaleString();
+    document.getElementById('goal-gap').textContent = 'NT$ ' + Math.max(goal - total, 0).toLocaleString();
+}
+
+function renderCards() {
+    const ar = apiRevenue || {};
+    const rs = revSummary?.by_product || {};
+    document.getElementById('rev-creator').textContent = '$' + (rs.ai_creator?.revenue || 0).toLocaleString();
+    document.getElementById('rev-creator-subs').textContent = rs.ai_creator?.active_subs || 0;
+    document.getElementById('rev-cms').textContent = '$' + (rs.construction_ai?.revenue || 0).toLocaleString();
+    document.getElementById('rev-cms-subs').textContent = rs.construction_ai?.active_subs || 0;
+    document.getElementById('rev-api').textContent = '$' + (ar.month_total_revenue || 0).toLocaleString();
+    document.getElementById('rev-api-keys').textContent = ar.active_keys || 0;
+    if (assetState) {
+        const gpuProfit = Math.max((assetState.net_profit_day || 0) * 30, 0);
+        document.getElementById('rev-gpu').textContent = '$' + Math.round(gpuProfit).toLocaleString();
+        document.getElementById('rev-gpu-platform').textContent = (assetState.current_platform || '-').toUpperCase();
+    }
+}
+
+function renderOverview() {
+    const breakdown = document.getElementById('income-breakdown');
+    const ar = apiRevenue || {};
+    const rs = revSummary?.by_product || {};
+    const sources = [
+        { name: '🎨 AI 創作', amount: rs.ai_creator?.revenue || 0, color: 'bg-pink-500' },
+        { name: '🏗️ 營建 AI', amount: rs.construction_ai?.revenue || 0, color: 'bg-amber-500' },
+        { name: '🧠 大模型 API', amount: ar.month_total_revenue || 0, color: 'bg-blue-500' },
+        { name: '🎮 GPU 出租', amount: assetState ? Math.max((assetState.net_profit_day || 0) * 30, 0) : 1500, color: 'bg-emerald-500' },
+        { name: '🌐 頻寬', amount: 400, color: 'bg-purple-500' },
+        { name: '💾 HDD', amount: 750, color: 'bg-teal-500' },
+    ];
+    const total = sources.reduce((s, x) => s + x.amount, 0) || 1;
+    breakdown.innerHTML = sources.map(s => {
+        const pct = ((s.amount / total) * 100).toFixed(1);
+        return `<div>
+            <div class="flex justify-between text-xs mb-1"><span class="text-slate-300">${s.name}</span><span class="font-medium">$${s.amount.toLocaleString()} <span class="text-slate-500">(${pct}%)</span></span></div>
+            <div class="goal-bg overflow-hidden"><div class="bar ${s.color}" style="width:${pct}%"></div></div>
+        </div>`;
+    }).join('');
+    if (assetState) {
+        document.getElementById('hw-power').textContent = (assetState.gpu_power_watts || 160) + ' W';
+        document.getElementById('hw-cost').textContent = 'NT$ ' + (assetState.total_cost_day || 15.36).toFixed(2);
+    } else {
+        document.getElementById('hw-cost').textContent = 'NT$ ~15.36';
+    }
+}
+
+function renderApiProxy() {
+    const ar = apiRevenue || {};
+    document.getElementById('api-month-rev').textContent = 'NT$ ' + (ar.month_api_revenue || 0).toFixed(2);
+    document.getElementById('api-sub-rev').textContent = 'NT$ ' + (ar.month_subscription_revenue || 0).toLocaleString();
+    document.getElementById('api-active').textContent = ar.active_keys || 0;
+    const tbody = document.getElementById('keys-tbody');
+    tbody.innerHTML = apiKeys.map(k => `<tr class="border-b border-slate-800/50">
+        <td class="py-1.5 font-mono text-slate-400">${k.key_prefix}...</td>
+        <td class="py-1.5">${k.owner}</td>
+        <td class="py-1.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-800">${k.plan}</span></td>
+        <td class="py-1.5 text-right"><button onclick="revokeKey('${k.id}')" class="text-red-400 hover:text-red-300 text-[10px]"><i class="fas fa-trash"></i></button></td>
+    </tr>`).join('') || '<tr><td colspan="4" class="py-4 text-center text-slate-600 text-xs">尚無 API Key</td></tr>';
+    const ptbody = document.getElementById('pricing-tbody');
+    ptbody.innerHTML = models.map(m => `<tr class="border-b border-slate-800/50">
+        <td class="py-1.5 font-mono text-slate-300">${m.model}</td>
+        <td class="py-1.5 text-right text-slate-400">$${m.input_price_per_1k}</td>
+        <td class="py-1.5 text-right text-slate-400">$${m.output_price_per_1k}</td>
+    </tr>`).join('');
+}
+
+function renderGpu() {
+    if (!assetState) return;
+    const tbody = document.getElementById('gpu-platform-table');
+    const platforms = assetState.platforms || {};
+    tbody.innerHTML = Object.entries(platforms).map(([name, p]) => {
+        const cls = p.profit > 0 ? 'text-emerald-400' : (p.profit < 0 ? 'text-red-400' : '');
+        const dot = p.status === 'online' ? 'text-emerald-400' : 'text-slate-600';
+        return `<tr class="border-b border-slate-800/50">
+            <td class="py-2 font-medium">${name.toUpperCase()}</td>
+            <td class="py-2"><i class="fas fa-circle text-[6px] ${dot} mr-1"></i>${p.status}</td>
+            <td class="py-2 text-right ${cls}">$${(p.profit || 0).toFixed(4)}</td>
+        </tr>`;
+    }).join('');
+    const best = assetState.best_platform;
+    document.getElementById('gpu-best').innerHTML = best ? `<i class="fas fa-trophy text-amber-400 mr-1"></i>最佳: <span class="text-amber-400 font-bold">${best.toUpperCase()}</span>` : '';
+    const btn = document.getElementById('toggle-btn');
+    btn.innerHTML = assetState.running ? '⏹️ 停止' : '▶️ 啟動';
+    btn.className = (assetState.running ? 'bg-red-600 hover:bg-red-500' : 'bg-emerald-600 hover:bg-emerald-500') + ' px-4 py-1.5 rounded-lg text-xs font-medium transition flex-1';
+}
+
+function renderSuggestions() {
+    const sug = document.getElementById('suggestions');
+    const tips = [];
+    const rs = revSummary?.by_product || {};
+    if ((rs.ai_creator?.active_subs || 0) < 5) tips.push({icon:'🎨',color:'pink',title:'推廣 AI 創作工作室',desc:'成人內容生成是剛需市場。在 Twitter/Reddit/Pixiv 發布作品 + 免費試用連結。',pot:'10 Pro = $7,990/月'});
+    if ((rs.construction_ai?.active_subs || 0) < 3) tips.push({icon:'🏗️',color:'amber',title:'開發營建客戶',desc:'台灣營建 AI 市場幾乎空白，你的 14,600 筆知識庫是護城河。聯繫營建公司提供免費試用。',pot:'2 Pro + 1 Enterprise = $11,000/月'});
+    if ((apiRevenue?.active_keys || 0) < 3) tips.push({icon:'🧠',color:'blue',title:'推廣大模型 API',desc:'64GB RAM 可跑 70B 模型。在 PTT/Dcard 技術版發文，強調比 OpenAI 便宜 80%。',pot:'3 Pro + 1 Business = $7,996/月'});
+    tips.push({icon:'🚀',color:'violet',title:'下載 70B 模型',desc:'ollama pull qwen3:70b（~40GB）。64GB RAM CPU offload 可跑 4-6 tok/s，大部分競爭者跑不了。',pot:'差異化定價，70B API 收更高費用'});
+    tips.push({icon:'💰',color:'emerald',title:'啟動全部被動收入',desc:'安裝 Grass.io + Honeygain + 設定 Storj 10TB 節點 + 註冊 IO.net/Salad GPU 出租。',pot:'$2,650/月 零額外人力'});
+    sug.innerHTML = tips.map(t => `<div class="p-3 bg-${t.color}-950/20 rounded-lg border border-${t.color}-900/20">
+        <div class="flex items-center gap-2 mb-1"><span>${t.icon}</span><span class="font-bold text-xs text-${t.color}-400">${t.title}</span><span class="ml-auto text-[10px] text-${t.color}-400/60">${t.pot}</span></div>
+        <div class="text-[11px] text-slate-400">${t.desc}</div>
+    </div>`).join('');
+}
+
+async function generateKey() {
+    const owner = document.getElementById('new-key-owner').value.trim();
+    const email = document.getElementById('new-key-email').value.trim();
+    const plan = document.getElementById('new-key-plan').value;
+    if (!owner) return alert('請輸入擁有者名稱');
+    const r = await api('/api/proxy/keys/generate', { method: 'POST', body: JSON.stringify({ owner, email, plan }) });
+    if (r.ok) { alert('API Key 已生成:\n\n' + r.api_key + '\n\n請妥善保管！'); loadAll(); }
+    else alert('失敗: ' + (r.error || r.detail || '未知錯誤'));
+}
+async function revokeKey(keyId) {
+    if (!confirm('確定撤銷此 Key？')) return;
+    const r = await api('/api/proxy/keys/revoke', { method: 'POST', body: JSON.stringify({ key_id: keyId }) });
+    if (r.ok) loadAll(); else alert('失敗: ' + (r.error || ''));
+}
+async function toggleSystem() {
+    const endpoint = assetState?.running ? '/api/asset/stop' : '/api/asset/start';
+    await api(endpoint, { method: 'POST' }); loadAll();
+}
+async function refreshAsset() { await api('/api/asset/refresh', { method: 'POST' }); loadAll(); }
+async function switchBest() {
+    if (!assetState?.best_platform || assetState.best_platform === 'none') return;
+    await api('/api/asset/switch', { method: 'POST', body: JSON.stringify({ platform: assetState.best_platform }) }); loadAll();
+}
+async function saveConfig() {
+    const r = await api('/api/asset/config', { method: 'POST', body: JSON.stringify({
+        electricity_rate: parseFloat(document.getElementById('cfg-elec').value),
+        min_profit_threshold: parseFloat(document.getElementById('cfg-threshold').value)
+    })});
+    alert(r.ok ? '已儲存' : '失敗');
+}
+
+loadAll();
+setInterval(loadAll, 60000);
+</script>
+</body>
+</html>

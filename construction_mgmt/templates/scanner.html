@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#7c3aed">
+    <title>文件掃描辨識 — 營建自動化</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        video { transform: scaleX(1); }
+        .scan-line { animation: scanLine 2s ease-in-out infinite; }
+        @keyframes scanLine { 0%,100% { top: 10%; } 50% { top: 85%; } }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen text-white" x-data="scannerApp()">
+
+    <!-- 頂部導航 -->
+    <div class="bg-purple-900/90 px-4 py-3 flex items-center justify-between sticky top-0 z-50 backdrop-blur" style="-webkit-backdrop-filter: blur(10px);">
+        <div class="flex items-center gap-2">
+            <a href="/" class="text-white/70 hover:text-white text-sm">← 返回</a>
+            <h1 class="font-bold text-lg">📷 文件掃描辨識</h1>
+        </div>
+        <div class="text-xs text-purple-200" x-text="currentProject ? currentProject.project_name : '未選擇工程'"></div>
+    </div>
+
+    <!-- 工程選擇 -->
+    <div x-show="!currentProject" class="p-4">
+        <div class="bg-gray-800 rounded-xl p-6 text-center">
+            <svg class="w-16 h-16 mx-auto mb-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            <p class="text-gray-400 mb-4">請先選擇工程</p>
+            <div class="space-y-2">
+                <template x-for="p in projects" :key="p.id">
+                    <button @click="selectProject(p)" class="w-full px-4 py-3 bg-purple-900/50 border border-purple-700 rounded-lg text-left hover:bg-purple-800/50 transition-colors">
+                        <div class="font-medium text-purple-200" x-text="p.project_name"></div>
+                        <div class="text-xs text-gray-500" x-text="p.contract_number || ''"></div>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主介面 -->
+    <div x-show="currentProject">
+
+        <!-- 模式切換 -->
+        <div class="px-4 pt-3 flex gap-2">
+            <button @click="viewMode = 'camera'" :class="viewMode === 'camera' ? 'bg-purple-600' : 'bg-gray-700'" class="flex-1 py-2 rounded-lg text-sm font-medium transition-colors">📷 攝影機</button>
+            <button @click="viewMode = 'upload'" :class="viewMode === 'upload' ? 'bg-purple-600' : 'bg-gray-700'" class="flex-1 py-2 rounded-lg text-sm font-medium transition-colors">📁 上傳檔案</button>
+            <button @click="viewMode = 'history'; loadHistory()" :class="viewMode === 'history' ? 'bg-purple-600' : 'bg-gray-700'" class="flex-1 py-2 rounded-lg text-sm font-medium transition-colors">📋 歸檔記錄</button>
+        </div>
+
+        <!-- ===== 攝影機模式 ===== -->
+        <div x-show="viewMode === 'camera'" class="px-4 pt-3">
+            <div class="relative bg-black rounded-xl overflow-hidden aspect-[4/3]">
+                <!-- 攝影機畫面 -->
+                <video x-ref="video" autoplay playsinline class="w-full h-full object-cover" x-show="cameraActive && !capturedImage"></video>
+
+                <!-- 擷取的圖片 -->
+                <img x-show="capturedImage" :src="capturedImage" class="w-full h-full object-contain bg-gray-900">
+
+                <!-- 掃描線動畫 -->
+                <div x-show="isScanning" class="absolute inset-0 pointer-events-none">
+                    <div class="scan-line absolute left-0 right-0 h-0.5 bg-green-400 shadow-lg shadow-green-400/50"></div>
+                </div>
+
+                <!-- 攝影機未啟動 -->
+                <div x-show="!cameraActive && !capturedImage" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
+                    <svg class="w-16 h-16 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    <p class="text-sm">點擊下方按鈕啟動攝影機</p>
+                </div>
+
+                <!-- 處理中覆蓋 -->
+                <div x-show="isProcessing" class="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+                    <svg class="w-10 h-10 text-purple-400 animate-spin mb-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <p class="text-sm text-purple-200" x-text="processingStatus"></p>
+                </div>
+
+                <!-- 攝影機選擇 -->
+                <div x-show="cameraActive && !capturedImage && cameras.length > 1" class="absolute top-2 right-2">
+                    <button @click="switchCamera()" class="bg-black/50 rounded-full p-2 hover:bg-black/70 transition-colors" title="切換攝影機">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 攝影機控制按鈕 -->
+            <div class="flex items-center justify-center gap-4 mt-4">
+                <template x-if="!cameraActive && !capturedImage">
+                    <button @click="startCamera()" class="px-6 py-3 bg-purple-600 rounded-xl font-medium hover:bg-purple-700 transition-colors flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        啟動攝影機
+                    </button>
+                </template>
+                <template x-if="cameraActive && !capturedImage">
+                    <div class="flex gap-3">
+                        <button @click="capturePhoto()" class="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform active:scale-95">
+                            <div class="w-12 h-12 bg-purple-600 rounded-full"></div>
+                        </button>
+                        <button @click="stopCamera()" class="px-4 py-2 bg-gray-700 rounded-lg text-sm hover:bg-gray-600 self-center">關閉</button>
+                    </div>
+                </template>
+                <template x-if="capturedImage && !isProcessing">
+                    <div class="flex gap-3">
+                        <button @click="scanDocument()" class="px-6 py-3 bg-green-600 rounded-xl font-medium hover:bg-green-700 transition-colors flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            辨識歸檔
+                        </button>
+                        <button @click="ocrPreview()" class="px-4 py-3 bg-blue-600 rounded-xl text-sm hover:bg-blue-700 transition-colors">僅辨識</button>
+                        <button @click="retake()" class="px-4 py-3 bg-gray-700 rounded-xl text-sm hover:bg-gray-600 transition-colors">重拍</button>
+                    </div>
+                </template>
+            </div>
+            <canvas x-ref="canvas" class="hidden"></canvas>
+        </div>
+
+        <!-- ===== 上傳檔案模式 ===== -->
+        <div x-show="viewMode === 'upload'" class="px-4 pt-3">
+            <div class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-purple-500 transition-colors cursor-pointer"
+                 @click="$refs.fileInput.click()"
+                 @dragover.prevent="dragOver = true"
+                 @dragleave="dragOver = false"
+                 @drop.prevent="handleDrop($event)"
+                 :class="dragOver ? 'border-purple-400 bg-purple-900/20' : ''">
+                <svg class="w-12 h-12 mx-auto mb-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                <p class="text-gray-400 text-sm">點擊或拖放文件圖片</p>
+                <p class="text-gray-600 text-xs mt-1">支援 JPG、PNG、PDF 掃描檔</p>
+                <input x-ref="fileInput" type="file" accept="image/*,.pdf" class="hidden" @change="handleFileSelect($event)">
+            </div>
+
+            <!-- 上傳預覽 -->
+            <div x-show="uploadPreview" class="mt-3">
+                <div class="bg-gray-800 rounded-xl overflow-hidden">
+                    <img :src="uploadPreview" class="w-full max-h-64 object-contain">
+                </div>
+                <div class="flex gap-3 mt-3 justify-center">
+                    <button @click="scanUploadedFile()" class="px-6 py-3 bg-green-600 rounded-xl font-medium hover:bg-green-700 transition-colors" :disabled="isProcessing">
+                        <span x-show="!isProcessing">📄 辨識歸檔</span>
+                        <span x-show="isProcessing">處理中...</span>
+                    </button>
+                    <button @click="uploadPreview = null; uploadFile = null" class="px-4 py-3 bg-gray-700 rounded-xl text-sm hover:bg-gray-600">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== OCR 結果 ===== -->
+        <div x-show="ocrResult" class="px-4 mt-4 fade-in">
+            <div class="bg-gray-800 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-medium text-purple-300 text-sm">📝 OCR 辨識結果</h3>
+                    <div class="flex items-center gap-2 text-xs text-gray-400">
+                        <span x-text="ocrResult?.line_count + ' 行'"></span>
+                        <span>·</span>
+                        <span x-text="'信心度 ' + Math.round((ocrResult?.avg_confidence || 0) * 100) + '%'"></span>
+                        <span>·</span>
+                        <span x-text="ocrResult?.duration + 's'"></span>
+                    </div>
+                </div>
+                <pre class="text-sm text-gray-300 bg-gray-900 rounded-lg p-3 max-h-48 overflow-y-auto whitespace-pre-wrap font-mono" x-text="ocrResult?.text"></pre>
+            </div>
+        </div>
+
+        <!-- ===== 分類結果 ===== -->
+        <div x-show="classResult" class="px-4 mt-3 fade-in">
+            <div class="bg-gray-800 rounded-xl p-4 border border-green-800">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-medium text-green-300 text-sm">🏷️ AI 文件分類</h3>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-green-900 text-green-300" x-text="'信心度 ' + Math.round((classResult?.confidence || 0) * 100) + '%'"></span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div><span class="text-gray-500">分類：</span><span class="text-green-300 font-medium" x-text="classResult?.category_name"></span></div>
+                    <div><span class="text-gray-500">標題：</span><span x-text="classResult?.title"></span></div>
+                    <div x-show="classResult?.doc_number"><span class="text-gray-500">文號：</span><span x-text="classResult?.doc_number"></span></div>
+                    <div x-show="classResult?.doc_date"><span class="text-gray-500">日期：</span><span x-text="classResult?.doc_date"></span></div>
+                    <div x-show="classResult?.sender"><span class="text-gray-500">發文單位：</span><span x-text="classResult?.sender"></span></div>
+                </div>
+                <div x-show="classResult?.summary" class="mt-2">
+                    <span class="text-gray-500 text-xs">摘要：</span>
+                    <p class="text-sm text-gray-300 mt-1" x-text="classResult?.summary"></p>
+                </div>
+                <div x-show="scanId" class="mt-3 pt-3 border-t border-gray-700 flex items-center justify-between">
+                    <span class="text-xs text-green-400">✓ 已歸檔到文件管理</span>
+                    <button @click="clearResult()" class="text-xs text-gray-400 hover:text-white">繼續掃描</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 歸檔記錄 ===== -->
+        <div x-show="viewMode === 'history'" class="px-4 pt-3">
+            <!-- 搜尋 + 篩選 -->
+            <div class="flex gap-2 mb-3">
+                <input x-model="searchQuery" @keyup.enter="searchDocs()" class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm" placeholder="搜尋文件內容...">
+                <select x-model="filterCategory" @change="loadHistory()" class="px-2 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm">
+                    <option value="">全部分類</option>
+                    <option value="official_letter">公文</option>
+                    <option value="contract">合約/契約</option>
+                    <option value="test_report">試驗報告</option>
+                    <option value="submittal">送審文件</option>
+                    <option value="meeting_minutes">會議紀錄</option>
+                    <option value="material_cert">材料證明</option>
+                    <option value="safety_report">安全衛生</option>
+                    <option value="quality_report">品質文件</option>
+                    <option value="other">其他</option>
+                </select>
+            </div>
+
+            <!-- 記錄列表 -->
+            <div x-show="historyDocs.length === 0" class="text-center py-12 text-gray-500">
+                <svg class="w-12 h-12 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <p class="text-sm">尚無掃描記錄</p>
+            </div>
+            <div class="space-y-2">
+                <template x-for="doc in historyDocs" :key="doc.id">
+                    <div class="bg-gray-800 rounded-lg p-3 flex items-start gap-3 hover:bg-gray-750 transition-colors cursor-pointer" @click="viewDoc(doc)">
+                        <div class="w-12 h-12 bg-gray-700 rounded-lg flex items-center justify-center text-xl flex-shrink-0"
+                             x-text="doc.category === 'official_letter' ? '📄' : doc.category === 'contract' ? '📑' : doc.category === 'test_report' ? '🧪' : doc.category === 'submittal' ? '📤' : doc.category === 'meeting_minutes' ? '📝' : doc.category === 'material_cert' ? '🏭' : '📋'">
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-medium truncate" x-text="doc.title || '未命名'"></span>
+                                <span class="text-xs px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300 flex-shrink-0" x-text="doc.category_name"></span>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-0.5 truncate" x-text="doc.ocr_text?.substring(0, 80)"></p>
+                            <div class="flex items-center gap-3 mt-1 text-xs text-gray-600">
+                                <span x-text="doc.created_at?.substring(0, 16)"></span>
+                                <span x-show="doc.doc_number" x-text="doc.doc_number"></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- ===== 文件詳情 Modal ===== -->
+        <div x-show="selectedDoc" class="fixed inset-0 bg-black/80 z-50 flex items-end sm:items-center justify-center" @click.self="selectedDoc = null">
+            <div class="bg-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[85vh] overflow-y-auto">
+                <div class="sticky top-0 bg-gray-800 px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+                    <h3 class="font-medium" x-text="selectedDoc?.title || '文件詳情'"></h3>
+                    <button @click="selectedDoc = null" class="text-gray-400 hover:text-white">✕</button>
+                </div>
+                <div class="p-4 space-y-3">
+                    <div x-show="selectedDoc?.stored_filename" class="rounded-lg overflow-hidden bg-gray-900">
+                        <img :src="'/api/scanned-image/' + selectedDoc?.stored_filename" class="w-full max-h-64 object-contain">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div><span class="text-gray-500">分類：</span><span class="text-purple-300" x-text="selectedDoc?.category_name"></span></div>
+                        <div x-show="selectedDoc?.doc_number"><span class="text-gray-500">文號：</span><span x-text="selectedDoc?.doc_number"></span></div>
+                        <div x-show="selectedDoc?.doc_date"><span class="text-gray-500">日期：</span><span x-text="selectedDoc?.doc_date"></span></div>
+                        <div x-show="selectedDoc?.sender"><span class="text-gray-500">發文：</span><span x-text="selectedDoc?.sender"></span></div>
+                    </div>
+                    <div x-show="selectedDoc?.summary"><span class="text-gray-500 text-xs">摘要：</span><p class="text-sm mt-1" x-text="selectedDoc?.summary"></p></div>
+                    <div>
+                        <span class="text-gray-500 text-xs">OCR 全文：</span>
+                        <pre class="text-xs text-gray-400 bg-gray-900 rounded-lg p-3 mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap font-mono" x-text="selectedDoc?.ocr_text"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知 Toast -->
+    <div x-show="toast" x-transition class="fixed top-16 left-4 right-4 z-50">
+        <div class="rounded-lg shadow-lg px-4 py-3 text-sm" :class="toastType === 'success' ? 'bg-green-600' : toastType === 'error' ? 'bg-red-600' : 'bg-purple-600'" x-text="toast"></div>
+    </div>
+
+    <script>
+    function scannerApp() {
+        return {
+            projects: [],
+            currentProject: null,
+            viewMode: 'camera',
+            cameraActive: false,
+            cameras: [],
+            currentCameraIdx: 0,
+            stream: null,
+            capturedImage: null,
+            isProcessing: false,
+            isScanning: false,
+            processingStatus: '',
+            ocrResult: null,
+            classResult: null,
+            scanId: null,
+            dragOver: false,
+            uploadPreview: null,
+            uploadFile: null,
+            historyDocs: [],
+            searchQuery: '',
+            filterCategory: '',
+            selectedDoc: null,
+            toast: '',
+            toastType: 'info',
+
+            async init() {
+                await this.loadProjects();
+                if (this.projects.length === 1) this.selectProject(this.projects[0]);
+                // 列出攝影機
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    this.cameras = devices.filter(d => d.kind === 'videoinput');
+                } catch (e) {}
+            },
+
+            async loadProjects() {
+                try {
+                    const res = await fetch('/api/projects');
+                    const data = await res.json();
+                    if (data.success) this.projects = data.data;
+                } catch (e) { console.error(e); }
+            },
+
+            selectProject(p) {
+                this.currentProject = p;
+            },
+
+            async startCamera() {
+                try {
+                    const constraints = {
+                        video: {
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                            facingMode: 'environment'
+                        }
+                    };
+                    if (this.cameras.length > 0 && this.cameras[this.currentCameraIdx]) {
+                        constraints.video.deviceId = { exact: this.cameras[this.currentCameraIdx].deviceId };
+                    }
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.$refs.video.srcObject = this.stream;
+                    this.cameraActive = true;
+                } catch (e) {
+                    this.showToast('無法啟動攝影機：' + e.message, 'error');
+                }
+            },
+
+            stopCamera() {
+                if (this.stream) {
+                    this.stream.getTracks().forEach(t => t.stop());
+                    this.stream = null;
+                }
+                this.cameraActive = false;
+            },
+
+            async switchCamera() {
+                this.currentCameraIdx = (this.currentCameraIdx + 1) % this.cameras.length;
+                this.stopCamera();
+                await this.startCamera();
+            },
+
+            capturePhoto() {
+                const video = this.$refs.video;
+                const canvas = this.$refs.canvas;
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+                this.capturedImage = canvas.toDataURL('image/jpeg', 0.92);
+                this.stopCamera();
+            },
+
+            retake() {
+                this.capturedImage = null;
+                this.ocrResult = null;
+                this.classResult = null;
+                this.scanId = null;
+                this.startCamera();
+            },
+
+            clearResult() {
+                this.capturedImage = null;
+                this.ocrResult = null;
+                this.classResult = null;
+                this.scanId = null;
+                this.uploadPreview = null;
+                this.uploadFile = null;
+            },
+
+            async scanDocument() {
+                if (!this.capturedImage || this.isProcessing) return;
+                this.isProcessing = true;
+                this.isScanning = true;
+                this.processingStatus = 'OCR 文字辨識中...';
+
+                try {
+                    const res = await fetch(`/api/projects/${this.currentProject.id}/scanner/scan-base64`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: this.capturedImage })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.ocrResult = data.ocr;
+                        this.classResult = data.classification;
+                        this.scanId = data.scan_id;
+                        this.showToast(data.message, 'success');
+                    } else {
+                        this.showToast(data.message || 'OCR 辨識失敗', 'error');
+                        if (data.ocr) this.ocrResult = data.ocr;
+                    }
+                } catch (e) {
+                    this.showToast('處理失敗：' + e.message, 'error');
+                } finally {
+                    this.isProcessing = false;
+                    this.isScanning = false;
+                }
+            },
+
+            async ocrPreview() {
+                if (!this.capturedImage || this.isProcessing) return;
+                this.isProcessing = true;
+                this.isScanning = true;
+                this.processingStatus = 'OCR 辨識中...';
+
+                try {
+                    const res = await fetch(`/api/projects/${this.currentProject.id}/scanner/ocr-only`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: this.capturedImage })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.ocrResult = data.ocr;
+                        this.showToast(`辨識完成：${data.ocr.line_count} 行文字`, 'success');
+                    }
+                } catch (e) {
+                    this.showToast('辨識失敗：' + e.message, 'error');
+                } finally {
+                    this.isProcessing = false;
+                    this.isScanning = false;
+                }
+            },
+
+            handleFileSelect(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                this.uploadFile = file;
+                const reader = new FileReader();
+                reader.onload = (ev) => { this.uploadPreview = ev.target.result; };
+                reader.readAsDataURL(file);
+            },
+
+            handleDrop(e) {
+                this.dragOver = false;
+                const file = e.dataTransfer.files[0];
+                if (!file) return;
+                this.uploadFile = file;
+                const reader = new FileReader();
+                reader.onload = (ev) => { this.uploadPreview = ev.target.result; };
+                reader.readAsDataURL(file);
+            },
+
+            async scanUploadedFile() {
+                if (!this.uploadFile || this.isProcessing) return;
+                this.isProcessing = true;
+                this.processingStatus = 'OCR 辨識中...';
+
+                const formData = new FormData();
+                formData.append('image', this.uploadFile);
+
+                try {
+                    const res = await fetch(`/api/projects/${this.currentProject.id}/scanner/scan`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.ocrResult = data.ocr;
+                        this.classResult = data.classification;
+                        this.scanId = data.scan_id;
+                        this.showToast(data.message, 'success');
+                    } else {
+                        this.showToast(data.message || '辨識失敗', 'error');
+                    }
+                } catch (e) {
+                    this.showToast('處理失敗：' + e.message, 'error');
+                } finally {
+                    this.isProcessing = false;
+                }
+            },
+
+            async loadHistory() {
+                if (!this.currentProject) return;
+                try {
+                    let url = `/api/projects/${this.currentProject.id}/scanner/list`;
+                    if (this.filterCategory) url += `?category=${this.filterCategory}`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data.success) this.historyDocs = data.data;
+                } catch (e) { console.error(e); }
+            },
+
+            async searchDocs() {
+                if (!this.searchQuery.trim()) { this.loadHistory(); return; }
+                try {
+                    const res = await fetch(`/api/projects/${this.currentProject.id}/scanner/search?q=${encodeURIComponent(this.searchQuery)}`);
+                    const data = await res.json();
+                    if (data.success) this.historyDocs = data.data;
+                } catch (e) { console.error(e); }
+            },
+
+            viewDoc(doc) {
+                this.selectedDoc = doc;
+            },
+
+            showToast(msg, type = 'info') {
+                this.toast = msg;
+                this.toastType = type;
+                setTimeout(() => { this.toast = ''; }, 3500);
+            }
+        };
+    }
+    </script>
+</body>
+</html>

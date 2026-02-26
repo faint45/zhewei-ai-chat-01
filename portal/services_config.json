@@ -1,0 +1,56 @@
+{
+  "jarvis": {
+    "name": "Jarvis AI",
+    "url": "https://jarvis.zhe-wei.net",
+    "health": "https://jarvis.zhe-wei.net/health",
+    "local": "http://localhost:8000/health",
+    "icon": "jarvis",
+    "color": "blue",
+    "description": "AI 大腦系統"
+  },
+  "bridge": {
+    "name": "Smart Bridge",
+    "url": "https://bridge.zhe-wei.net",
+    "health": "https://bridge.zhe-wei.net/health",
+    "local": "http://localhost:8003/health",
+    "icon": "bridge",
+    "color": "blue",
+    "description": "智慧對話橋接"
+  },
+  "dify": {
+    "name": "Dify",
+    "url": "https://dify.zhe-wei.net",
+    "health": "https://dify.zhe-wei.net/health",
+    "local": "http://localhost:8080/health",
+    "icon": "dify",
+    "color": "blue",
+    "description": "AI 工作流"
+  },
+  "cms": {
+    "name": "CMS",
+    "url": "https://cms.zhe-wei.net",
+    "health": "https://cms.zhe-wei.net/health",
+    "local": "http://localhost:8020/health",
+    "icon": "cms",
+    "color": "blue",
+    "description": "營建管理系統"
+  },
+  "vision": {
+    "name": "Vision",
+    "url": "https://vision.zhe-wei.net",
+    "health": "https://vision.zhe-wei.net/health",
+    "local": "http://localhost:8030/health",
+    "icon": "vision",
+    "color": "blue",
+    "description": "AI 視覺辨識"
+  },
+  "codesim": {
+    "name": "Code Simulator",
+    "url": "https://codesim.zhe-wei.net",
+    "health": "https://codesim.zhe-wei.net/health",
+    "local": "http://localhost:8001/health",
+    "icon": "codesim",
+    "color": "blue",
+    "description": "代碼模擬器"
+  }
+}

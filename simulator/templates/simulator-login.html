@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0d1117">
+    <title>CodeSim — 登入</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Inter','Noto Sans TC',sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;-webkit-tap-highlight-color:transparent}
+        .bg-glow{position:fixed;width:350px;height:350px;border-radius:50%;filter:blur(140px);opacity:.12;pointer-events:none}
+        .glow-1{top:-100px;left:-100px;background:#667eea}
+        .glow-2{bottom:-100px;right:-100px;background:#22c55e}
+        .card{width:100%;max-width:380px;animation:fadeIn .5s ease-out}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        .logo{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#667eea,#22c55e);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:22px;font-weight:700;color:#fff;font-family:'JetBrains Mono',monospace;box-shadow:0 8px 32px rgba(102,126,234,.25)}
+        h1{font-size:20px;font-weight:700;color:#fff;text-align:center;margin-bottom:4px}
+        .subtitle{font-size:13px;color:#8b949e;text-align:center;margin-bottom:28px}
+        .glass{background:rgba(22,27,34,.8);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(48,54,61,.6);border-radius:16px;padding:28px;box-shadow:0 16px 48px rgba(0,0,0,.3)}
+        .form-title{font-size:14px;font-weight:600;color:#fff;text-align:center;margin-bottom:20px}
+        .field-group{margin-bottom:16px}
+        .field-label{display:block;font-size:11px;color:#8b949e;margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:.5px}
+        .field{width:100%;background:rgba(13,17,23,.8);border:1px solid rgba(48,54,61,.8);border-radius:10px;padding:11px 14px;font-size:14px;color:#e6edf3;outline:none;transition:border-color .2s,box-shadow .2s;font-family:inherit}
+        .field:focus{border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,.15)}
+        .field::placeholder{color:#484f58}
+        .err-msg{display:none;margin-bottom:14px;padding:10px 14px;border-radius:10px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);color:#f85149;font-size:13px;text-align:center}
+        .err-msg.show{display:block}
+        .btn{width:100%;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+        .btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;box-shadow:0 4px 16px rgba(102,126,234,.3)}
+        .btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 6px 24px rgba(102,126,234,.4)}
+        .btn-primary:active{filter:brightness(.95);transform:translateY(0)}
+        .btn-primary:disabled{opacity:.4;pointer-events:none}
+        .divider{margin:20px 0;border-top:1px solid rgba(48,54,61,.6);position:relative}
+        .divider span{position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:#161b22;padding:0 12px;font-size:11px;color:#484f58}
+        .footer{text-align:center;margin-top:24px;font-size:11px;color:#484f58}
+        .footer a{color:#667eea;text-decoration:none}
+        .footer a:hover{text-decoration:underline}
+        .features{display:flex;gap:16px;margin-top:24px;justify-content:center}
+        .feature{text-align:center;font-size:11px;color:#8b949e}
+        .feature-icon{font-size:20px;margin-bottom:4px}
+    </style>
+</head>
+<body>
+
+<div class="bg-glow glow-1"></div>
+<div class="bg-glow glow-2"></div>
+
+<div class="card">
+    <div class="logo">&lt;/&gt;</div>
+    <h1>築未 CodeSim</h1>
+    <p class="subtitle">AI 代碼模擬器</p>
+
+    <div class="glass">
+        <div class="form-title">系統登入</div>
+        <div class="err-msg" id="errMsg"></div>
+
+        <form id="loginForm">
+            <div class="field-group">
+                <label class="field-label">帳號</label>
+                <input id="username" type="text" class="field" placeholder="請輸入帳號" required autocomplete="username" autofocus>
+            </div>
+            <div class="field-group">
+                <label class="field-label">密碼</label>
+                <input id="password" type="password" class="field" placeholder="請輸入密碼" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn btn-primary" id="loginBtn">登入</button>
+        </form>
+
+        <div class="divider"><span>或</span></div>
+        <p style="text-align:center;font-size:12px;color:#8b949e">
+            還沒有帳號？<a href="/simulator-register" style="color:#667eea">註冊</a>
+        </p>
+    </div>
+
+    <div class="features">
+        <div class="feature"><div class="feature-icon">🤖</div>AI 編碼</div>
+        <div class="feature"><div class="feature-icon">▶</div>即時執行</div>
+        <div class="feature"><div class="feature-icon">📱</div>多設備預覽</div>
+        <div class="feature"><div class="feature-icon">📂</div>專案管理</div>
+    </div>
+
+    <div class="footer">© 2026 築未科技 Zhe-Wei Technology</div>
+</div>
+
+<script>
+const BASE = window.location.origin;
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('errMsg');
+    const btn = document.getElementById('loginBtn');
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+
+    if (!username || !password) {
+        errEl.textContent = '請輸入帳號和密碼';
+        errEl.classList.add('show');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '登入中…';
+    errEl.classList.remove('show');
+
+    try {
+        const r = await fetch(`${BASE}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const d = await r.json();
+
+        if (d.ok) {
+            localStorage.setItem('codesim_token', d.token);
+            localStorage.setItem('codesim_user', JSON.stringify(d.user));
+            window.location.href = '/simulator';
+        } else {
+            errEl.textContent = d.error || '登入失敗';
+            errEl.classList.add('show');
+        }
+    } catch (err) {
+        errEl.textContent = '連線失敗: ' + err.message;
+        errEl.classList.add('show');
+    }
+
+    btn.disabled = false;
+    btn.textContent = '登入';
+});
+
+// 已登入則直接跳轉
+(async () => {
+    const token = localStorage.getItem('codesim_token');
+    if (!token) return;
+    try {
+        const r = await fetch(`${BASE}/api/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const d = await r.json();
+        if (d.ok && d.user) {
+            window.location.href = '/simulator';
+        }
+    } catch {}
+})();
+</script>
+</body>
+</html>

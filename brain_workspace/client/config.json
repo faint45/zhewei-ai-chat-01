@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "mode": "auto",
+  "remote_url": "https://brain.zhe-wei.net",
+  "remote_timeout": 10,
+  "local_ollama_url": "http://localhost:11460",
+  "local_ollama_model": "qwen3:8b",
+  "local_coder_model": "qwen2.5-coder:7b",
+  "local_embed_model": "nomic-embed-text:latest",
+  "local_vision_model": "moondream",
+  "chromadb_path": "D:\\zhe-wei-tech\\Jarvis_Training\\chroma_db",
+  "auto_sync_kb": true,
+  "sync_interval_hours": 24,
+  "telemetry_enabled": true,
+  "ui_language": "zh-TW"
+}

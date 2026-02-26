@@ -1,0 +1,31 @@
+{
+  "id": "excel_report_automation",
+  "name": "報表與 Excel 自動處理（週/月）",
+  "description": "自動開啟 Excel、整理資料欄位、輸出週/月報，並保留證據截圖。",
+  "category": "business",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "title": "Smart GUI 執行 Excel 報表整理",
+      "execution": "host_script",
+      "job_type": "smart_gui_agent",
+      "provider": "desktop",
+      "args": {
+        "instruction": "開啟指定 Excel 報表檔，更新彙總區與總計欄，儲存為今天日期版本。",
+        "execute": true,
+        "max_actions": 12,
+        "retry_count": 3
+      }
+    },
+    {
+      "title": "全螢幕 VLM 驗證報表關鍵欄位",
+      "execution": "host_script",
+      "job_type": "screen_vlm_query",
+      "provider": "desktop",
+      "args": {
+        "question": "請檢查畫面中的報表是否已更新，輸出 JSON：檔名、總計欄、異常提示。"
+      }
+    }
+  ]
+}
+

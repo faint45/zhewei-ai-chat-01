@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>築未科技 — 訂閱付款</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+.card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; transition: all .2s; }
+.card:hover { border-color: #0ea5e9; transform: translateY(-2px); }
+.card.selected { border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14,165,233,.3); }
+.btn { padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 8px; }
+.btn-primary { background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white; font-size: 1.1rem; }
+.btn-primary:hover { background: linear-gradient(135deg, #0284c7, #0369a1); transform: scale(1.02); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn-outline { border: 1px solid #475569; color: #94a3b8; }
+.btn-outline:hover { border-color: #0ea5e9; color: #0ea5e9; }
+.badge { padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; }
+.badge-green { background: #065f46; color: #6ee7b7; }
+.badge-blue { background: #1e3a5f; color: #7dd3fc; }
+.badge-purple { background: #4c1d95; color: #c4b5fd; }
+.method-card { cursor: pointer; position: relative; }
+.method-card.selected::after { content: '✓'; position: absolute; top: 12px; right: 12px; width: 24px; height: 24px; background: #0ea5e9; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
+.plan-card { cursor: pointer; position: relative; }
+.plan-card.selected { border-color: #0ea5e9; background: #1e3a5f20; }
+.plan-card .popular { position: absolute; top: -10px; right: 16px; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 2px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; }
+.step-indicator { display: flex; gap: 8px; align-items: center; }
+.step { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+.step.active { background: #0ea5e9; color: white; }
+.step.done { background: #059669; color: white; }
+.step.pending { background: #334155; color: #64748b; }
+.step-line { width: 40px; height: 2px; background: #334155; }
+.step-line.done { background: #059669; }
+.fade-in { animation: fadeIn .3s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+</style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<!-- Header -->
+<header class="border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-500 to-blue-700 flex items-center justify-center text-white font-bold text-lg">築</div>
+    <div>
+      <h1 class="text-lg font-bold text-white">築未科技 AI 平台</h1>
+      <p class="text-xs text-slate-400">選擇方案，開始使用 AI 加速工作</p>
+    </div>
+  </div>
+  <a href="/jarvis" class="btn btn-outline text-sm">← 返回系統</a>
+</header>
+
+<main class="flex-1 max-w-5xl mx-auto w-full px-6 py-8">
+
+<!-- Step Indicator -->
+<div class="flex justify-center mb-8">
+  <div class="step-indicator">
+    <div class="step active" id="step1">1</div>
+    <div class="step-line" id="line1"></div>
+    <div class="step pending" id="step2">2</div>
+    <div class="step-line" id="line2"></div>
+    <div class="step pending" id="step3">3</div>
+  </div>
+</div>
+<div class="text-center mb-8">
+  <p class="text-sm text-slate-400" id="stepLabel">步驟 1：選擇方案</p>
+</div>
+
+<!-- ===== Step 1: 選擇產品 & 方案 ===== -->
+<div id="view-plans" class="fade-in">
+  <!-- 產品選擇器 -->
+  <div class="flex justify-center gap-3 mb-6">
+    <button onclick="selectProduct('ai_creator')" id="prodBtn_ai_creator" class="card text-center px-5 py-3 cursor-pointer border-pink-500/50 bg-pink-950/20" style="min-width:140px">
+      <div class="text-2xl mb-1">🎨</div><div class="text-sm font-bold text-pink-400">AI 創作工作室</div><div class="text-[10px] text-slate-500">生圖 · 生影片 · NSFW</div>
+    </button>
+    <button onclick="selectProduct('construction_ai')" id="prodBtn_construction_ai" class="card text-center px-5 py-3 cursor-pointer" style="min-width:140px">
+      <div class="text-2xl mb-1">🏗️</div><div class="text-sm font-bold text-amber-400">營建 AI 助手</div><div class="text-[10px] text-slate-500">知識庫 · 語音 · 視覺</div>
+    </button>
+    <button onclick="selectProduct('llm_api')" id="prodBtn_llm_api" class="card text-center px-5 py-3 cursor-pointer" style="min-width:140px">
+      <div class="text-2xl mb-1">🧠</div><div class="text-sm font-bold text-blue-400">大模型 API</div><div class="text-[10px] text-slate-500">OpenAI 相容 · 70B</div>
+    </button>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" id="planGrid"></div>
+</div>
+
+<!-- ===== Step 2: 選擇支付方式 ===== -->
+<div id="view-methods" class="hidden fade-in">
+  <h2 class="text-xl font-bold text-center mb-6">選擇支付方式</h2>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" id="methodGrid"></div>
+  <div class="flex justify-center gap-4">
+    <button onclick="goStep(1)" class="btn btn-outline">← 上一步</button>
+    <button onclick="goStep(3)" id="btnNext2" class="btn btn-primary" disabled>確認付款 →</button>
+  </div>
+</div>
+
+<!-- ===== Step 3: 確認 & 付款 ===== -->
+<div id="view-confirm" class="hidden fade-in">
+  <div class="max-w-lg mx-auto">
+    <div class="card mb-6">
+      <h2 class="text-xl font-bold mb-4">📋 訂單確認</h2>
+      <div class="space-y-3" id="orderSummary"></div>
+    </div>
+    <div class="flex justify-center gap-4">
+      <button onclick="goStep(2)" class="btn btn-outline">← 修改</button>
+      <button onclick="submitPayment()" id="btnPay" class="btn btn-primary text-lg px-8">
+        💳 立即付款
+      </button>
+    </div>
+    <div id="paymentResult" class="mt-6 hidden"></div>
+  </div>
+</div>
+
+</main>
+
+<!-- Footer -->
+<footer class="border-t border-slate-700 px-6 py-4 text-center text-xs text-slate-500">
+  築未科技 © 2026 — 付款由第三方金流平台安全處理，我們不儲存您的信用卡資訊
+</footer>
+
+<script>
+const API = '';
+const TOKEN = localStorage.getItem('jarvis_token') || '';
+const HEADERS = { 'Content-Type': 'application/json' };
+if (TOKEN) HEADERS['Authorization'] = `Bearer ${TOKEN}`;
+
+let selectedPlan = null;
+let selectedMethod = null;
+let selectedProduct = 'ai_creator';
+let allPlans = [];
+let allMethods = [];
+let productPlans = {};
+
+async function api(path, opts = {}) {
+  try {
+    const r = await fetch(API + path, { headers: HEADERS, ...opts });
+    return await r.json();
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// ── 產品方案定義 ──
+const PRODUCT_PLANS = {
+  ai_creator: {
+    gradient: { basic:'from-pink-600 to-rose-700', pro:'from-pink-500 to-violet-600', ultra:'from-violet-600 to-purple-700' },
+    plans: [
+      { id:'creator_basic', name:'基礎版', price:299, period:'monthly', popular:false, features:['200 張圖片/月','30 個影片/月','12+ 雲端模型','作品庫 + 下載'] },
+      { id:'creator_pro', name:'專業版', price:799, period:'monthly', popular:true, features:['無限圖片生成','100 個影片/月','無審查模式 (NSFW)','本地 Forge + ComfyUI','所有雲端模型','優先生成佇列'] },
+      { id:'creator_ultra', name:'無限版', price:1999, period:'monthly', popular:false, features:['全部無限','無審查模式 (NSFW)','本地模型無限制','影片無限生成','API 存取','專屬支援'] },
+    ]
+  },
+  construction_ai: {
+    gradient: { basic:'from-amber-600 to-orange-700', pro:'from-amber-500 to-yellow-600', ultra:'from-orange-600 to-red-700' },
+    plans: [
+      { id:'cms_pro', name:'專業版', price:1500, period:'monthly', popular:true, features:['50,000 筆知識庫','15 種專業角色','Whisper 語音辨識','AI 視覺安全偵測','施工日誌 + 自主檢查','優先支援'] },
+      { id:'cms_enterprise', name:'企業版', price:8000, period:'monthly', popular:false, features:['無限知識庫','全部角色','語音 + 視覺','施工前後比對','OCR 文字辨識','專屬客服 + 客製化','多工地管理'] },
+    ]
+  },
+  llm_api: {
+    gradient: { basic:'from-blue-600 to-sky-700', pro:'from-blue-500 to-indigo-600', ultra:'from-indigo-600 to-violet-700' },
+    plans: [
+      { id:'api_starter', name:'入門版', price:299, period:'monthly', popular:false, features:['500K tokens/月','30 req/min','Qwen3 8B/4B + Gemma3','Embedding API'] },
+      { id:'api_pro', name:'專業版', price:999, period:'monthly', popular:true, features:['5M tokens/月','60 req/min','全部模型','70B 模型存取','優先佇列'] },
+      { id:'api_business', name:'商務版', price:4999, period:'monthly', popular:false, features:['50M tokens/月','120 req/min','全部模型 + 70B','專屬 API 端點','SLA 保證','技術支援'] },
+    ]
+  }
+};
+
+function selectProduct(product) {
+  selectedProduct = product;
+  ['ai_creator','construction_ai','llm_api'].forEach(p => {
+    const btn = document.getElementById('prodBtn_' + p);
+    if (p === product) {
+      btn.classList.add('selected');
+      const colors = { ai_creator:'border-pink-500/50 bg-pink-950/20', construction_ai:'border-amber-500/50 bg-amber-950/20', llm_api:'border-blue-500/50 bg-blue-950/20' };
+      btn.className = 'card text-center px-5 py-3 cursor-pointer ' + (colors[p] || '');
+    } else {
+      btn.classList.remove('selected');
+      btn.className = 'card text-center px-5 py-3 cursor-pointer';
+    }
+  });
+  renderProductPlans();
+}
+
+function renderProductPlans() {
+  const pp = PRODUCT_PLANS[selectedProduct];
+  if (!pp) return;
+  const grid = document.getElementById('planGrid');
+  const gradients = ['from-slate-600 to-slate-700','from-sky-600 to-blue-700','from-purple-600 to-indigo-700'];
+  const productGradients = {
+    ai_creator: ['from-pink-600 to-rose-700','from-pink-500 to-violet-600','from-violet-600 to-purple-700'],
+    construction_ai: ['from-amber-600 to-orange-700','from-amber-500 to-yellow-600','from-orange-600 to-red-700'],
+    llm_api: ['from-blue-600 to-sky-700','from-blue-500 to-indigo-600','from-indigo-600 to-violet-700'],
+  };
+  const grads = productGradients[selectedProduct] || gradients;
+
+  grid.innerHTML = pp.plans.map((p, i) => `
+    <div class="plan-card card" onclick="selectPlan('${p.id}')" data-plan="${p.id}">
+      ${p.popular ? '<div class="popular">🔥 最受歡迎</div>' : ''}
+      <div class="rounded-lg bg-gradient-to-br ${grads[i] || grads[0]} p-4 mb-4 text-center">
+        <h3 class="text-lg font-bold text-white">${p.name}</h3>
+        <p class="text-3xl font-black text-white mt-2">NT$${p.price.toLocaleString()}</p>
+        <p class="text-sm text-white/70">/月</p>
+      </div>
+      <ul class="space-y-2 text-sm">
+        ${p.features.map(f => `<li class="flex items-center gap-2"><span class="text-emerald-400">✓</span> ${f}</li>`).join('')}
+      </ul>
+    </div>`).join('');
+
+  allPlans = pp.plans;
+}
+
+// ── 載入方案（初始化） ──
+async function loadPlans() {
+  // 從 URL 參數讀取產品
+  const params = new URLSearchParams(location.search);
+  const prod = params.get('product');
+  if (prod && PRODUCT_PLANS[prod]) selectedProduct = prod;
+  selectProduct(selectedProduct);
+}
+
+// ── 載入支付方式 ──
+async function loadMethods() {
+  const r = await api('/api/gateway/methods');
+  if (!r.ok) return;
+  allMethods = r.methods;
+  const grid = document.getElementById('methodGrid');
+
+  const methodLogos = {
+    ecpay: '💳',
+    alipay: '🔵',
+    jkopay: '🟢',
+  };
+
+  grid.innerHTML = allMethods.map(m => {
+    const avail = m.available;
+    return `
+    <div class="method-card card ${avail ? '' : 'opacity-50 cursor-not-allowed'}" 
+         onclick="${avail ? `selectMethod('${m.id}')` : ''}" data-method="${m.id}">
+      <div class="text-center mb-3">
+        <span class="text-4xl">${methodLogos[m.id] || m.icon}</span>
+      </div>
+      <h3 class="text-lg font-bold text-center">${m.name}</h3>
+      <p class="text-sm text-slate-400 text-center mt-1">${m.desc}</p>
+      <p class="text-xs text-center mt-2">
+        <span class="badge ${avail ? 'badge-green' : 'badge-blue'}">${avail ? '✅ 可用' : '⚙️ 設定中'}</span>
+        <span class="badge badge-blue ml-1">${m.region}</span>
+      </p>
+    </div>`;
+  }).join('');
+}
+
+// ── 選擇邏輯 ──
+function selectPlan(planId) {
+  selectedPlan = allPlans.find(p => p.id === planId);
+  if (selectedPlan) selectedPlan.product = selectedProduct;
+  document.querySelectorAll('.plan-card').forEach(el => {
+    el.classList.toggle('selected', el.dataset.plan === planId);
+  });
+  setTimeout(() => goStep(2), 300);
+}
+
+function selectMethod(methodId) {
+  selectedMethod = allMethods.find(m => m.id === methodId);
+  document.querySelectorAll('.method-card').forEach(el => {
+    el.classList.toggle('selected', el.dataset.method === methodId);
+  });
+  document.getElementById('btnNext2')?.disabled = false;
+}
+
+// ── 步驟切換 ──
+function goStep(step) {
+  document.getElementById('view-plans')?.classList.toggle('hidden', step !== 1);
+  document.getElementById('view-methods')?.classList.toggle('hidden', step !== 2);
+  document.getElementById('view-confirm')?.classList.toggle('hidden', step !== 3);
+
+  for (let i = 1; i <= 3; i++) {
+    const el = document.getElementById('step' + i);
+    el.className = 'step ' + (i < step ? 'done' : i === step ? 'active' : 'pending');
+    if (i < 3) {
+      document.getElementById('line' + i)?.className = 'step-line ' + (i < step ? 'done' : '');
+    }
+  }
+
+  const labels = { 1: '步驟 1：選擇方案', 2: '步驟 2：選擇支付方式', 3: '步驟 3：確認付款' };
+  document.getElementById('stepLabel')?.textContent = labels[step];
+
+  if (step === 3) renderSummary();
+}
+
+function renderSummary() {
+  if (!selectedPlan || !selectedMethod) return;
+  const div = document.getElementById('orderSummary');
+  div.innerHTML = `
+    <div class="flex justify-between py-2 border-b border-slate-700">
+      <span class="text-slate-400">方案</span>
+      <span class="font-bold">${selectedPlan.name}</span>
+    </div>
+    <div class="flex justify-between py-2 border-b border-slate-700">
+      <span class="text-slate-400">週期</span>
+      <span>${selectedPlan.period === 'monthly' ? '月繳' : selectedPlan.period === 'yearly' ? '年繳' : selectedPlan.period}</span>
+    </div>
+    <div class="flex justify-between py-2 border-b border-slate-700">
+      <span class="text-slate-400">支付方式</span>
+      <span>${selectedMethod.icon} ${selectedMethod.name}</span>
+    </div>
+    <div class="flex justify-between py-3 text-lg">
+      <span class="font-bold">應付金額</span>
+      <span class="font-black text-sky-400">NT$${selectedPlan.price.toLocaleString()}</span>
+    </div>
+  `;
+}
+
+// ── 提交付款 ──
+async function submitPayment() {
+  if (!selectedPlan || !selectedMethod) return;
+  const btn = document.getElementById('btnPay');
+  btn.disabled = true;
+  btn.textContent = '⏳ 處理中...';
+
+  const r = await api('/api/gateway/create', {
+    method: 'POST',
+    body: JSON.stringify({
+      method: selectedMethod.id,
+      plan: selectedPlan.id,
+    }),
+  });
+
+  const div = document.getElementById('paymentResult');
+  div.classList.remove('hidden');
+
+  if (r.ok) {
+    // 有表單 HTML → 自動跳轉到金流頁面
+    if (r.form_html) {
+      div.innerHTML = `
+        <div class="card text-center">
+          <p class="text-lg font-bold text-emerald-400 mb-2">✅ 訂單已建立</p>
+          <p class="text-sm text-slate-400 mb-4">訂單編號: ${r.order_id}</p>
+          <p class="text-sm">正在跳轉到付款頁面...</p>
+        </div>`;
+      // 在新視窗中開啟付款表單
+      const w = window.open('', '_blank');
+      if (w) {
+        w.document.write(r.form_html);
+        w.document.close();
+      } else {
+        // 彈窗被擋，顯示手動按鈕
+        div.innerHTML += `
+          <div class="mt-4 p-4 rounded-lg bg-amber-900/30 border border-amber-700">
+            <p class="text-amber-400 text-sm mb-2">⚠️ 瀏覽器阻擋了彈出視窗</p>
+            <button onclick="manualRedirect()" class="btn btn-primary">手動前往付款頁面</button>
+          </div>`;
+        window._payFormHtml = r.form_html;
+      }
+    }
+    // 有 redirect URL（支付寶）
+    else if (r.redirect_url) {
+      div.innerHTML = `
+        <div class="card text-center">
+          <p class="text-lg font-bold text-emerald-400 mb-2">✅ 訂單已建立</p>
+          <p class="text-sm mb-4">正在跳轉到支付寶...</p>
+        </div>`;
+      window.open(r.redirect_url, '_blank');
+    }
+    // 有 payment URL（街口）
+    else if (r.payment_url) {
+      div.innerHTML = `
+        <div class="card text-center">
+          <p class="text-lg font-bold text-emerald-400 mb-2">✅ 訂單已建立</p>
+          <p class="text-sm mb-2">請使用街口 App 掃描以下連結付款：</p>
+          <a href="${r.payment_url}" target="_blank" class="btn btn-primary mt-2">🟢 前往街口付款</a>
+        </div>`;
+    }
+  } else {
+    div.innerHTML = `
+      <div class="card border-red-700">
+        <p class="text-red-400 font-bold">❌ 建立訂單失敗</p>
+        <p class="text-sm text-slate-400 mt-1">${r.error || '未知錯誤'}</p>
+      </div>`;
+    btn.disabled = false;
+    btn.textContent = '💳 立即付款';
+  }
+}
+
+function manualRedirect() {
+  if (window._payFormHtml) {
+    const w = window.open('', '_blank');
+    w.document.write(window._payFormHtml);
+    w.document.close();
+  }
+}
+
+// ── 初始化 ──
+(async () => {
+  await Promise.all([loadPlans(), loadMethods()]);
+  const params = new URLSearchParams(location.search);
+  const preselect = params.get('plan');
+  if (preselect && allPlans.find(p => p.id === preselect)) {
+    selectPlan(preselect);
+  }
+})();
+</script>
+</body>
+</html>

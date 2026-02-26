@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Studio AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      background: #0d1117; 
+      color: #c9d1d9; 
+      font-family: 'JetBrains Mono', monospace;
+      overflow: hidden;
+    }
+    .studio-container { height: 100vh; display: flex; flex-direction: column; }
+    
+    /* 頂部工具列 */
+    .studio-header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 48px;
+    }
+    
+    /* 三欄式佈局 */
+    .studio-main { flex: 1; display: flex; overflow: hidden; }
+    
+    /* 左側欄 - 檔案總管 + 工具 */
+    .sidebar-left {
+      width: 280px;
+      background: #161b22;
+      border-right: 1px solid #30363d;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* 中央區域 - 代碼編輯器 + AI 討論 */
+    .studio-center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    
+    /* 代碼編輯器區 */
+    .code-editor {
+      flex: 1;
+      background: #0d1117;
+      display: flex;
+      flex-direction: column;
+      border-bottom: 1px solid #30363d;
+    }
+    
+    .code-tabs {
+      background: #161b22;
+      display: flex;
+      border-bottom: 1px solid #30363d;
+      overflow-x: auto;
+    }
+    
+    .code-tab {
+      padding: 8px 16px;
+      font-size: 12px;
+      cursor: pointer;
+      border-right: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #8b949e;
+    }
+    
+    .code-tab.active {
+      background: #0d1117;
+      color: #c9d1d9;
+      border-top: 2px solid #58a6ff;
+    }
+    
+    .code-content {
+      flex: 1;
+      padding: 16px;
+      overflow: auto;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    
+    .code-line-numbers {
+      color: #484f58;
+      text-align: right;
+      padding-right: 16px;
+      user-select: none;
+    }
+    
+    /* AI 討論區 */
+    .ai-chat-panel {
+      height: 280px;
+      background: #161b22;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .chat-header {
+      padding: 8px 16px;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    
+    .chat-input-area {
+      padding: 12px;
+      border-top: 1px solid #30363d;
+      display: flex;
+      gap: 8px;
+    }
+    
+    /* 右側欄 - 軟件模擬瀏覽器 */
+    .sidebar-right {
+      width: 360px;
+      background: #0d1117;
+      border-left: 1px solid #30363d;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* 瀏覽器預覽 */
+    .browser-preview {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .browser-toolbar {
+      background: #161b22;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #30363d;
+    }
+    
+    .browser-url-bar {
+      flex: 1;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 12px;
+      color: #c9d1d9;
+      font-size: 12px;
+    }
+    
+    .browser-content {
+      flex: 1;
+      background: #fff;
+      color: #1f2328;
+      padding: 16px;
+      overflow: auto;
+    }
+    
+    /* 同步狀態面板 */
+    .sync-panel {
+      background: #161b22;
+      border-top: 1px solid #30363d;
+      padding: 12px;
+    }
+    
+    /* 檔案樹 */
+    .file-tree { padding: 8px 0; }
+    .file-item {
+      padding: 4px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #8b949e;
+    }
+    .file-item:hover { background: #21262d; color: #c9d1d9; }
+    .file-item.active { background: #1f6feb20; color: #58a6ff; }
+    .folder-item { font-weight: 600; color: #c9d1d9; }
+    
+    /* 工具按鈕 */
+    .tool-btn {
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #8b949e;
+      border-radius: 6px;
+      margin: 2px 8px;
+    }
+    .tool-btn:hover { background: #21262d; color: #c9d1d9; }
+    .tool-btn.active { background: #1f6feb20; color: #58a6ff; }
+    
+    /* AI 消息 */
+    .ai-message {
+      background: #21262d;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .ai-message .role {
+      color: #58a6ff;
+      font-size: 10px;
+      margin-bottom: 4px;
+    }
+    .user-message {
+      background: #1f6feb20;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    
+    /* Token 節省徽章 */
+    .token-badge {
+      background: linear-gradient(90deg, #238636, #2ea043);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+    }
+    
+    /* 快捷軟件格 */
+    .software-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 12px;
+    }
+    .software-btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .software-btn:hover {
+      border-color: #58a6ff;
+      background: #1f6feb20;
+    }
+    .software-btn .icon { font-size: 20px; margin-bottom: 4px; }
+    .software-btn .name { font-size: 10px; color: #8b949e; }
+    
+    /* 滾動條 */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0d1117; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+  </style>
+</head>
+<body>
+  <div id="app" class="studio-container">
+    
+    <!-- 頂部工具列 -->
+    <div class="studio-header">
+      <div class="flex items-center gap-4">
+        <span class="text-lg font-bold">🤖 Agent Studio</span>
+        <span class="token-badge">Token 節省: [[ tokenSavings ]]%</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-xs text-slate-400">[[ wsConnected ? '🟢 即時同步' : '🔴 離線模式' ]]</span>
+        <button class="px-3 py-1 bg-green-600 rounded text-xs">▶ 執行</button>
+        <button class="px-3 py-1 bg-blue-600 rounded text-xs">💾 儲存</button>
+      </div>
+    </div>
+    
+    <!-- 主內容區 -->
+    <div class="studio-main">
+      
+      <!-- 左側欄 -->
+      <div class="sidebar-left">
+        <!-- 標籤切換 -->
+        <div class="flex border-b border-slate-700">
+          <div class="px-4 py-2 text-xs cursor-pointer border-b-2 border-blue-500">檔案</div>
+          <div class="px-4 py-2 text-xs cursor-pointer text-slate-400">工具</div>
+          <div class="px-4 py-2 text-xs cursor-pointer text-slate-400">Agent</div>
+        </div>
+        
+        <!-- 檔案總管 -->
+        <div class="file-tree flex-1 overflow-y-auto">
+          <div v-for="folder in folders" :key="folder.name" class="mb-2">
+            <div class="folder-item file-item">
+              <span>📁</span> [[ folder.name ]]
+            </div>
+            <div class="ml-4">
+              <div v-for="file in folder.files" :key="file.name" 
+                class="file-item" :class="{ active: file.active }"
+                @click="openFile(file)">
+                <span>[[ getFileIcon(file.name) ]]</span> [[ file.name ]]
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 快捷工具 -->
+        <div class="border-t border-slate-700 p-2">
+          <div class="text-xs text-slate-400 mb-2 px-2">Agent 工具</div>
+          <div class="tool-btn" :class="{ active: activeTool === 'smart-gui' }" @click="activeTool = 'smart-gui'">
+            <span>🖱️</span> Smart GUI
+          </div>
+          <div class="tool-btn" :class="{ active: activeTool === 'semantic' }" @click="activeTool = 'semantic'">
+            <span>🔀</span> 語義路由
+          </div>
+          <div class="tool-btn" :class="{ active: activeTool === 'vision' }" @click="activeTool = 'vision'">
+            <span>👁️</span> 視覺分析
+          </div>
+          <div class="tool-btn" :class="{ active: activeTool === 'task' }" @click="activeTool = 'task'">
+            <span>📋</span> 任務派工
+          </div>
+        </div>
+      </div>
+      
+      <!-- 中央區域 -->
+      <div class="studio-center">
+        <!-- 代碼編輯器 -->
+        <div class="code-editor">
+          <div class="code-tabs">
+            <div v-for="tab in openTabs" :key="tab.name" class="code-tab" :class="{ active: tab.active }">
+              <span>[[ getFileIcon(tab.name) ]]</span> [[ tab.name ]]
+              <span @click="closeTab(tab)" class="text-slate-500 hover:text-white">×</span>
+            </div>
+          </div>
+          <div class="code-content flex">
+            <div class="code-line-numbers mr-4">
+              <div v-for="n in 20" :key="n">[[ n ]]</div>
+            </div>
+            <div class="flex-1">
+              <div v-for="line in codeLines" :key="line" class="font-mono">[[ line ]]</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- AI 討論區 -->
+        <div class="ai-chat-panel">
+          <div class="chat-header">
+            <div class="flex items-center gap-2">
+              <span>💬</span> AI 討論區
+              <select v-model="dataFormat" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs">
+                <option value="token">Token-Optimized</option>
+                <option value="compact">Compact</option>
+                <option value="binary">Binary</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-400">Token: [[ tokenUsage ]]</span>
+            </div>
+          </div>
+          <div class="chat-messages">
+            <div v-for="(msg, idx) in chatMessages" :key="idx" :class="msg.role === 'user' ? 'user-message' : 'ai-message'">
+              <div class="role" :style="{ color: msg.role === 'user' ? '#58a6ff' : '#f78166' }">
+                [[ msg.role ]] · [[ msg.time ]]
+              </div>
+              <div class="mt-1">[[ msg.text ]]</div>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <input v-model="chatInput" @keyup.enter="sendChat" 
+              class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2 text-xs"
+              placeholder="輸入需求或問題..." />
+            <button @click="sendChat" class="px-4 py-2 bg-blue-600 rounded text-xs">送出</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 右側欄 -->
+      <div class="sidebar-right">
+        <!-- 瀏覽器預覽 -->
+        <div class="browser-preview">
+          <div class="browser-toolbar">
+            <button @click="browserBack" class="p-1 hover:bg-slate-700 rounded">←</button>
+            <button @click="browserForward" class="p-1 hover:bg-slate-700 rounded">→</button>
+            <button @click="refreshBrowser" class="p-1 hover:bg-slate-700 rounded">↻</button>
+            <input v-model="browserUrl" @keyup.enter="navigateBrowser" 
+              class="browser-url-bar" placeholder="輸入軟件名稱或網址..." />
+          </div>
+          <div class="browser-content">
+            <div v-if="browserContent.type === 'software'">
+              <h3 class="text-lg font-bold mb-4">[[ browserContent.title ]]</h3>
+              <div class="bg-slate-100 rounded p-4">
+                <div class="flex gap-2 mb-4">
+                  <button v-for="btn in browserContent.buttons" :key="btn" 
+                    @click="simulateAction(btn)"
+                    class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">
+                    [[ btn ]]
+                  </button>
+                </div>
+                <div v-for="(field, idx) in browserContent.fields" :key="idx" class="mb-3">
+                  <label class="block text-sm text-slate-600 mb-1">[[ field.label ]]</label>
+                  <input v-model="field.value" class="w-full border rounded px-3 py-2 text-sm" :placeholder="field.placeholder" />
+                </div>
+              </div>
+              <div class="mt-4 text-xs text-slate-500">
+                模擬延遲: [[ browserContent.latency ]]ms | Token: [[ browserContent.tokenCount ]]
+              </div>
+            </div>
+            <div v-else class="text-center py-12 text-slate-400">
+              <div class="text-4xl mb-4">📱</div>
+              <div class="text-sm">輸入軟件名稱開始模擬</div>
+              <div class="text-xs mt-2">Excel, LINE, Email, 瀏覽器...</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 同步數據流 -->
+        <div class="sync-panel">
+          <div class="text-xs text-slate-400 mb-2">同步數據流</div>
+          <div class="flex items-center justify-between text-xs mb-2">
+            <span>討論 → 瀏覽器</span>
+            <span :class="syncDiscussionToBrowser ? 'text-green-400' : 'text-slate-500'">
+              [[ syncDiscussionToBrowser ? '✓ 已同步' : '○ 未同步' ]]
+            </span>
+          </div>
+          <div class="flex items-center justify-between text-xs mb-2">
+            <span>瀏覽器 → AI</span>
+            <span :class="syncBrowserToAi ? 'text-green-400' : 'text-slate-500'">
+              [[ syncBrowserToAi ? '✓ 已同步' : '○ 未同步' ]]
+            </span>
+          </div>
+          <div class="text-xs text-slate-500 mt-2">壓縮預覽:</div>
+          <pre class="text-[10px] bg-slate-800 rounded p-2 mt-1 overflow-x-auto">[[ compactPreview ]]</pre>
+        </div>
+        
+        <!-- 快捷軟件 -->
+        <div class="border-t border-slate-700">
+          <div class="text-xs text-slate-400 p-2">快捷軟件</div>
+          <div class="software-grid">
+            <div v-for="soft in softwareList" :key="soft.name" class="software-btn" @click="openSoftware(soft)">
+              <div class="icon">[[ soft.icon ]]</div>
+              <div class="name">[[ soft.name ]]</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, computed, onMounted, watch } = Vue;
+    createApp({
+      setup() {
+        // 狀態
+        const wsConnected = ref(true);
+        const tokenSavings = ref(65);
+        const tokenUsage = ref(1240);
+        const dataFormat = ref('token');
+        const activeTool = ref('smart-gui');
+        const chatInput = ref('');
+        const browserUrl = ref('');
+        const syncDiscussionToBrowser = ref(true);
+        const syncBrowserToAi = ref(true);
+        
+        // 檔案結構
+        const folders = ref([
+          { name: 'src', files: [
+            { name: 'main.py', active: true },
+            { name: 'agent.py', active: false },
+            { name: 'utils.py', active: false }
+          ]},
+          { name: 'scripts', files: [
+            { name: 'install.bat', active: false },
+            { name: 'deploy.sh', active: false }
+          ]},
+          { name: 'docs', files: [
+            { name: 'README.md', active: false }
+          ]}
+        ]);
+        
+        // 開啟的標籤
+        const openTabs = ref([
+          { name: 'main.py', active: true }
+        ]);
+        
+        // 代碼內容
+        const codeLines = ref([
+          'import asyncio',
+          'from agent import Agent',
+          '',
+          'async def main():',
+          '    agent = Agent()',
+          '    await agent.run("分析專案結構")',
+          '',
+          'if __name__ == "__main__":',
+          '    asyncio.run(main())'
+        ]);
+        
+        // AI 討論消息
+        const chatMessages = ref([
+          { role: 'ai', time: '22:45', text: '我已分析您的專案結構。建議使用 Smart GUI 來自動化測試流程。' },
+          { role: 'user', time: '22:46', text: '好，請開啟 Excel 並輸入測試數據' },
+          { role: 'ai', time: '22:46', text: '已開啟 Excel 模擬器。請輸入您要測試的數據。' }
+        ]);
+        
+        // 瀏覽器內容
+        const browserContent = ref({ type: 'blank' });
+        
+        // 軟件列表
+        const softwareList = ref([
+          { name: 'Excel', icon: '📊' },
+          { name: 'LINE', icon: '💬' },
+          { name: 'Email', icon: '📧' },
+          { name: 'Word', icon: '📝' },
+          { name: '瀏覽器', icon: '🌐' },
+          { name: '終端機', icon: '💻' }
+        ]);
+        
+        // 壓縮預覽
+        const compactPreview = computed(() => {
+          const recent = chatMessages.value.slice(-2);
+          return JSON.stringify(recent.map(m => ({
+            t: m.time, r: m.role[0].toUpperCase(), c: m.text.substring(0, 50) + '...'
+          })), null, 2);
+        });
+        
+        // 工具函數
+        function getFileIcon(filename) {
+          const icons = {
+            '.py': '🐍', '.js': '📜', '.html': '🌐', '.md': '📝',
+            '.bat': '⚙️', '.sh': '📜', '.json': '📋'
+          };
+          const ext = '.' + filename.split('.').pop();
+          return icons[ext] || '📄';
+        }
+        
+        function openFile(file) {
+          folders.value.forEach(f => f.files.forEach(f => f.active = false));
+          file.active = true;
+          if (!openTabs.value.find(t => t.name === file.name)) {
+            openTabs.value.push({ name: file.name, active: false });
+          }
+        }
+        
+        function closeTab(tab) {
+          const idx = openTabs.value.indexOf(tab);
+          if (idx > 0) openTabs.value.splice(idx, 1);
+        }
+        
+        function sendChat() {
+          if (!chatInput.value.trim()) return;
+          chatMessages.value.push({
+            role: 'user',
+            time: new Date().toLocaleTimeString().slice(0, 5),
+            text: chatInput.value
+          });
+          
+          // 模擬 AI 回覆
+          setTimeout(() => {
+            chatMessages.value.push({
+              role: 'ai',
+              time: new Date().toLocaleTimeString().slice(0, 5),
+              text: `已處理: "${chatInput.value}"。請問需要進一步操作嗎？`
+            });
+          }, 500);
+          
+          chatInput.value = '';
+        }
+        
+        function navigateBrowser() {
+          const url = browserUrl.value.toLowerCase();
+          let content = { type: 'software', title: '', buttons: [], fields: [], latency: 150, tokenCount: 45 };
+          
+          if (url.includes('excel')) {
+            content.title = '📊 Excel 模擬';
+            content.buttons = ['開啟', '儲存', '新增圖表'];
+            content.fields = [{ label: '儲存格', value: ref(''), placeholder: '輸入值' }];
+          } else if (url.includes('line')) {
+            content.title = '💬 LINE 模擬';
+            content.buttons = ['傳送', '圖片'];
+            content.fields = [{ label: '訊息', value: ref(''), placeholder: '輸入訊息...' }];
+          } else if (url.includes('email')) {
+            content.title = '📧 Email 模擬';
+            content.buttons = ['傳送', '附件'];
+            content.fields = [{ label: '收件人', value: ref(''), placeholder: 'email@example.com' }];
+          } else {
+            content.title = '🌐 瀏覽器模擬';
+            content.buttons = ['搜尋', '書籤'];
+            content.fields = [{ label: '搜尋', value: ref(''), placeholder: '關鍵字...' }];
+          }
+          
+          browserContent.value = content;
+          chatMessages.value.push({
+            role: 'system',
+            time: new Date().toLocaleTimeString().slice(0, 5),
+            text: `已開啟: ${content.title}`
+          });
+        }
+        
+        function browserBack() { /* 歷史回退 */ }
+        function browserForward() { /* 歷史前進 */ }
+        function refreshBrowser() { if (browserUrl.value) navigateBrowser(); }
+        
+        function simulateAction(action) {
+          chatMessages.value.push({
+            role: 'system',
+            time: new Date().toLocaleTimeString().slice(0, 5),
+            text: `執行: ${action} (延遲: ${browserContent.value.latency}ms)`
+          });
+        }
+        
+        function openSoftware(soft) {
+          browserUrl.value = soft.name;
+          navigateBrowser();
+        }
+        
+        // 監聽討論區，自動開啟軟件
+        watch(chatMessages, (newMsgs) => {
+          if (syncDiscussionToBrowser.value && newMsgs.length > 0) {
+            const last = newMsgs[newMsgs.length - 1];
+            if (last.role === 'ai' || last.role === 'system') {
+              const text = last.text.toLowerCase();
+              if (text.includes('開') || text.includes('excel') || text.includes('line')) {
+                const soft = softwareList.value.find(s => text.includes(s.name.toLowerCase()));
+                if (soft) openSoftware(soft);
+              }
+            }
+          }
+        }, { deep: true });
+        
+        onMounted(() => {
+          chatMessages.value.push({
+            role: 'system',
+            time: new Date().toLocaleTimeString().slice(0, 5),
+            text: 'Agent Studio AI 已就緒。輸入需求開始開發。'
+          });
+        });
+        
+        return {
+          wsConnected, tokenSavings, tokenUsage, dataFormat, activeTool,
+          chatInput, chatMessages, browserUrl, browserContent,
+          syncDiscussionToBrowser, syncBrowserToAi,
+          folders, openTabs, codeLines, softwareList, compactPreview,
+          getFileIcon, openFile, closeTab, sendChat,
+          navigateBrowser, browserBack, browserForward, refreshBrowser, simulateAction, openSoftware
+        };
+      },
+      delimiters: ['[[', ']]']
+    }).mount('#app');
+  </script>
+</body>
+</html>

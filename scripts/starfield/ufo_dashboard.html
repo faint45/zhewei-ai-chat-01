@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UFO Detector — Tapo C230</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #050510; color: #d0d0e8; font-family: system-ui, sans-serif; }
+  .glass { background: rgba(255,255,255,0.04); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.06); }
+  .tab-btn.active { background: linear-gradient(135deg, #dc2626, #991b1b); color: #fff; }
+  .tab-btn:hover:not(.active) { background: rgba(255,255,255,0.08); }
+  .glow-red { box-shadow: 0 0 20px rgba(220,38,38,0.3); }
+  .glow-green { box-shadow: 0 0 15px rgba(34,197,94,0.3); }
+  .slider-track { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: #222; outline: none; }
+  .slider-track::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #dc2626; cursor: pointer; }
+  .cls-airplane { color: #fbbf24; }
+  .cls-satellite { color: #9ca3af; }
+  .cls-meteor { color: #f97316; }
+  .cls-drone { color: #c084fc; }
+  .cls-ufo { color: #ef4444; font-weight: bold; }
+  .cls-unknown { color: #6b7280; }
+  .event-card { transition: all 0.2s; cursor: pointer; }
+  .event-card:hover { background: rgba(255,255,255,0.08); transform: translateX(4px); }
+  .pulse { animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .fade-in { animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  select, input[type="number"], input[type="text"] { background: #0f0f1f; border: 1px solid #333; color: #d0d0e8; border-radius: 6px; padding: 6px 10px; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Header -->
+<header class="glass sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <span class="text-2xl">🛸</span>
+    <h1 class="text-lg font-bold bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
+      UFO Detector — Tapo C230
+    </h1>
+  </div>
+  <div class="flex items-center gap-4 text-sm">
+    <span id="detectDot" class="w-2.5 h-2.5 rounded-full bg-gray-600 inline-block"></span>
+    <span id="detectStatus" class="text-gray-400">待機</span>
+    <span id="fpsText" class="text-gray-500">-- FPS</span>
+    <span id="eventCount" class="text-gray-500">0 events</span>
+  </div>
+</header>
+
+<!-- Tabs -->
+<nav class="flex gap-2 px-6 py-3 overflow-x-auto">
+  <button class="tab-btn active px-4 py-2 rounded-lg text-sm font-medium" data-tab="live" title="即時偵測">🔴 即時偵測</button>
+  <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="events" title="事件記錄">📋 事件記錄</button>
+  <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="stats" title="統計分析">📊 統計</button>
+  <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="settings" title="設定">⚙️ 設定</button>
+</nav>
+
+<main class="px-6 pb-8">
+
+<!-- ==================== 即時偵測 ==================== -->
+<section id="tab-live" class="tab-content fade-in">
+  <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+    <!-- 串流畫面 -->
+    <div class="lg:col-span-3">
+      <div class="glass rounded-xl p-3">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span id="liveDot" class="w-3 h-3 rounded-full bg-gray-600 inline-block"></span>
+            <span class="text-sm font-medium">即時偵測畫面</span>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="toggleDetection()" id="btnDetect" class="px-4 py-1.5 rounded-lg text-sm font-medium bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600">
+              ▶ 開始偵測
+            </button>
+          </div>
+        </div>
+        <img id="streamImg" alt="UFO Detection Stream" class="w-full rounded-lg bg-black" style="min-height:400px"
+             src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='480'%3E%3Crect fill='%23050510' width='640' height='480'/%3E%3Ctext x='50%25' y='45%25' text-anchor='middle' fill='%23333' font-size='24'%3E🛸%3C/text%3E%3Ctext x='50%25' y='55%25' text-anchor='middle' fill='%23444' font-size='16'%3E等待偵測啟動...%3C/text%3E%3C/svg%3E">
+      </div>
+    </div>
+
+    <!-- 右側面板 -->
+    <div class="space-y-3">
+      <!-- 偵測統計 -->
+      <div class="glass rounded-xl p-3">
+        <h3 class="text-sm font-semibold mb-2 text-red-400">📡 偵測狀態</h3>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="bg-red-900/20 rounded-lg p-2 text-center">
+            <div class="text-gray-400">偵測數</div>
+            <div id="statDetections" class="text-lg font-bold text-red-300">0</div>
+          </div>
+          <div class="bg-orange-900/20 rounded-lg p-2 text-center">
+            <div class="text-gray-400">追蹤中</div>
+            <div id="statTracks" class="text-lg font-bold text-orange-300">0</div>
+          </div>
+          <div class="bg-yellow-900/20 rounded-lg p-2 text-center">
+            <div class="text-gray-400">事件</div>
+            <div id="statEvents" class="text-lg font-bold text-yellow-300">0</div>
+          </div>
+          <div class="bg-purple-900/20 rounded-lg p-2 text-center">
+            <div class="text-gray-400">UFO</div>
+            <div id="statUFO" class="text-lg font-bold text-purple-300">0</div>
+          </div>
+        </div>
+        <div class="mt-2 text-xs text-gray-500">
+          <span>星點遮罩: </span><span id="starMaskStatus" class="text-gray-400">--</span>
+        </div>
+      </div>
+
+      <!-- 靈敏度 -->
+      <div class="glass rounded-xl p-3">
+        <h3 class="text-sm font-semibold mb-2">🎚️ 靈敏度</h3>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-500">低</span>
+          <input type="range" class="slider-track flex-1" min="0" max="100" value="50" id="sensitivitySlider" title="偵測靈敏度"
+                 oninput="document.getElementById('sensVal').textContent=this.value+'%'; debounceSensitivity(this.value/100)">
+          <span class="text-xs text-gray-500">高</span>
+        </div>
+        <div class="text-center text-xs text-gray-400 mt-1"><span id="sensVal">50%</span></div>
+      </div>
+
+      <!-- 影像模式 -->
+      <div class="glass rounded-xl p-3">
+        <h3 class="text-sm font-semibold mb-2">📷 影像模式</h3>
+        <div class="grid grid-cols-3 gap-1 mb-1">
+          <button onclick="setPreset('auto')" id="preAuto" class="px-2 py-1.5 rounded text-xs font-medium bg-red-900/60 border border-red-700" title="自動偵測">🔄 自動</button>
+          <button onclick="setPreset('daytime')" id="preDaytime" class="px-2 py-1.5 rounded text-xs font-medium bg-gray-800" title="白天模式">☀️ 白天</button>
+          <button onclick="setPreset('night_sky')" id="preNight" class="px-2 py-1.5 rounded text-xs font-medium bg-gray-800" title="夜空優化">🌙 夜空</button>
+        </div>
+        <div class="grid grid-cols-3 gap-1 mb-1">
+          <button onclick="setPreset('starfield')" id="preStarfield" class="px-2 py-1.5 rounded text-xs font-medium bg-gray-800" title="星空攝影">⭐ 星空</button>
+          <button onclick="setPreset('ai_enhanced')" id="preAI" class="px-2 py-1.5 rounded text-xs font-medium bg-gray-800" title="漸進增強（疊加+AI）">� 漸進</button>
+          <button onclick="setPreset('raw')" id="preRaw" class="px-2 py-1.5 rounded text-xs font-medium bg-gray-800" title="原始畫面">📹 原始</button>
+        </div>
+        <div class="text-xs text-gray-500 mt-1.5" id="presetDesc">自動偵測亮度選擇最佳模式</div>
+        <div class="text-xs text-gray-600 mt-0.5 hidden" id="progressiveInfo">
+          <div class="flex items-center gap-2 mb-0.5">
+            <span>輪次: <b id="progRound">0</b></span>
+            <span>畫質: <b id="progQuality" class="text-green-400">0</b>/100</span>
+          </div>
+          <div class="w-full bg-gray-800 rounded-full h-1.5">
+            <div id="progBar" class="bg-gradient-to-r from-blue-500 to-green-400 h-1.5 rounded-full transition-all" style="width:0%"></div>
+          </div>
+          <div class="text-gray-700 mt-0.5">收集中: <span id="progBuffer">0</span>/16</div>
+        </div>
+      </div>
+
+      <!-- 即時事件 -->
+      <div class="glass rounded-xl p-3">
+        <h3 class="text-sm font-semibold mb-2 text-yellow-400">⚡ 最新事件</h3>
+        <div id="liveEvents" class="space-y-1 max-h-48 overflow-y-auto text-xs">
+          <p class="text-gray-600">等待偵測...</p>
+        </div>
+      </div>
+
+      <!-- 告警 -->
+      <div class="glass rounded-xl p-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold">🔔 告警</h3>
+          <label class="flex items-center gap-1 cursor-pointer">
+            <input type="checkbox" id="alertToggle" checked class="accent-red-500" title="告警開關"
+                   onchange="setAlert(this.checked)">
+            <span class="text-xs">啟用</span>
+          </label>
+        </div>
+        <div id="alertBanner" class="hidden mt-2 bg-red-900/40 border border-red-800 rounded-lg p-2 text-xs text-red-300 glow-red">
+          <span class="pulse">🛸</span> <span id="alertText">偵測到不明飛行物！</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 事件記錄 ==================== -->
+<section id="tab-events" class="tab-content hidden fade-in">
+  <div class="glass rounded-xl p-4">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-lg">📋 事件記錄</h2>
+      <div class="flex gap-2">
+        <select id="filterClass" title="分類篩選" class="text-sm" onchange="loadEvents()">
+          <option value="">全部分類</option>
+          <option value="ufo">🛸 UFO</option>
+          <option value="airplane">✈️ 飛機</option>
+          <option value="satellite">🛰️ 衛星</option>
+          <option value="meteor">☄️ 流星</option>
+          <option value="drone">🤖 無人機</option>
+        </select>
+        <button onclick="loadEvents()" class="px-3 py-1 rounded-lg text-sm bg-gray-800 hover:bg-gray-700">🔄</button>
+      </div>
+    </div>
+    <div id="eventList" class="space-y-2 max-h-[600px] overflow-y-auto">
+      <p class="text-gray-500 text-sm">載入中...</p>
+    </div>
+  </div>
+
+  <!-- 事件詳情 Modal -->
+  <div id="eventModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" onclick="if(event.target===this)closeModal()">
+    <div class="glass rounded-2xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h3 id="modalTitle" class="font-bold text-lg text-red-400">事件詳情</h3>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white text-xl">&times;</button>
+      </div>
+      <div id="modalContent" class="space-y-4"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 統計 ==================== -->
+<section id="tab-stats" class="tab-content hidden fade-in">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="glass rounded-xl p-4">
+      <h3 class="font-semibold mb-3">🏷️ 分類統計</h3>
+      <div id="classStats" class="space-y-2">
+        <p class="text-gray-500 text-sm">載入中...</p>
+      </div>
+    </div>
+    <div class="glass rounded-xl p-4">
+      <h3 class="font-semibold mb-3">📈 偵測概覽</h3>
+      <div id="overviewStats" class="space-y-2 text-sm">
+        <p class="text-gray-500">載入中...</p>
+      </div>
+    </div>
+    <div class="glass rounded-xl p-4">
+      <h3 class="font-semibold mb-3">🕐 最近活動</h3>
+      <div id="recentActivity" class="space-y-1 text-xs max-h-64 overflow-y-auto">
+        <p class="text-gray-500">載入中...</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 設定 ==================== -->
+<section id="tab-settings" class="tab-content hidden fade-in">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="glass rounded-xl p-4">
+      <h2 class="font-semibold mb-4">📡 攝影機連線</h2>
+      <div class="space-y-3">
+        <div>
+          <label for="rtspUrl" class="text-sm text-gray-400">攝影機 URL（RTSP / HTTP / 本機）</label>
+          <input type="text" id="rtspUrl" placeholder="rtsp://帳號:密碼@IP:554/stream1"
+                 class="w-full mt-1 text-sm">
+        </div>
+        <div class="text-xs text-gray-600 mb-1">快速選擇：</div>
+        <div class="grid grid-cols-2 gap-1.5 mb-2">
+          <button onclick="window.open('/cam','_blank')"
+                  class="px-2 py-1.5 rounded text-xs bg-red-900/60 border border-red-700 hover:bg-red-800/60 text-left col-span-2" title="iPhone 開啟此網址即可串流">📱 iPhone PWA（推薦）→ /cam</button>
+          <button onclick="document.getElementById('rtspUrl').value='rtsp://admin:password@192.168.1.x:554/stream1';document.getElementById('rtspUrl').focus()"
+                  class="px-2 py-1.5 rounded text-xs bg-gray-800 hover:bg-gray-700 text-left" title="Tapo C230">📹 Tapo C230</button>
+          <button onclick="document.getElementById('rtspUrl').value='0';document.getElementById('rtspUrl').focus()"
+                  class="px-2 py-1.5 rounded text-xs bg-gray-800 hover:bg-gray-700 text-left" title="本機攝影機">💻 本機鏡頭</button>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="connectCam()" class="px-4 py-2 rounded-lg text-sm font-medium bg-green-700 hover:bg-green-600 flex-1">🔗 連線</button>
+          <button onclick="disconnectCam()" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-gray-600">斷線</button>
+        </div>
+        <div id="connMsg" class="text-sm"></div>
+        <div id="sourceInfo" class="text-xs text-gray-600 hidden">
+          來源: <span id="sourceType" class="text-gray-400">-</span> |
+          解析度: <span id="sourceRes" class="text-gray-400">-</span>
+        </div>
+      </div>
+    </div>
+    <div class="glass rounded-xl p-4">
+      <h2 class="font-semibold mb-4">🎛️ 影像前處理</h2>
+      <p class="text-xs text-gray-500 mb-3">可選：偵測前先套用虛擬參數增強影像</p>
+      <label class="flex items-center gap-2 cursor-pointer mb-3">
+        <input type="checkbox" id="useParamsToggle" class="accent-red-500" title="啟用影像前處理"
+               onchange="sendParams({use_params:this.checked})">
+        <span class="text-sm">啟用影像前處理</span>
+      </label>
+      <div class="space-y-2">
+        <div>
+          <label class="text-xs text-gray-400 flex justify-between"><span>亮度</span><span id="pBright">0</span></label>
+          <input type="range" class="slider-track w-full" min="-100" max="100" value="0" title="亮度"
+                 oninput="document.getElementById('pBright').textContent=this.value; sendParams({brightness:+this.value})">
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 flex justify-between"><span>伽瑪</span><span id="pGamma">1.0</span></label>
+          <input type="range" class="slider-track w-full" min="50" max="200" value="100" title="伽瑪"
+                 oninput="let v=0.5+(this.value-50)/100; document.getElementById('pGamma').textContent=v.toFixed(1); sendParams({gamma:v})">
+        </div>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" class="accent-red-500" title="CLAHE" onchange="sendParams({clahe:this.checked})">
+          <span class="text-xs">CLAHE 自適應對比</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" class="accent-red-500" title="降噪" onchange="sendParams({denoise:this.checked})">
+          <span class="text-xs">降噪</span>
+        </label>
+      </div>
+    </div>
+    <div class="glass rounded-xl p-4">
+      <h2 class="font-semibold mb-4">🔔 告警設定</h2>
+      <div class="space-y-2 text-sm">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked class="accent-red-500" title="瀏覽器通知"
+                 onchange="if(this.checked)Notification.requestPermission()">
+          <span>瀏覽器通知</span>
+        </label>
+        <p class="text-xs text-gray-500">Ntfy 推播：設定環境變數 NTFY_SERVER + NTFY_UFO_TOPIC</p>
+      </div>
+    </div>
+    <div class="glass rounded-xl p-4">
+      <h2 class="font-semibold mb-4">ℹ️ 系統資訊</h2>
+      <div class="text-sm text-gray-400 space-y-1">
+        <p>版本：1.0.0</p>
+        <p>引擎：背景差分(MOG2) + 星點遮罩 + 多物體追蹤</p>
+        <p>分類：飛機 / 衛星 / 流星 / 無人機 / UFO</p>
+        <p>Port：8035</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+const API = location.origin;
+let ws = null;
+let detecting = false;
+let sensTimer = null;
+
+// --- Tabs ---
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(s => s.classList.add('hidden'));
+    const t = document.getElementById('tab-' + btn.dataset.tab);
+    if (t) { t.classList.remove('hidden'); }
+    if (btn.dataset.tab === 'events') loadEvents();
+    if (btn.dataset.tab === 'stats') loadStats();
+  });
+});
+
+// --- Detection ---
+async function toggleDetection() {
+  if (detecting) {
+    await fetch(API + '/api/detect/stop', { method: 'POST' });
+    if (ws) ws.close();
+    detecting = false;
+    document.getElementById('btnDetect').textContent = '▶ 開始偵測';
+    document.getElementById('detectDot').className = 'w-2.5 h-2.5 rounded-full bg-gray-600 inline-block';
+    document.getElementById('detectStatus').textContent = '已停止';
+    document.getElementById('liveDot').className = 'w-3 h-3 rounded-full bg-gray-600 inline-block';
+  } else {
+    const r = await fetch(API + '/api/detect/start', { method: 'POST' });
+    const d = await r.json();
+    if (d.error) { alert(d.error); return; }
+    detecting = true;
+    document.getElementById('btnDetect').textContent = '⏹ 停止偵測';
+    document.getElementById('detectDot').className = 'w-2.5 h-2.5 rounded-full bg-red-500 inline-block pulse';
+    document.getElementById('detectStatus').textContent = '偵測中';
+    document.getElementById('liveDot').className = 'w-3 h-3 rounded-full bg-red-500 inline-block pulse';
+    startWS();
+  }
+}
+
+function startWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto + '//' + location.host + '/ws/detect');
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'frame') {
+      document.getElementById('streamImg').src = 'data:image/jpeg;base64,' + msg.data;
+      document.getElementById('fpsText').textContent = msg.fps + ' FPS';
+      // Stats
+      const s = msg.stats || {};
+      document.getElementById('statDetections').textContent = s.total_frames || 0;
+      document.getElementById('statTracks').textContent = s.confirmed_tracks || 0;
+      document.getElementById('statEvents').textContent = s.total_events || 0;
+      document.getElementById('statUFO').textContent = (s.classification_counts || {}).ufo || 0;
+      document.getElementById('eventCount').textContent = (s.total_events || 0) + ' events';
+      document.getElementById('starMaskStatus').textContent = s.star_mask_ready ? '✅ Ready' : '建立中...';
+      // Progressive info
+      if (msg.progressive && msg.preset === 'ai_enhanced') {
+        const p = msg.progressive;
+        document.getElementById('progRound').textContent = p.round;
+        document.getElementById('progQuality').textContent = p.quality_score;
+        document.getElementById('progBuffer').textContent = p.buffer + '/' + p.buffer_max;
+        const pct = Math.round((p.buffer / p.buffer_max) * 100);
+        document.getElementById('progBar').style.width = pct + '%';
+        // 畫質分數顏色
+        const qEl = document.getElementById('progQuality');
+        if (p.quality_score >= 70) qEl.className = 'text-green-400';
+        else if (p.quality_score >= 40) qEl.className = 'text-yellow-400';
+        else qEl.className = 'text-red-400';
+      }
+      // New events
+      if (msg.new_events && msg.new_events.length > 0) {
+        msg.new_events.forEach(ev => addLiveEvent(ev));
+      }
+    }
+  };
+  ws.onclose = () => {
+    if (detecting) setTimeout(startWS, 2000);
+  };
+}
+
+function addLiveEvent(ev) {
+  const el = document.getElementById('liveEvents');
+  if (el.querySelector('.text-gray-600')) el.innerHTML = '';
+  const icons = { airplane: '✈️', satellite: '🛰️', meteor: '☄️', drone: '🤖', ufo: '🛸', unknown: '❓' };
+  const icon = icons[ev.classification] || '❓';
+  const cls = 'cls-' + ev.classification;
+  const html = `<div class="bg-gray-900/50 rounded px-2 py-1 flex justify-between items-center">
+    <span class="${cls}">${icon} ${ev.classification} <span class="text-gray-500">${(ev.confidence*100).toFixed(0)}%</span></span>
+    <span class="text-gray-500">${ev.duration_sec}s</span>
+  </div>`;
+  el.insertAdjacentHTML('afterbegin', html);
+  // 保留最近 20 條
+  while (el.children.length > 20) el.removeChild(el.lastChild);
+  // 告警
+  if (ev.classification === 'ufo') showAlert(ev);
+}
+
+function showAlert(ev) {
+  const banner = document.getElementById('alertBanner');
+  document.getElementById('alertText').textContent =
+    `偵測到不明飛行物！信心度 ${(ev.confidence*100).toFixed(0)}% 速度 ${ev.avg_speed?.toFixed(0) || '?'}px/s`;
+  banner.classList.remove('hidden');
+  setTimeout(() => banner.classList.add('hidden'), 10000);
+  // 瀏覽器通知
+  if (Notification.permission === 'granted') {
+    new Notification('🛸 UFO 偵測告警', {
+      body: `分類: ${ev.classification} (${(ev.confidence*100).toFixed(0)}%)`,
+      icon: '🛸'
+    });
+  }
+}
+
+// --- Sensitivity ---
+function debounceSensitivity(val) {
+  clearTimeout(sensTimer);
+  sensTimer = setTimeout(() => {
+    fetch(API + '/api/sensitivity?value=' + val, { method: 'POST' });
+  }, 300);
+}
+
+// --- Params ---
+function sendParams(data) {
+  fetch(API + '/api/params', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+}
+
+// --- Alert ---
+function setAlert(enabled) {
+  fetch(API + '/api/alert?enabled=' + enabled, { method: 'POST' });
+}
+
+// --- Camera ---
+async function connectCam() {
+  const url = document.getElementById('rtspUrl').value.trim();
+  if (!url) return;
+  const r = await fetch(API + '/api/connect?url=' + encodeURIComponent(url), { method: 'POST' });
+  const d = await r.json();
+  document.getElementById('connMsg').innerHTML = d.success
+    ? '<span class="text-green-400">✅ 連線成功</span>'
+    : '<span class="text-red-400">❌ 連線失敗</span>';
+  if (d.success) {
+    // 取得來源資訊
+    const st = await fetch(API + '/api/status').then(r => r.json());
+    const typeNames = { rtsp: '📹 RTSP', http: '📱 HTTP/iPhone', local: '💻 本機鏡頭' };
+    document.getElementById('sourceType').textContent = typeNames[st.source_type] || st.source_type;
+    document.getElementById('sourceRes').textContent = st.source_resolution || '-';
+    document.getElementById('sourceInfo').classList.remove('hidden');
+  }
+}
+async function disconnectCam() {
+  await fetch(API + '/api/disconnect', { method: 'POST' });
+  document.getElementById('connMsg').innerHTML = '<span class="text-gray-400">已斷線</span>';
+  if (detecting) toggleDetection();
+}
+
+// --- Events ---
+async function loadEvents() {
+  const cls = document.getElementById('filterClass').value;
+  const r = await fetch(API + '/api/history?limit=100');
+  const d = await r.json();
+  let events = d.events || [];
+  if (cls) events = events.filter(e => e.classification === cls);
+  const el = document.getElementById('eventList');
+  if (events.length === 0) {
+    el.innerHTML = '<p class="text-gray-500 text-sm">尚無事件記錄</p>';
+    return;
+  }
+  const icons = { airplane: '✈️', satellite: '🛰️', meteor: '☄️', drone: '🤖', ufo: '🛸', unknown: '❓' };
+  el.innerHTML = events.map(e => `
+    <div class="event-card glass rounded-lg px-4 py-3 flex items-center justify-between" onclick="showEvent('${e.event_id}')">
+      <div class="flex items-center gap-3">
+        <span class="text-xl">${icons[e.classification] || '❓'}</span>
+        <div>
+          <span class="cls-${e.classification} font-medium">${e.classification}</span>
+          <span class="text-gray-500 text-xs ml-2">${(e.confidence*100).toFixed(0)}%</span>
+          <div class="text-xs text-gray-500">${e.start_time || ''}</div>
+        </div>
+      </div>
+      <div class="text-right text-xs text-gray-400">
+        <div>${e.duration_sec}s</div>
+        <div>${e.avg_speed?.toFixed(0) || '?'} px/s</div>
+        <div>${e.is_flashing ? '💡閃爍' : ''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function showEvent(eventId) {
+  const r = await fetch(API + '/api/events/' + eventId);
+  if (!r.ok) return;
+  const e = await r.json();
+  document.getElementById('modalTitle').textContent = `${e.classification} — ${e.event_id}`;
+  const icons = { airplane: '✈️', satellite: '🛰️', meteor: '☄️', drone: '🤖', ufo: '🛸', unknown: '❓' };
+  document.getElementById('modalContent').innerHTML = `
+    <div class="grid grid-cols-2 gap-3 text-sm">
+      <div class="bg-gray-900/50 rounded-lg p-3">
+        <div class="text-gray-400 text-xs">分類</div>
+        <div class="cls-${e.classification} text-lg">${icons[e.classification]||''} ${e.classification} (${(e.confidence*100).toFixed(0)}%)</div>
+      </div>
+      <div class="bg-gray-900/50 rounded-lg p-3">
+        <div class="text-gray-400 text-xs">持續時間</div>
+        <div class="text-lg">${e.duration_sec}s</div>
+      </div>
+      <div class="bg-gray-900/50 rounded-lg p-3">
+        <div class="text-gray-400 text-xs">平均速度</div>
+        <div>${e.avg_speed} px/s</div>
+      </div>
+      <div class="bg-gray-900/50 rounded-lg p-3">
+        <div class="text-gray-400 text-xs">最大速度</div>
+        <div>${e.max_speed} px/s</div>
+      </div>
+      <div class="bg-gray-900/50 rounded-lg p-3">
+        <div class="text-gray-400 text-xs">軌跡點數</div>
+        <div>${e.trajectory_points}</div>
+      </div>
+      <div class="bg-gray-900/50 rounded-lg p-3">
+        <div class="text-gray-400 text-xs">軌跡長度</div>
+        <div>${e.trajectory_length_px} px</div>
+      </div>
+      <div class="bg-gray-900/50 rounded-lg p-3">
+        <div class="text-gray-400 text-xs">平均亮度</div>
+        <div>${e.avg_brightness}</div>
+      </div>
+      <div class="bg-gray-900/50 rounded-lg p-3">
+        <div class="text-gray-400 text-xs">閃爍</div>
+        <div>${e.is_flashing ? '是 ('+e.flash_frequency+'Hz)' : '否'}</div>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3 mt-3">
+      <div>
+        <p class="text-xs text-gray-400 mb-1">截圖</p>
+        <img src="${API}/api/events/${e.event_id}/screenshot" alt="Event screenshot" class="w-full rounded-lg bg-black" onerror="this.style.display='none'">
+      </div>
+      <div>
+        <p class="text-xs text-gray-400 mb-1">軌跡圖</p>
+        <img src="${API}/api/events/${e.event_id}/trail" alt="Event trail" class="w-full rounded-lg bg-black" onerror="this.style.display='none'">
+      </div>
+    </div>
+    <div class="text-xs text-gray-500 mt-2">
+      <p>開始: ${e.start_time}</p>
+      <p>結束: ${e.end_time}</p>
+    </div>
+  `;
+  document.getElementById('eventModal').classList.remove('hidden');
+}
+function closeModal() { document.getElementById('eventModal').classList.add('hidden'); }
+
+// --- Stats ---
+async function loadStats() {
+  const r = await fetch(API + '/api/stats');
+  const s = await r.json();
+  // 分類統計
+  const cc = s.classification_counts || {};
+  const icons = { airplane: '✈️', satellite: '🛰️', meteor: '☄️', drone: '🤖', ufo: '🛸', unknown: '❓' };
+  const classEl = document.getElementById('classStats');
+  if (Object.keys(cc).length === 0) {
+    classEl.innerHTML = '<p class="text-gray-500 text-sm">尚無資料</p>';
+  } else {
+    classEl.innerHTML = Object.entries(cc).sort((a,b) => b[1]-a[1]).map(([k,v]) =>
+      `<div class="flex justify-between items-center bg-gray-900/50 rounded-lg px-3 py-2">
+        <span class="cls-${k}">${icons[k]||''} ${k}</span>
+        <span class="font-bold">${v}</span>
+      </div>`
+    ).join('');
+  }
+  // 概覽
+  document.getElementById('overviewStats').innerHTML = `
+    <div class="flex justify-between"><span class="text-gray-400">總幀數</span><span>${s.total_frames || 0}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">總事件</span><span>${s.total_events || 0}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">UFO 數</span><span class="text-red-400 font-bold">${s.ufo_count || 0}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">平均持續</span><span>${s.avg_duration || 0}s</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">平均速度</span><span>${s.avg_speed || 0} px/s</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">活躍追蹤</span><span>${s.active_tracks || 0}</span></div>
+  `;
+  // 最近活動
+  const hr = await fetch(API + '/api/events?limit=10');
+  const hd = await hr.json();
+  const actEl = document.getElementById('recentActivity');
+  if ((hd.events||[]).length === 0) {
+    actEl.innerHTML = '<p class="text-gray-500">尚無活動</p>';
+  } else {
+    actEl.innerHTML = (hd.events||[]).map(e =>
+      `<div class="flex justify-between bg-gray-900/30 rounded px-2 py-1">
+        <span class="cls-${e.classification}">${icons[e.classification]||''} ${e.classification}</span>
+        <span class="text-gray-500">${e.start_time?.split('T')[1]?.substring(0,8) || ''}</span>
+      </div>`
+    ).join('');
+  }
+}
+
+// --- Preset ---
+const presetDescs = {
+  auto: '自動偵測亮度選擇最佳模式',
+  daytime: '白天模式 — 降低亮度避免過曝',
+  night_sky: '大光圈 + ISO 50 低雜訊',
+  starfield: '最大化星點可見度',
+  ai_enhanced: '� 漸進增強 — 每16幀合併+AI，畫質越來越好',
+  raw: '原始畫面（不處理）',
+};
+async function setPreset(name) {
+  await fetch(API + '/api/preset?name=' + name, { method: 'POST' });
+  ['preAuto','preDaytime','preNight','preStarfield','preAI','preRaw'].forEach(id => {
+    document.getElementById(id).className = 'px-2 py-1.5 rounded text-xs font-medium bg-gray-800';
+  });
+  const btnMap = { auto:'preAuto', daytime:'preDaytime', night_sky:'preNight', starfield:'preStarfield', ai_enhanced:'preAI', raw:'preRaw' };
+  const btn = document.getElementById(btnMap[name]);
+  if (btn) btn.className = 'px-2 py-1.5 rounded text-xs font-medium bg-red-900/60 border border-red-700';
+  document.getElementById('presetDesc').textContent = presetDescs[name] || '';
+  document.getElementById('progressiveInfo').classList.toggle('hidden', name !== 'ai_enhanced');
+}
+
+// --- Init ---
+fetch(API + '/api/status').then(r => r.json()).then(d => {
+  if (d.connected) {
+    document.getElementById('detectDot').className = 'w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block';
+    document.getElementById('detectStatus').textContent = '已連線';
+  }
+  if (d.detecting) {
+    detecting = true;
+    document.getElementById('btnDetect').textContent = '⏹ 停止偵測';
+    document.getElementById('detectDot').className = 'w-2.5 h-2.5 rounded-full bg-red-500 inline-block pulse';
+    document.getElementById('detectStatus').textContent = '偵測中';
+    document.getElementById('liveDot').className = 'w-3 h-3 rounded-full bg-red-500 inline-block pulse';
+    startWS();
+  }
+  if (d.preset) setPreset(d.preset);
+}).catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>築未科技｜Agent Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    body { background: #0b1020; color: #e5e7eb; }
+    .card { background: rgba(17,24,39,.8); border: 1px solid rgba(55,65,81,.8); }
+    .active { border-color: #3b82f6; color: #93c5fd; }
+    .browser-frame { background: #1e1e1e; border-radius: 8px; overflow: hidden; }
+    .browser-toolbar { background: #2d2d2d; padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
+    .browser-url { background: #3d3d3d; border: none; border-radius: 4px; padding: 4px 12px; color: #fff; flex: 1; font-size: 12px; }
+    .browser-content { background: #fff; min-height: 280px; color: #333; padding: 12px; }
+    .sim-window { background: #1a1a2e; border: 1px solid #3d3d5c; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+    .token-badge { background: linear-gradient(90deg, #06b6d4, #3b82f6); padding: 2px 8px; border-radius: 12px; font-size: 10px; }
+    .compact-msg { padding: 4px 8px; border-radius: 4px; margin: 2px 0; font-size: 12px; }
+    .compact-msg.ai { background: rgba(59, 130, 246, 0.2); border-left: 3px solid #3b82f6; }
+    .compact-msg.user { background: rgba(16, 185, 129, 0.2); border-left: 3px solid #10b981; }
+    .compact-msg.system { background: rgba(245, 158, 11, 0.2); border-left: 3px solid #f59e0b; }
+    .mini-browser { font-size: 11px; line-height: 1.4; }
+    .mini-browser h3 { font-size: 13px; font-weight: bold; margin-bottom: 8px; }
+    .mini-browser button { padding: 2px 6px; margin: 2px; font-size: 10px; }
+    .mini-browser input { padding: 2px 4px; font-size: 10px; }
+    .data-compression { font-family: monospace; font-size: 10px; color: #6b7280; }
+    .sync-indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .sync-active { background: #10b981; animation: pulse 2s infinite; }
+    .sync-idle { background: #6b7280; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div id="app" class="max-w-7xl mx-auto p-4 md:p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-xl md:text-2xl font-semibold">Agent Hub<span class="text-xs text-slate-400 ml-2">｜三欄式佈局</span></h1>
+      <div class="flex items-center gap-4">
+        <div class="text-xs text-slate-400">
+          <span class="sync-indicator" :class="wsConnected ? 'sync-active' : 'sync-idle'"></span>
+          [[ wsConnected ? '即時同步' : '離線模式' ]]
+        </div>
+        <div class="text-xs text-cyan-400">Token 節省: <span class="token-badge">[[ tokenSavings ]]%</span></div>
+      </div>
+    </div>
+
+    <!-- 三欄式佈局 -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      
+      <!-- 第一欄：控制台 (3格) -->
+      <div class="lg:col-span-3 space-y-4">
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">模式切換</div>
+          <div class="flex gap-2 mb-3">
+            <button class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs" @click="switchMode('daily')">Daily</button>
+            <button class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs" @click="switchMode('dev')">Dev</button>
+          </div>
+          <div class="text-xs text-slate-400">模式：<span class="text-cyan-300">[[ mode ]]</span></div>
+          <pre class="text-xs text-slate-400 whitespace-pre-wrap mt-2">[[ modeOutput ]]</pre>
+        </div>
+
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">代理通道</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button v-for="p in providers" :key="p" @click="provider=p"
+              :class="['px-3 py-2 rounded-lg border bg-slate-800 hover:bg-slate-700 text-xs', provider===p ? 'active' : 'border-slate-700']">
+              [[ p ]]
+            </button>
+          </div>
+        </div>
+
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">任務派工</div>
+          <input v-model="taskObjective" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs" placeholder="任務目標" />
+          <textarea v-model="taskContext" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs min-h-[60px]" placeholder="上下文"></textarea>
+          <label class="text-xs text-slate-400 flex items-center gap-2 mb-3">
+            <input type="checkbox" v-model="taskAutoRun" />
+            建立後自動執行
+          </label>
+          <button @click="createTask" class="w-full px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs">建立任務</button>
+        </div>
+
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">Smart GUI</div>
+          <textarea v-model="smartGuiInstruction" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs min-h-[60px]" placeholder="指令"></textarea>
+          <div class="flex gap-2 mb-2">
+            <input v-model.number="smartGuiMaxActions" type="number" class="w-20 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs" placeholder="步數" />
+            <label class="text-xs text-slate-300 flex items-center gap-1">
+              <input type="checkbox" v-model="smartGuiExecute" />
+              執行
+            </label>
+          </div>
+          <button @click="createSmartGuiTask" class="w-full px-3 py-2 rounded-lg bg-orange-700 hover:bg-orange-600 text-xs">執行 Smart GUI</button>
+        </div>
+
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">語義路由</div>
+          <textarea v-model="semanticText" class="w-full mb-2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs min-h-[60px]" placeholder="自然語句"></textarea>
+          <button @click="createSemanticRouteTask" class="w-full px-3 py-2 rounded-lg bg-sky-700 hover:bg-sky-600 text-xs">自動拆解</button>
+        </div>
+      </div>
+
+      <!-- 第二欄：討論區 (5格) -->
+      <div class="lg:col-span-5 card rounded-xl p-4 flex flex-col min-h-[70vh]">
+        <div class="flex items-center justify-between mb-3">
+          <div class="text-sm text-slate-300">討論區</div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500">壓縮格式:</span>
+            <select v-model="dataFormat" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs">
+              <option value="compact">Compact JSON</option>
+              <option value="binary">Binary</option>
+              <option value="token">Token-Optimized</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- 壓縮數據預覽 -->
+        <div class="bg-slate-900 rounded-lg p-2 mb-3 data-compression">
+          <div class="text-[10px] text-slate-500 mb-1">AI 數據格式 (Token-Optimized):</div>
+          <pre class="whitespace-pre-wrap text-[10px]">[[ compactDataPreview ]]</pre>
+        </div>
+
+        <div class="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[350px]">
+          <div v-for="(m,i) in logs" :key="i" class="compact-msg" :class="m.role">
+            <div class="text-[10px] text-slate-500">[[ m.time ]] · [[ m.role ]]</div>
+            <div class="whitespace-pre-wrap">[[ m.text ]]</div>
+          </div>
+        </div>
+        
+        <div class="mt-3 flex gap-2">
+          <input v-model="input" @keyup.enter="send" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs" placeholder="輸入需求..." />
+          <button @click="send" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs">送出</button>
+        </div>
+        
+        <!-- 任務佇列 -->
+        <div class="mt-4 border-t border-slate-800 pt-3">
+          <div class="text-xs text-slate-300 mb-2">任務佇列</div>
+          <div class="space-y-1 max-h-40 overflow-y-auto">
+            <div v-for="t in tasks" :key="t.id" class="text-xs bg-slate-900 border border-slate-800 rounded p-2">
+              <div class="flex items-center justify-between">
+                <span class="text-slate-200">[[ t.id.substring(0,8) ]]</span>
+                <span class="text-slate-400">[[ t.status ]]</span>
+              </div>
+              <div class="text-slate-500 truncate">[[ t.objective ]]</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 第三欄：軟件模擬瀏覽器 (4格) -->
+      <div class="lg:col-span-4 space-y-4">
+        <div class="card rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-sm text-slate-300">軟件模擬瀏覽器</div>
+            <div class="flex gap-1">
+              <button @click="browserBack" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs">←</button>
+              <button @click="browserForward" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs">→</button>
+              <button @click="refreshBrowser" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs">↻</button>
+            </div>
+          </div>
+          
+          <!-- 瀏覽器框架 -->
+          <div class="browser-frame">
+            <div class="browser-toolbar">
+              <span class="text-xs text-slate-400">🔒</span>
+              <input v-model="browserUrl" @keyup.enter="navigateBrowser" class="browser-url" placeholder="輸入網址或軟件名稱..." />
+              <button @click="navigateBrowser" class="px-3 py-1 rounded bg-blue-600 text-xs">前往</button>
+            </div>
+            <div class="browser-content mini-browser">
+              <!-- 軟件模擬內容 -->
+              <div v-if="browserContent.type === 'software'">
+                <h3>[[ browserContent.title ]]</h3>
+                <div class="bg-slate-100 rounded p-3 mb-3">
+                  <div class="flex gap-2 mb-2">
+                    <button v-for="btn in browserContent.buttons" :key="btn" @click="simulateAction(btn)"
+                      class="px-3 py-1 rounded bg-blue-500 text-white text-xs hover:bg-blue-600">
+                      [[ btn ]]
+                    </button>
+                  </div>
+                  <div v-for="(field, idx) in browserContent.fields" :key="idx" class="mb-2">
+                    <label class="text-xs text-slate-600 block mb-1">[[ field.label ]]</label>
+                    <input v-model="field.value" class="border rounded px-2 py-1 text-xs w-full" :placeholder="field.placeholder" />
+                  </div>
+                </div>
+                <div class="text-xs text-slate-500">
+                  模擬延遲: [[ browserContent.latency ]]ms | Token: [[ browserContent.tokenCount ]]
+                </div>
+              </div>
+              
+              <!-- 空白狀態 -->
+              <div v-else class="text-center text-slate-400 py-8">
+                <div class="text-3xl mb-2">📱</div>
+                <div class="text-xs">輸入軟件名稱或功能開始模擬</div>
+                <div class="text-[10px] text-slate-500 mt-2">
+                  支援: Excel, Word, LINE, Email, 瀏覽器...
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 同步數據流 -->
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">同步數據流</div>
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-400">討論 → 瀏覽器</span>
+              <span :class="syncDiscussionToBrowser ? 'text-green-400' : 'text-slate-500'">
+                [[ syncDiscussionToBrowser ? '已同步' : '未同步' ]]
+              </span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-400">瀏覽器 → AI</span>
+              <span :class="syncBrowserToAi ? 'text-green-400' : 'text-slate-500'">
+                [[ syncBrowserToAi ? '已同步' : '未同步' ]]
+              </span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-400">Token 使用</span>
+              <span class="text-cyan-400">[[ tokenUsage ]] / [[ tokenLimit ]]</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 快捷軟件模板 -->
+        <div class="card rounded-xl p-4">
+          <div class="text-sm text-slate-300 mb-3">快捷軟件</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button v-for="soft in softwareTemplates" :key="soft.name" @click="openSoftware(soft)"
+              class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs border border-slate-700">
+              <span class="block">[[ soft.icon ]]</span>
+              <span class="text-slate-300">[[ soft.name ]]</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, computed, onMounted, watch } = Vue;
+    createApp({
+      setup() {
+        // 狀態
+        const providers = ['ollama', 'cursor', 'gemini', 'claude', 'codebuddy'];
+        const provider = ref('ollama');
+        const mode = ref('daily');
+        const modeOutput = ref('');
+        const sessionId = ref('hub-' + Date.now());
+        const input = ref('');
+        const logs = ref([]);
+        const taskObjective = ref('');
+        const taskContext = ref('');
+        const taskAutoRun = ref(true);
+        const tasks = ref([]);
+        const semanticText = ref('');
+        const smartGuiInstruction = ref('');
+        const smartGuiExecute = ref(true);
+        const smartGuiMaxActions = ref(8);
+        const dataFormat = ref('token');
+        const wsConnected = ref(false);
+        
+        // 瀏覽器狀態
+        const browserUrl = ref('');
+        const browserContent = ref({ type: 'blank' });
+        const browserHistory = ref([]);
+        const historyIndex = ref(-1);
+        
+        // 同步狀態
+        const syncDiscussionToBrowser = ref(true);
+        const syncBrowserToAi = ref(true);
+        const tokenUsage = ref(0);
+        const tokenLimit = ref(100000);
+        const tokenSavings = ref(65);
+        
+        // 軟件模板
+        const softwareTemplates = ref([
+          { name: 'Excel', icon: '📊', type: 'spreadsheet' },
+          { name: 'Word', icon: '📝', type: 'document' },
+          { name: 'LINE', icon: '💬', type: 'messenger' },
+          { name: 'Email', icon: '📧', type: 'email' },
+          { name: '瀏覽器', icon: '🌐', type: 'browser' },
+          { name: '終端機', icon: '💻', type: 'terminal' },
+        ]);
+
+        // 壓縮數據預覽
+        const compactDataPreview = computed(() => {
+          if (logs.value.length === 0) return '// 無數據';
+          const recent = logs.value.slice(-3);
+          // Token-Optimized 格式
+          const optimized = recent.map(m => ({
+            t: m.time.split(':').slice(0,2).join(':'), // 簡化時間
+            r: m.role.substring(0,1).toUpperCase(),   // 簡化角色
+            c: m.text.substring(0, 100) + (m.text.length > 100 ? '...' : '') // 截斷文字
+          }));
+          return JSON.stringify(optimized, null, 2);
+        });
+
+        const now = () => new Date().toLocaleTimeString();
+        const push = (role, text) => logs.value.push({ role, text, time: now() });
+
+        // 瀏覽器功能
+        function navigateBrowser() {
+          const url = browserUrl.value.toLowerCase();
+          let content = { type: 'software', title: '', buttons: [], fields: [], latency: 150, tokenCount: 45 };
+          
+          if (url.includes('excel') || url.includes('試算表')) {
+            content.title = '📊 Excel 模擬';
+            content.buttons = ['開啟檔案', '儲存', '新增圖表', '篩選'];
+            content.fields = [
+              { label: '儲存格 A1', value: ref(''), placeholder: '輸入值' },
+              { label: '儲存格 B1', value: ref(''), placeholder: '輸入值' },
+            ];
+          } else if (url.includes('line') || url.includes('訊息')) {
+            content.title = '💬 LINE 模擬';
+            content.buttons = ['傳送訊息', '開啟圖片', '語音輸入'];
+            content.fields = [
+              { label: '訊息內容', value: ref(''), placeholder: '輸入訊息...' },
+            ];
+          } else if (url.includes('email') || url.includes('郵件')) {
+            content.title = '📧 Email 模擬';
+            content.buttons = ['傳送', '加入附件', '草稿'];
+            content.fields = [
+              { label: '收件人', value: ref(''), placeholder: 'email@example.com' },
+              { label: '主旨', value: ref(''), placeholder: '輸入主旨' },
+            ];
+          } else if (url.includes('終端') || url.includes('terminal')) {
+            content.title = '💻 終端機模擬';
+            content.buttons = ['執行', '清除', '中斷'];
+            content.fields = [
+              { label: '命令', value: ref(''), placeholder: '輸入命令...' },
+            ];
+          } else {
+            content.title = '🌐 瀏覽器模擬';
+            content.buttons = ['搜尋', '開新分頁', '書籤'];
+            content.fields = [
+              { label: '搜尋', value: ref(''), placeholder: '輸入關鍵字...' },
+            ];
+          }
+          
+          browserContent.value = content;
+          browserHistory.value.push({ url: browserUrl.value, content });
+          historyIndex.value = browserHistory.value.length - 1;
+          push('system', `已開啟: ${content.title}`);
+        }
+
+        function browserBack() {
+          if (historyIndex.value > 0) {
+            historyIndex.value--;
+            browserUrl.value = browserHistory.value[historyIndex.value].url;
+            browserContent.value = browserHistory.value[historyIndex.value].content;
+          }
+        }
+
+        function browserForward() {
+          if (historyIndex.value < browserHistory.value.length - 1) {
+            historyIndex.value++;
+            browserUrl.value = browserHistory.value[historyIndex.value].url;
+            browserContent.value = browserHistory.value[historyIndex.value].content;
+          }
+        }
+
+        function refreshBrowser() {
+          if (browserUrl.value) {
+            navigateBrowser();
+          }
+        }
+
+        function simulateAction(action) {
+          push('browser', `執行: ${action}`);
+          setTimeout(() => {
+            push('system', `${action} 完成 (延遲: ${browserContent.value.latency}ms)`);
+          }, browserContent.value.latency);
+        }
+
+        function openSoftware(soft) {
+          browserUrl.value = soft.name;
+          navigateBrowser();
+        }
+
+        // API 函數
+        async function send() {
+          const text = (input.value || '').trim();
+          if (!text) return;
+          push('user', text);
+          input.value = '';
+          
+          try {
+            const r = await fetch('/api/remote/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                provider: provider.value,
+                message: text,
+                session_id: sessionId.value,
+                max_turns: 12,
+                format: dataFormat.value
+              })
+            });
+            const j = await r.json();
+            push(j.provider_mapping || provider.value, j.reply || '(no response)');
+          } catch (e) {
+            push('system', '呼叫失敗: ' + String(e));
+          }
+        }
+
+        async function createTask() {
+          const objective = (taskObjective.value || '').trim();
+          if (!objective) return;
+          try {
+            const r = await fetch('/api/agent/tasks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                objective,
+                context: taskContext.value || '',
+                provider: provider.value,
+                auto_run: taskAutoRun.value,
+                format: dataFormat.value
+              })
+            });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `任務已建立: ${j.task.id}`);
+              taskObjective.value = '';
+              taskContext.value = '';
+              await loadTasks();
+            }
+          } catch (e) {
+            push('system', '建立任務失敗: ' + String(e));
+          }
+        }
+
+        async function createSmartGuiTask() {
+          const instruction = (smartGuiInstruction.value || '').trim();
+          if (!instruction) return;
+          try {
+            const r = await fetch('/api/agent/tasks/smart-gui', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                instruction,
+                execute: !!smartGuiExecute.value,
+                max_actions: Number(smartGuiMaxActions.value || 8),
+                format: dataFormat.value
+              })
+            });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `Smart GUI 任務: ${j.task.id}`);
+            }
+          } catch (e) {
+            push('system', '建立失敗: ' + String(e));
+          }
+        }
+
+        async function createSemanticRouteTask() {
+          const text = (semanticText.value || '').trim();
+          if (!text) return;
+          try {
+            const r = await fetch('/api/agent/tasks/semantic-route', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text, auto_run: true, format: dataFormat.value })
+            });
+            const j = await r.json();
+            if (j.ok) {
+              push('agent', `語義路由: ${j.route_id}`);
+              semanticText.value = '';
+            }
+          } catch (e) {
+            push('system', '建立失敗: ' + String(e));
+          }
+        }
+
+        async function switchMode(m) {
+          modeOutput.value = '切換中...';
+          try {
+            const r = await fetch('/api/system/mode/switch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mode: m })
+            });
+            const j = await r.json();
+            mode.value = m;
+            modeOutput.value = (j.output || '切換成功').toString();
+          } catch (e) {
+            modeOutput.value = String(e);
+          }
+        }
+
+        async function loadTasks() {
+          try {
+            const r = await fetch('/api/agent/tasks');
+            const j = await r.json();
+            tasks.value = j.tasks || [];
+          } catch (e) {
+            push('system', '載入任務失敗: ' + String(e));
+          }
+        }
+
+        // 監聽討論區變化，同步到瀏覽器
+        watch(logs, (newLogs) => {
+          if (syncDiscussionToBrowser.value && newLogs.length > 0) {
+            const lastMsg = newLogs[newLogs.length - 1];
+            if (lastMsg.role === 'ai' || lastMsg.role === 'agent') {
+              const text = lastMsg.text.toLowerCase();
+              if (text.includes('開啟') || text.includes('開excel') || text.includes('開line')) {
+                const soft = softwareTemplates.value.find(s => text.includes(s.name.toLowerCase()));
+                if (soft) openSoftware(soft);
+              }
+            }
+          }
+        }, { deep: true });
+
+        onMounted(async () => {
+          wsConnected.value = true;
+          push('system', 'Agent Hub 已就緒 (三欄式佈局)');
+          push('system', 'Token 壓縮格式: ' + dataFormat.value);
+          await loadTasks();
+          setInterval(loadTasks, 5000);
+        });
+
+        return {
+          providers, provider, mode, modeOutput, input, logs, send,
+          taskObjective, taskContext, taskAutoRun, createTask,
+          semanticText, createSemanticRouteTask,
+          smartGuiInstruction, smartGuiExecute, smartGuiMaxActions, createSmartGuiTask,
+          dataFormat, compactDataPreview,
+          browserUrl, browserContent, browserBack, browserForward, refreshBrowser, navigateBrowser, simulateAction, openSoftware,
+          softwareTemplates, syncDiscussionToBrowser, syncBrowserToAi, tokenUsage, tokenLimit, tokenSavings, wsConnected,
+          switchMode, loadTasks
+        };
+      },
+      delimiters: ['[[', ']]']
+    }).mount('#app');
+  </script>
+</body>
+</html>

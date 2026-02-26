@@ -1326,13 +1326,19 @@ ai_service = UnifiedAIService()
 # ========== FastAPI App ==========
 app = FastAPI(title="築未科技 AI 對話系統", version="1.0.0")
 
-# CORS
+# CORS - Phase 1.3 安全修復：使用白名單限制來源
+# 從環境變數讀取允許的來源，預設為築未科技域名
+CORS_ORIGINS = os.environ.get(
+    "CORS_ORIGINS",
+    "https://zhe-wei.net,https://brain.zhe-wei.net,https://www.zhe-wei.net,http://localhost:3000,http://localhost:8000,http://localhost:8002"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,  # 白名單限制
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 限制方法
+    allow_headers=["Content-Type", "Authorization", "Accept"],  # 限制標頭
 )
 
 # ========== 路由 ==========

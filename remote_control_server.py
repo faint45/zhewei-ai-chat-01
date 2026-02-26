@@ -23,6 +23,7 @@ from pydantic import BaseModel
 import subprocess
 import threading
 import queue
+import shlex
 
 # 配置日誌
 logging.basicConfig(
@@ -38,13 +39,18 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# 配置 CORS
+# 配置 CORS - Phase 1.3 安全修復：使用白名單限制來源
+CORS_ORIGINS_REMOTE = os.environ.get(
+    "CORS_ORIGINS",
+    "https://zhe-wei.net,https://brain.zhe-wei.net,http://localhost:3000,http://localhost:5100"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS_REMOTE,  # 白名單限制
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 限制方法
+    allow_headers=["Content-Type", "Authorization", "Accept"],  # 限制標頭
 )
 
 # 靜態文件目錄
@@ -144,23 +150,34 @@ class LocalAIController:
             return f"執行AI指令時出錯: {e}"
     
     def execute_system_command(self, command: str) -> str:
-        """執行系統指令"""
+        """
+        執行系統指令（Phase 1.2 安全修復）
+        使用 shlex.split() 安全解析，shell=False 防止注入
+        """
         try:
+            # 安全解析命令
+            args = shlex.split(command)
+            if not args:
+                return "錯誤：命令格式無效"
+
+            # 使用列表形式執行（shell=False）
             result = subprocess.run(
-                command,
-                shell=True,
+                args,
+                shell=False,  # 關鍵安全修復
                 capture_output=True,
                 text=True,
                 timeout=60
             )
-            
+
             if result.returncode == 0:
                 return result.stdout if result.stdout else "指令執行成功"
             else:
                 return f"指令執行失敗: {result.stderr}"
-                
+
         except subprocess.TimeoutExpired:
             return "指令執行超時"
+        except ValueError as e:
+            return f"命令解析錯誤: {e}"
         except Exception as e:
             return f"執行系統指令時出錯: {e}"
 
@@ -619,8 +636,8 @@ if __name__ == "__main__":
     import uvicorn
     
     logger.info("啟動築未科技遠程控制服務器...")
-    logger.info("控制面板: http://localhost:8003")
-    logger.info("API文檔: http://localhost:8003/docs")
+    logger.info("控制面板: http://localhost:8005")
+    logger.info("API文檔: http://localhost:8005/docs")
     
     # 檢查Ollama狀態
     status, message = ai_controller.check_ollama_status()

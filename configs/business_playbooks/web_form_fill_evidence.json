@@ -1,0 +1,31 @@
+{
+  "id": "web_form_fill_evidence",
+  "name": "網頁重複填報與截圖存證",
+  "description": "依模板執行網頁填報，提交前後截圖，輸出可稽核證據。",
+  "category": "business",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "title": "Smart GUI 執行網頁填報",
+      "execution": "host_script",
+      "job_type": "smart_gui_agent",
+      "provider": "desktop",
+      "args": {
+        "instruction": "開啟 target_url，依流程填寫表單欄位，送出前先截圖，送出後再截圖。",
+        "execute": true,
+        "max_actions": 14,
+        "retry_count": 4
+      }
+    },
+    {
+      "title": "全螢幕 VLM 驗證送出成功",
+      "execution": "host_script",
+      "job_type": "screen_vlm_query",
+      "provider": "desktop",
+      "args": {
+        "question": "請判斷此畫面是否顯示提交成功，輸出 JSON：success(boolean)、message、evidence_hint。"
+      }
+    }
+  ]
+}
+

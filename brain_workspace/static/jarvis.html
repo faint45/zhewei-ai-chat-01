@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <title>Jarvis — 築未科技 AI 助理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        html,body{height:100%;overflow:hidden}
+        body{font-family:'Inter','Noto Sans TC',sans-serif;-webkit-tap-highlight-color:transparent}
+        .glass{background:rgba(15,23,42,.8);backdrop-filter:blur(12px)}
+        .scroll-area{overflow-y:auto;overscroll-behavior:contain}
+        .scroll-area::-webkit-scrollbar{width:3px}
+        .scroll-area::-webkit-scrollbar-thumb{background:rgba(100,116,139,.25);border-radius:2px}
+        .bubble-user{background:linear-gradient(135deg,#1e40af,#2563eb);border-radius:18px 18px 4px 18px}
+        .bubble-ai{background:rgba(30,41,59,.9);border:1px solid rgba(51,65,85,.5);border-radius:18px 18px 18px 4px}
+        .bubble-ai pre{background:rgba(0,0,0,.35);border-radius:8px;padding:10px;overflow-x:auto;margin:6px 0}
+        .bubble-ai code{font-size:13px}
+        .bubble-ai p{margin:3px 0;line-height:1.65}
+        .bubble-ai ul,.bubble-ai ol{padding-left:1.2em;margin:3px 0}
+        .typing-dots span{display:inline-block;width:5px;height:5px;border-radius:50%;background:#64748b;margin:0 2px;animation:bounce 1.4s infinite}
+        .typing-dots span:nth-child(2){animation-delay:.15s}
+        .typing-dots span:nth-child(3){animation-delay:.3s}
+        @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+        .fade-in{animation:fadeIn .25s ease-out}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+        .btn{background:linear-gradient(135deg,#2563eb,#1d4ed8);transition:all .12s}
+        .btn:hover{filter:brightness(1.08)}.btn:active{filter:brightness(.95)}.btn:disabled{opacity:.35;pointer-events:none}
+        .field{background:rgba(15,23,42,.5);border:1px solid rgba(51,65,85,.5);transition:border-color .15s;color:#e2e8f0}
+        .field:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.12);outline:none}
+        .tab-btn{transition:color .15s}.tab-btn.active{color:#3b82f6}.tab-btn.active .tab-dot{background:#3b82f6}
+        .tab-dot{width:4px;height:4px;border-radius:50%;background:transparent;margin-top:1px;transition:background .15s}
+        .card{background:rgba(20,30,50,.6);border:1px solid rgba(51,65,85,.4);border-radius:16px}
+        .safe-b{padding-bottom:env(safe-area-inset-bottom,0px)}
+        .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;opacity:0;transition:opacity .2s}
+        .drawer-overlay.open{opacity:1}
+        .drawer{position:fixed;top:0;left:0;bottom:0;width:280px;max-width:80vw;background:#0d1117;border-right:1px solid rgba(51,65,85,.4);z-index:50;transform:translateX(-100%);transition:transform .25s ease}
+        .drawer.open{transform:translateX(0)}
+        .code-pane{display:flex;flex-direction:column;height:100%}
+        @media(min-width:768px){.code-pane{flex-direction:row}}
+        .code-left{flex:1;min-height:0;display:flex;flex-direction:column;border-bottom:1px solid rgba(51,65,85,.4)}
+        @media(min-width:768px){.code-left{border-bottom:none;border-right:1px solid rgba(51,65,85,.4);max-width:50%}}
+        .code-right{flex:1;min-height:0;position:relative;background:#fff}
+        .code-right iframe{width:100%;height:100%;border:none}
+    </style>
+</head>
+<body class="bg-[#0a0a0f] text-slate-200 antialiased">
+
+<div id="app" class="h-full flex flex-col">
+
+    <!-- Chat History Drawer Overlay -->
+    <div class="drawer-overlay" :class="{open:historyOpen}" @click="historyOpen=false" v-show="historyOpen"></div>
+    <!-- Chat History Drawer -->
+    <div class="drawer scroll-area" :class="{open:historyOpen}">
+        <div class="p-4">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm font-semibold text-white">對話紀錄</h2>
+                <button @click="historyOpen=false" class="text-slate-400 hover:text-white p-1">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <button @click="newChat();historyOpen=false" class="w-full btn text-white text-xs py-2 rounded-lg mb-3 font-medium">+ 新對話</button>
+            <div class="space-y-1">
+                <div v-for="h in chatHistory" :key="h.id" @click="loadChatHistory(h.id)"
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-800/60 transition group"
+                    :class="currentChatId===h.id?'bg-slate-800/80 border border-blue-500/30':''">
+                    <svg class="w-4 h-4 text-slate-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-[12px] text-slate-300 truncate">[[ h.title ]]</div>
+                        <div class="text-[10px] text-slate-600">[[ h.updated?.slice(0,10) ]]</div>
+                    </div>
+                    <button @click.stop="deleteChatHistory(h.id)" class="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-rose-400 p-0.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </div>
+                <p v-if="!chatHistory.length" class="text-[11px] text-slate-600 text-center py-4">尚無紀錄</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Bar -->
+    <header class="shrink-0 glass border-b border-slate-700/40 px-3 py-2 flex items-center gap-2 z-10">
+        <button v-if="activeTab==='chat'" @click="historyOpen=!historyOpen" class="p-1.5 rounded-lg hover:bg-slate-700/40 text-slate-400" title="對話紀錄">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M4 12h16M4 18h7"/></svg>
+        </button>
+        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white font-bold text-xs shadow shrink-0">J</div>
+        <div class="flex-1 min-w-0">
+            <h1 class="text-sm font-semibold text-white truncate">[[ tabLabels[activeTab] ]]</h1>
+            <div class="flex items-center gap-1.5 text-[10px]">
+                <span :class="wsConnected?'text-emerald-400':'text-rose-400'">[[ wsConnected?'● 已連線':'○ 連線中' ]]</span>
+                <span class="text-slate-500" v-if="kbCount!=='...'">· KB [[ kbCount ]]</span>
+            </div>
+        </div>
+        <select v-if="activeTab==='learn'" v-model="learnProvider" title="AI 來源" class="field rounded-lg px-2 py-1 text-xs text-slate-300">
+            <option value="groq">Groq</option><option value="deepseek">DeepSeek</option><option value="mistral">Mistral</option><option value="qwen">千尋</option><option value="gemini">Gemini</option>
+        </select>
+        <button v-if="activeTab==='chat'" @click="saveChatHistory" title="儲存對話" class="p-1.5 rounded-lg hover:bg-slate-700/40 text-slate-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+        </button>
+        <button v-if="activeTab==='chat'" @click="newChat" title="新對話" class="p-1.5 rounded-lg hover:bg-slate-700/40 text-slate-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        </button>
+        <button v-if="activeTab==='code'" @click="codeViewMode=codeViewMode==='split'?'preview':'split'" class="p-1.5 rounded-lg hover:bg-slate-700/40 text-slate-400" title="切換檢視">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7"/></svg>
+        </button>
+        <button @click="doLogout" title="登出" class="p-1.5 rounded-lg hover:bg-slate-700/40 text-slate-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        </button>
+    </header>
+
+    <!-- Content Area -->
+    <div class="flex-1 min-h-0 relative">
+
+        <!-- === Chat === -->
+        <div v-show="activeTab==='chat'" class="absolute inset-0 flex flex-col">
+            <div ref="chatBox" class="flex-1 scroll-area">
+                <div class="max-w-2xl mx-auto px-4 py-4 space-y-3">
+                    <div v-if="messages.length===0" class="flex flex-col items-center justify-center pt-[18vh] text-center">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white text-xl font-bold mb-3 shadow-lg">J</div>
+                        <h2 class="text-lg font-semibold text-white mb-1">你好，我是 Jarvis</h2>
+                        <p class="text-slate-400 text-sm mb-5">築未科技 AI 助理</p>
+                        <div class="flex flex-wrap gap-2 justify-center max-w-sm">
+                            <button v-for="q in quickQ" :key="q" @click="userInput=q;sendChat()" class="px-3 py-1.5 rounded-full text-xs border border-slate-600/60 text-slate-400 hover:text-white hover:border-slate-500 transition">[[ q ]]</button>
+                        </div>
+                    </div>
+                    <div v-for="(msg,i) in messages" :key="i" class="fade-in" :class="msg.role==='user'?'flex justify-end':'flex justify-start'">
+                        <div v-if="msg.role==='ai'" class="flex gap-2 max-w-[88%] lg:max-w-[75%]">
+                            <div class="shrink-0 w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white text-[10px] font-bold mt-0.5">J</div>
+                            <div class="bubble-ai px-3.5 py-2.5 text-[13px] leading-relaxed" v-html="renderMd(msg.content)"></div>
+                        </div>
+                        <div v-else class="max-w-[88%] lg:max-w-[75%]">
+                            <div class="bubble-user px-3.5 py-2.5 text-[13px] text-white">[[ msg.content ]]</div>
+                        </div>
+                    </div>
+                    <div v-if="aiTyping" class="flex gap-2">
+                        <div class="shrink-0 w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white text-[10px] font-bold">J</div>
+                        <div class="bubble-ai px-3.5 py-2.5"><div class="typing-dots"><span></span><span></span><span></span></div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="shrink-0 border-t border-slate-700/40 bg-[#0a0a0f]">
+                <div class="max-w-2xl mx-auto px-3 py-2 flex gap-2 items-center">
+                    <!-- 語音輸入按鈕 -->
+                    <button @click="voice.isListening ? voice.stopListening() : voice.startListening()" 
+                            :disabled="!voice.recognitionSupported"
+                            class="p-2.5 rounded-xl transition-all"
+                            :class="voice.isListening.value ? 'bg-rose-500/20 text-rose-400 animate-pulse' : 'bg-slate-700/40 text-slate-400 hover:text-white'"
+                            title="語音輸入">
+                        <svg v-if="!voice.isListening.value" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                        </svg>
+                        <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                        </svg>
+                    </button>
+                    <input v-model="userInput" @keyup.enter="sendChat" type="text" class="flex-1 field rounded-xl px-3.5 py-2.5 text-sm" placeholder="輸入訊息…" enterkeyhint="send">
+                    <!-- 語音輸出開關 -->
+                    <button @click="voice.toggleAutoSpeak()" 
+                            class="p-2.5 rounded-xl transition-all"
+                            :class="voice.autoSpeak.value ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700/40 text-slate-500'"
+                            title="自動朗讀 AI 回應">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                        </svg>
+                    </button>
+                    <button @click="sendChat" :disabled="!userInput.trim()||aiTyping" class="btn text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow">發送</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- === Code === -->
+        <div v-show="activeTab==='code'" class="absolute inset-0">
+            <div class="code-pane">
+                <div class="code-left" :class="codeViewMode==='preview'?'hidden md:flex':''">
+                    <div class="p-3 border-b border-slate-700/40 flex items-center gap-2">
+                        <span class="text-xs font-semibold text-white flex-1">需求描述</span>
+                        <select v-model="codeLang" class="field rounded px-2 py-0.5 text-[11px]">
+                            <option value="html">HTML 網頁</option><option value="python">Python</option><option value="javascript">JavaScript</option><option value="react">React</option>
+                        </select>
+                    </div>
+                    <textarea v-model="codePrompt" class="flex-1 w-full bg-transparent border-0 px-3 py-3 text-sm resize-none text-slate-200 placeholder-slate-600 focus:outline-none" placeholder="描述你想要的網頁或軟體功能…&#10;&#10;例如：&#10;· 做一個計算機網頁，有漂亮的 UI&#10;· 做一個待辦事項 App&#10;· 做一個動態時鐘"></textarea>
+                    <div class="p-3 border-t border-slate-700/40 flex gap-2">
+                        <button @click="generateCode" :disabled="codeLoading||!codePrompt.trim()" class="btn text-white px-4 py-2 rounded-lg text-xs font-medium flex-1">
+                            [[ codeLoading ? '生成中…' : '生成程式碼' ]]
+                        </button>
+                        <button v-if="codeResult" @click="codeViewMode='preview'" class="md:hidden bg-slate-700/60 text-white px-3 py-2 rounded-lg text-xs">預覽</button>
+                    </div>
+                    <div v-if="codeError" class="px-3 pb-3"><p class="text-xs text-rose-400">[[ codeError ]]</p></div>
+                    <div v-if="codeResult" class="border-t border-slate-700/40 max-h-[30vh] md:max-h-[40vh] scroll-area">
+                        <div class="flex items-center justify-between px-3 py-1.5 bg-slate-900/50">
+                            <span class="text-[10px] text-slate-500">生成的程式碼</span>
+                            <button @click="copyCode" class="text-[10px] text-blue-400 hover:text-blue-300">[[ codeCopied?'已複製':'複製' ]]</button>
+                        </div>
+                        <pre class="px-3 py-2 text-[12px] text-slate-300 whitespace-pre-wrap break-all"><code>[[ codeResult ]]</code></pre>
+                    </div>
+                </div>
+                <div class="code-right" :class="codeViewMode==='split'?'hidden md:block':''">
+                    <div v-if="!codeResult" class="absolute inset-0 flex items-center justify-center bg-slate-900/30">
+                        <div class="text-center">
+                            <svg class="w-12 h-12 text-slate-700 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+                            <p class="text-sm text-slate-600">輸入需求後生成預覽</p>
+                        </div>
+                    </div>
+                    <iframe v-if="codeResult" ref="previewFrame" sandbox="allow-scripts allow-modals allow-forms allow-popups" title="Preview" class="w-full h-full"></iframe>
+                    <button v-if="codeResult&&codeViewMode==='preview'" @click="codeViewMode='split'" class="md:hidden absolute top-2 left-2 bg-slate-800/90 text-white text-[11px] px-3 py-1.5 rounded-lg border border-slate-600/40">返回編輯</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- === Image === -->
+        <div v-show="activeTab==='image'" class="absolute inset-0 scroll-area">
+            <div class="max-w-lg mx-auto px-4 py-5 space-y-4">
+                <div class="card p-5">
+                    <h3 class="text-sm font-semibold text-white mb-1">🎨 文字生圖</h3>
+                    <p class="text-[11px] text-slate-500 mb-3">ComfyUI + Stable Diffusion · 英文 prompt 效果最佳</p>
+                    <textarea v-model="imgPrompt" rows="3" class="w-full field rounded-xl px-3.5 py-2.5 text-sm resize-none" placeholder="a modern glass building, rooftop garden, 4k"></textarea>
+                    <button @click="generateImage" :disabled="imgLoading||!imgPrompt.trim()" class="btn text-white px-5 py-2 rounded-xl text-sm font-medium mt-3">[[ imgLoading?'生成中…':'生成圖片' ]]</button>
+                    <span v-if="imgLoading" class="text-[11px] text-slate-500 ml-2">約 30-60 秒</span>
+                </div>
+                <div v-if="imgResult" class="card p-4 fade-in"><p class="text-sm text-emerald-400">✅ [[ imgResult ]]</p></div>
+                <div v-if="imgError" class="card p-4 fade-in"><p class="text-sm text-rose-400">❌ [[ imgError ]]</p></div>
+            </div>
+        </div>
+
+        <!-- === Learn === -->
+        <div v-show="activeTab==='learn'" class="absolute inset-0 scroll-area">
+            <div class="max-w-lg mx-auto px-4 py-5 space-y-4">
+                <!-- 角色選擇器 -->
+                <div class="card p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-semibold text-white">👤 專業角色</h3>
+                        <button @click="activeRole=''" class="text-[10px] px-2 py-0.5 rounded-full" :class="!activeRole?'bg-blue-500/20 text-blue-400':'text-slate-500 hover:text-slate-300'">通識（大智庫）</button>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button v-for="role in roles" :key="role.id" @click="activeRole=role.id"
+                            class="text-[11px] px-2.5 py-1 rounded-lg border transition-all"
+                            :class="activeRole===role.id?'border-blue-500/50 bg-blue-500/10 text-blue-400':'border-slate-700/40 text-slate-400 hover:border-slate-600 hover:text-slate-300'"
+                            :title="role.description">
+                            [[ role.icon ]] [[ role.name ]]
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-slate-600 mt-2" v-if="activeRole">[[ roles.find(r=>r.id===activeRole)?.description ]]</p>
+                </div>
+                <div class="card p-5">
+                    <h3 class="text-sm font-semibold text-white mb-1">🧠 學習大模型精華</h3>
+                    <p class="text-[11px] text-slate-500 mb-3">問大模型 → 萃取精華 → 寫入<span v-if="activeRole" class="text-blue-400">角色</span>知識庫</p>
+                    <textarea v-model="learnQuestion" rows="2" class="w-full field rounded-xl px-3.5 py-2.5 text-sm resize-none" title="學習問題" placeholder="輸入學習問題…" :placeholder="activeRole?'以 '+roles.find(r=>r.id===activeRole)?.name+' 視角學習…':'例：ControlNet 如何將線稿轉為渲染圖？'"></textarea>
+                    <button @click="askAndLearn" :disabled="learnLoading||!learnQuestion.trim()" class="btn text-white px-5 py-2 rounded-xl text-sm font-medium mt-3">[[ learnLoading?'學習中…':'問 & 學' ]]</button>
+                    <span v-if="activeRole" class="text-[10px] text-blue-400/60 ml-2">→ [[ roles.find(r=>r.id===activeRole)?.name ]]庫</span>
+                </div>
+                <div v-if="learnResult" class="card p-4 fade-in space-y-2">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-[11px] px-2 py-0.5 rounded-full" :class="learnResult.learned?'bg-emerald-500/15 text-emerald-400':'bg-amber-500/15 text-amber-400'">[[ learnResult.learned?'✅ 已學習':'⚠️ 未寫入' ]]</span>
+                        <span class="text-[11px] text-slate-500">來源: [[ learnResult.source ]]</span>
+                    </div>
+                    <div class="text-[13px] text-slate-300 leading-relaxed" v-html="renderMd(learnResult.essence||'')"></div>
+                    <details class="text-[11px] text-slate-500"><summary class="cursor-pointer hover:text-slate-300">展開完整回答</summary><div class="mt-2 text-slate-400 text-[12px] leading-relaxed" v-html="renderMd(learnResult.answer||'')"></div></details>
+                </div>
+                <div class="card p-5">
+                    <h3 class="text-sm font-semibold text-white mb-2">📚 批次學習</h3>
+                    <textarea v-model="batchTopics" rows="3" class="w-full field rounded-xl px-3.5 py-2.5 text-sm resize-none" placeholder="每行一個主題…"></textarea>
+                    <button @click="batchLearn" :disabled="batchLoading||!batchTopics.trim()" class="btn text-white px-5 py-2 rounded-xl text-sm font-medium mt-3">[[ batchLoading?'學習中…':'批次學習' ]]</button>
+                </div>
+                <div v-if="batchResult" class="card p-4 fade-in">
+                    <p class="text-sm text-emerald-400 mb-2">完成 [[ batchResult.learned ]]/[[ batchResult.total ]]</p>
+                    <div v-for="r in batchResult.results" :key="r.topic" class="text-[11px] py-0.5">
+                        <span :class="r.learned?'text-emerald-400':'text-slate-500'">[[ r.learned?'✅':'⏭️' ]]</span>
+                        <span class="text-slate-300 ml-1">[[ r.topic ]]</span><span class="text-slate-600 ml-1">([[ r.source ]])</span>
+                    </div>
+                </div>
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold text-white">📊 學習統計</h3><button @click="loadStats" class="text-[11px] text-blue-400 hover:text-blue-300">重新整理</button></div>
+                    <div v-if="learnStats" class="grid grid-cols-2 gap-2">
+                        <div class="bg-slate-800/40 rounded-xl p-2.5 text-center"><div class="text-xl font-bold text-white">[[ learnStats.total ]]</div><div class="text-[10px] text-slate-500">學習次數</div></div>
+                        <div class="bg-slate-800/40 rounded-xl p-2.5 text-center"><div class="text-xl font-bold text-emerald-400">[[ learnStats.learned ]]</div><div class="text-[10px] text-slate-500">成功寫入</div></div>
+                        <div v-for="(count,src) in learnStats.by_source" :key="src" class="bg-slate-800/40 rounded-xl p-2.5 text-center"><div class="text-base font-bold text-blue-400">[[ count ]]</div><div class="text-[10px] text-slate-500">[[ src ]]</div></div>
+                    </div>
+                    <p v-else class="text-[11px] text-slate-600">點擊「重新整理」載入</p>
+                </div>
+                <!-- Token 省費統計 -->
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold text-white">💰 Token 省費</h3><button @click="learn.updateTokenStats()" class="text-[11px] text-blue-400 hover:text-blue-300">重新整理</button></div>
+                    <div v-if="learn.tokenStats" class="grid grid-cols-2 gap-2">
+                        <div class="bg-slate-800/40 rounded-xl p-2.5 text-center"><div class="text-xl font-bold text-emerald-400">[[ learn.tokenStats.cached ]]</div><div class="text-[10px] text-slate-500">快取筆數</div></div>
+                        <div class="bg-slate-800/40 rounded-xl p-2.5 text-center"><div class="text-xl font-bold text-blue-400">[[ learn.tokenStats.savedTokens ]]</div><div class="text-[10px] text-slate-500">節省 Token</div></div>
+                    </div>
+                    <p v-else class="text-[11px] text-slate-600">載入中…</p>
+                </div>
+                <!-- 角色知識庫統計 -->
+                <div class="card p-5" v-if="roleStats">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-white">🏢 角色知識庫</h3>
+                        <button @click="loadRoleStats" class="text-[11px] text-blue-400 hover:text-blue-300">重新整理</button>
+                    </div>
+                    <div class="bg-slate-800/40 rounded-xl p-2.5 text-center mb-3">
+                        <div class="text-xl font-bold text-white">[[ roleStats.master_count ]]</div>
+                        <div class="text-[10px] text-slate-500">大智庫（通識）</div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <div v-for="rs in roleStats.roles" :key="rs.id"
+                            class="bg-slate-800/40 rounded-lg p-2 text-center cursor-pointer transition-all hover:bg-slate-700/40"
+                            :class="activeRole===rs.id?'ring-1 ring-blue-500/40':''"
+                            @click="activeRole=rs.id">
+                            <div class="text-sm">[[ rs.icon ]]</div>
+                            <div class="text-base font-bold" :class="rs.count>0?'text-blue-400':'text-slate-600'">[[ rs.count ]]</div>
+                            <div class="text-[9px] text-slate-500 truncate">[[ rs.name ]]</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- MCP 工作流 -->
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-white">⚡ MCP 工作流</h3>
+                        <button @click="loadWorkflows" class="text-[11px] text-blue-400 hover:text-blue-300">重新整理</button>
+                    </div>
+                    <!-- 建立新工作流 -->
+                    <div v-if="activeRole" class="mb-3">
+                        <textarea v-model="wfIdea" rows="2" class="w-full field rounded-xl px-3.5 py-2.5 text-sm resize-none" title="工作流想法" placeholder="描述你的想法，AI 會分析並用 MCP 工具執行…"></textarea>
+                        <button @click="createWorkflow" :disabled="wfCreating||!wfIdea.trim()||!activeRole" class="btn text-white px-4 py-1.5 rounded-xl text-xs font-medium mt-2">[[ wfCreating?'建立中…':'🚀 啟動工作流' ]]</button>
+                    </div>
+                    <p v-else class="text-[10px] text-slate-600 mb-3">請先選擇角色再啟動工作流</p>
+                    <!-- 當前工作流 -->
+                    <div v-if="activeWf" class="border border-slate-700/40 rounded-xl p-3 mb-3 space-y-2">
+                        <div class="flex items-center gap-2 text-[12px]">
+                            <span>[[ activeWf.role_icon ]]</span>
+                            <span class="text-white font-medium truncate flex-1">[[ activeWf.title ]]</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded-full" :class="activeWf.status==='completed'?'bg-emerald-500/15 text-emerald-400':'bg-blue-500/15 text-blue-400'">[[ activeWf.status==='completed'?'已結案':'進行中' ]]</span>
+                        </div>
+                        <!-- 步驟進度條 -->
+                        <div class="flex gap-0.5">
+                            <div v-for="s in wfSteps" :key="s.id" class="flex-1 h-1.5 rounded-full"
+                                :class="activeWf.steps[s.id]?.status==='done'?'bg-emerald-500':activeWf.current_step===s.id?'bg-blue-500 animate-pulse':'bg-slate-700/50'"
+                                :title="s.name"></div>
+                        </div>
+                        <div class="text-[10px] text-slate-500">目前：[[ wfSteps.find(s=>s.id===activeWf.current_step)?.icon ]] [[ wfSteps.find(s=>s.id===activeWf.current_step)?.name ]]</div>
+                        <!-- 步驟輸出 -->
+                        <div v-for="s in wfSteps" :key="'out_'+s.id">
+                            <div v-if="activeWf.steps[s.id]?.output" class="mt-1">
+                                <details class="text-[11px]" :open="activeWf.current_step===s.id||wfSteps.indexOf(s)===wfSteps.findIndex(x=>x.id===activeWf.current_step)-1">
+                                    <summary class="cursor-pointer text-slate-400 hover:text-slate-300">[[ s.icon ]] [[ s.name ]]</summary>
+                                    <div class="mt-1 text-[11px] text-slate-400 leading-relaxed max-h-40 overflow-y-auto" v-html="renderMd(activeWf.steps[s.id].output)"></div>
+                                </details>
+                            </div>
+                        </div>
+                        <!-- 操作按鈕 -->
+                        <div v-if="activeWf.status==='active'" class="flex gap-2 pt-2 border-t border-slate-700/30">
+                            <textarea v-model="wfInput" rows="1" class="flex-1 field rounded-lg px-2.5 py-1.5 text-[11px] resize-none" title="回饋" placeholder="補充說明（可選）"></textarea>
+                            <button @click="advanceWf(true)" :disabled="wfAdvancing" class="text-[10px] px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-40">[[ wfAdvancing?'…':'✓ 確認' ]]</button>
+                            <button @click="advanceWf(false)" :disabled="wfAdvancing" class="text-[10px] px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium disabled:opacity-40">✗ 重做</button>
+                        </div>
+                    </div>
+                    <!-- 工作流列表 -->
+                    <div v-if="workflows.length" class="space-y-1">
+                        <div v-for="w in workflows.slice(0,5)" :key="w.id" @click="loadWorkflow(w.id)"
+                            class="flex items-center gap-2 py-1.5 text-[11px] border-b border-slate-700/20 last:border-0 cursor-pointer hover:bg-slate-800/30 rounded px-1 -mx-1">
+                            <span>[[ w.role_icon ]]</span>
+                            <span class="text-slate-300 truncate flex-1">[[ w.title ]]</span>
+                            <span class="text-[9px]" :class="w.status==='completed'?'text-emerald-500':'text-blue-400'">[[ w.status==='completed'?'✅':'⏳' ]]</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- === System / PC Control === -->
+        <div v-show="activeTab==='system'" class="absolute inset-0 scroll-area">
+            <div class="max-w-lg mx-auto px-4 py-5 space-y-4">
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold text-white">📸 遠端截圖</h3><button @click="takeScreenshot" :disabled="ssLoading" class="btn text-white px-4 py-1.5 rounded-lg text-xs font-medium">[[ ssLoading?'截圖中…':'截圖' ]]</button></div>
+                    <div v-if="ssImage" class="fade-in">
+                        <img :src="'data:image/png;base64,'+ssImage" alt="Screenshot" class="w-full rounded-lg border border-slate-700/40 cursor-pointer" @click="ssFullscreen=!ssFullscreen" :class="ssFullscreen?'fixed inset-4 z-50 w-auto h-auto max-w-full max-h-full object-contain bg-black/90 rounded-xl':''">
+                        <p class="text-[10px] text-slate-500 mt-1">[[ ssInfo ]] · 點擊放大</p>
+                    </div>
+                    <p v-if="ssError" class="text-xs text-rose-400 mt-2">[[ ssError ]]</p>
+                </div>
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold text-white">🖥️ 系統資訊</h3><button @click="loadSysinfo" class="text-[11px] text-blue-400 hover:text-blue-300">重新整理</button></div>
+                    <div v-if="sysData" class="space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="bg-slate-800/40 rounded-xl p-2.5 text-center"><div class="text-base font-bold text-white">[[ sysData.cpu_percent ]]%</div><div class="text-[10px] text-slate-500">CPU ([[ sysData.cpu_count ]] 核)</div></div>
+                            <div class="bg-slate-800/40 rounded-xl p-2.5 text-center"><div class="text-base font-bold" :class="sysData.memory?.percent>80?'text-rose-400':'text-emerald-400'">[[ sysData.memory?.percent ]]%</div><div class="text-[10px] text-slate-500">RAM [[ sysData.memory?.used_gb ]]G / [[ sysData.memory?.total_gb ]]G</div></div>
+                        </div>
+                        <div v-if="sysData.gpus?.length" v-for="g in sysData.gpus" :key="g.name" class="bg-slate-800/40 rounded-xl p-2.5">
+                            <div class="flex justify-between text-[12px]"><span class="text-slate-300 font-medium">[[ g.name ]]</span><span class="text-slate-400">[[ g.temp_c ]]°C</span></div>
+                            <div class="flex gap-3 mt-1 text-[11px]"><span class="text-slate-400">VRAM: <span class="text-white">[[ g.vram_used_mb ]]</span>/[[ g.vram_total_mb ]] MB</span><span class="text-slate-400">GPU: <span class="text-white">[[ g['gpu_util%'] ]]%</span></span></div>
+                        </div>
+                        <div v-if="sysData.disks?.length" class="space-y-1">
+                            <div v-for="d in sysData.disks" :key="d.mount" class="flex items-center gap-2 text-[11px]">
+                                <span class="text-slate-400 w-8">[[ d.mount ]]</span>
+                                <div class="flex-1 h-1.5 bg-slate-700/50 rounded-full overflow-hidden"><div class="h-full rounded-full" :class="d.percent>85?'bg-rose-500':'bg-blue-500'" :style="{width:d.percent+'%'}"></div></div>
+                                <span class="text-slate-500 w-16 text-right">[[ d.used_gb ]]G/[[ d.total_gb ]]G</span>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-500 pt-1 border-t border-slate-700/25">[[ sysData.hostname ]] · [[ sysData.os ]]</div>
+                    </div>
+                    <p v-else class="text-[11px] text-slate-600">點擊「重新整理」載入</p>
+                </div>
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold text-white">📊 程序 Top 10</h3><button @click="loadSysinfo" class="text-[11px] text-blue-400 hover:text-blue-300">重新整理</button></div>
+                    <div v-if="sysData?.top_processes" class="space-y-0.5">
+                        <div v-for="p in sysData.top_processes" :key="p.pid" class="flex items-center gap-2 text-[11px] py-0.5">
+                            <span class="text-slate-500 w-12 text-right">[[ p['mem%'] ]]%</span>
+                            <div class="flex-1 h-1 bg-slate-700/50 rounded-full overflow-hidden"><div class="h-full bg-cyan-500/70 rounded-full" :style="{width:Math.min(p['mem%']*5,100)+'%'}"></div></div>
+                            <span class="text-slate-300 truncate w-28">[[ p.name ]]</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold text-white">🪟 開啟視窗</h3><button @click="loadWindows" class="text-[11px] text-blue-400 hover:text-blue-300">重新整理</button></div>
+                    <div v-if="winList.length" class="space-y-1">
+                        <div v-for="w in winList" :key="w.title" class="text-[11px] py-1 border-b border-slate-700/20 last:border-0 flex items-center gap-2">
+                            <span :class="w.active?'text-emerald-400':'text-slate-500'" class="text-[9px]">[[ w.active?'●':'○' ]]</span>
+                            <span class="text-slate-300 truncate flex-1">[[ w.title ]]</span><span class="text-slate-600 text-[10px]">[[ w.w ]]×[[ w.h ]]</span>
+                        </div>
+                    </div>
+                    <p v-else class="text-[11px] text-slate-600">點擊「重新整理」載入</p>
+                </div>
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-white">🔍 系統自檢 & 修復</h3>
+                        <div class="flex gap-2">
+                            <button @click="runSelfCheck" :disabled="selfCheckLoading" class="text-[11px] text-blue-400 hover:text-blue-300 disabled:opacity-40">[[ selfCheckLoading ? '檢查中…' : '執行自檢' ]]</button>
+                            <button @click="runSelfRepair" :disabled="repairLoading" class="text-[11px] text-amber-400 hover:text-amber-300 disabled:opacity-40">[[ repairLoading ? '修復中…' : '自動修復' ]]</button>
+                        </div>
+                    </div>
+                    <p v-if="selfCheckError" class="text-xs text-rose-400 mb-2">[[ selfCheckError ]]</p>
+                    <p v-if="repairError" class="text-xs text-rose-400 mb-2">[[ repairError ]]</p>
+                    <div v-if="selfCheckData && selfCheckData.summary" class="space-y-1.5">
+                        <div v-for="item in selfCheckData.summary" :key="item.name" class="flex items-center gap-2 py-1.5 border-b border-slate-700/20 last:border-0">
+                            <span class="text-sm" :class="item.status==='pass'?'text-emerald-400':item.status==='warn'?'text-amber-400':'text-rose-400'">[[ item.status==='pass'?'✅':item.status==='warn'?'⚠️':'❌' ]]</span>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-[12px] text-slate-300 font-medium">[[ item.name ]]</div>
+                                <div class="text-[10px] text-slate-500 truncate">[[ item.detail ]]</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 pt-2 text-[10px]">
+                            <span :class="selfCheckData.ok?'text-emerald-400':'text-rose-400'" class="font-semibold">[[ selfCheckData.ok?'全部通過':'有項目未通過' ]]</span>
+                            <span class="text-slate-600">[[ selfCheckData.timestamp ]]</span>
+                        </div>
+                    </div>
+                    <div v-else-if="!selfCheckLoading" class="text-[11px] text-slate-600">點擊「執行自檢」檢查學習系統狀態</div>
+                    <div v-if="repairData && repairData.actions && repairData.actions.length" class="mt-3 pt-3 border-t border-slate-700/30">
+                        <div class="text-[11px] text-slate-400 mb-1">修復動作：</div>
+                        <div v-for="a in repairData.actions" :key="a" class="text-[10px] text-slate-500 py-0.5">[[ a ]]</div>
+                        <div v-if="repairData.errors && repairData.errors.length" class="mt-1">
+                            <div v-for="e in repairData.errors" :key="e" class="text-[10px] text-rose-400 py-0.5">[[ e ]]</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-semibold text-white">🧠 Brain Server</h3><button @click="loadHealth" class="text-[11px] text-blue-400 hover:text-blue-300">檢查</button></div>
+                    <div v-if="healthData" class="space-y-1 text-[12px]">
+                        <div class="flex justify-between py-1 border-b border-slate-700/20"><span class="text-slate-400">狀態</span><span :class="healthData.status==='healthy'?'text-emerald-400':'text-rose-400'">[[ healthData.status ]]</span></div>
+                        <div class="flex justify-between py-1 border-b border-slate-700/20"><span class="text-slate-400">Ollama</span><span :class="healthData.ollama?'text-emerald-400':'text-rose-400'">[[ healthData.ollama?'✅':'❌' ]]</span></div>
+                        <div v-for="(v,k) in healthData.dependencies_raw" :key="k" class="flex justify-between py-1 border-b border-slate-700/20"><span class="text-slate-400">[[ k ]]</span><span :class="v?'text-emerald-400':'text-rose-400'">[[ v?'✅':'❌' ]]</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Tab Bar (5 tabs) -->
+    <nav class="shrink-0 border-t border-slate-700/40 bg-[#0a0a0f] safe-b z-10">
+        <div class="max-w-lg mx-auto flex">
+            <button v-for="(t,key) in tabLabels" :key="key" @click="activeTab=key" :class="{active:activeTab===key}" class="tab-btn flex-1 flex flex-col items-center gap-0.5 py-2 text-slate-500">
+                <svg v-if="key==='chat'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                <svg v-if="key==='code'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+                <svg v-if="key==='image'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <svg v-if="key==='learn'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                <svg v-if="key==='system'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span class="text-[10px] font-medium">[[ t ]]</span>
+                <div class="tab-dot"></div>
+            </button>
+        </div>
+    </nav>
+</div>
+
+<!-- ═══ 授權檢查：未登入跳轉登入頁 ═══ -->
+<script>
+(function(){
+    const token = localStorage.getItem('jarvis_token');
+    if (!token) { window.location.href = '/jarvis-login'; return; }
+    // 簡易 JWT 過期檢查（解析 payload）
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+        if (payload.exp && payload.exp < Date.now()/1000) {
+            localStorage.removeItem('jarvis_token');
+            localStorage.removeItem('jarvis_user');
+            window.location.href = '/jarvis-login';
+            return;
+        }
+        // 檢查訂閱狀態
+        if (payload.role !== 'superadmin' && payload.role !== 'admin' && payload.sub_status !== 'active') {
+            window.location.href = '/jarvis-register?step=subscribe&username=' + encodeURIComponent(payload.usr || '');
+            return;
+        }
+    } catch(e) {
+        localStorage.removeItem('jarvis_token');
+        window.location.href = '/jarvis-login';
+        return;
+    }
+})();
+</script>
+
+<!-- ═══ 模組化載入：每個功能獨立一個 JS 檔案 ═══ -->
+<!-- 後續開發只需修改對應模組，不碰主框架 -->
+<script src="/static/modules/mod-chat.js"></script>
+<script src="/static/modules/mod-code.js"></script>
+<script src="/static/modules/mod-image.js"></script>
+<script src="/static/modules/mod-learn.js"></script>
+<script src="/static/modules/mod-system.js"></script>
+<script src="/static/modules/mod-voice.js"></script>
+<script src="/static/modules/mod-token-saver.js"></script>
+<script>
+/**
+ * ═══ Jarvis 主框架（組裝器）═══
+ * 此區塊僅負責組裝各模組，請勿在此新增業務邏輯。
+ * 新增功能請建立新的 mod-xxx.js 模組檔案。
+ */
+const{createApp,ref,computed,onMounted,nextTick,watch}=Vue;
+marked.setOptions({highlight:(code,lang)=>{try{return hljs.highlight(code,{language:lang||'plaintext'}).value}catch{return code}}});
+
+createApp({
+    setup(){
+        const BASE=window.location.origin;
+        const activeTab=ref('chat');
+        const tabLabels={chat:'對話',code:'編碼',image:'生圖',learn:'學習',system:'系統'};
+
+        // ── 載入各模組 ──
+        const token  = JarvisModTokenSaver(BASE, {ref, computed});
+        const chat   = JarvisModChat(BASE, {ref, nextTick});
+        chat.setTokenModule(token);
+        const code   = JarvisModCode(BASE, {ref, nextTick, watch});
+        const image  = JarvisModImage(BASE, {ref});
+        const learn  = JarvisModLearn(BASE, {ref});
+        const system = JarvisModSystem(BASE, {ref});
+        const voice  = JarvisModVoice(BASE, {ref, computed});
+
+        // 跨模組共享：kbCount 由 learn 模組提供
+        const kbCount = learn.kbCount;
+        const wsConnected = chat.wsConnected;
+
+        // renderMd 共享給 learn 模組的 HTML template
+        const renderMd = chat.renderMd;
+
+        // newChat 需要切換 tab
+        const newChat = () => { chat.newChat(); activeTab.value = 'chat'; };
+
+        // loadChatHistory 需要切換 tab
+        const loadChatHistory = async (id) => {
+            const ok = await chat.loadChatHistory(id);
+            if (ok) activeTab.value = 'chat';
+        };
+
+        // 登出
+        const doLogout = () => {
+            localStorage.removeItem('jarvis_token');
+            localStorage.removeItem('jarvis_user');
+            window.location.href = '/jarvis-login';
+        };
+
+        // ── 初始化 ──
+        onMounted(() => {
+            chat.init();
+            learn.init();
+            system.init();
+            voice.init();
+            
+            // 監聽語音輸入事件
+            window.addEventListener('jarvis-voice-input', (e) => {
+                chat.userInput.value = e.detail;
+                chat.sendChat();
+            });
+        });
+
+        // ── 組裝 return（模板需要的所有變數）──
+        return {
+            activeTab, tabLabels, wsConnected, kbCount, renderMd, doLogout,
+            // Chat
+            ...chat, newChat, loadChatHistory,
+            // Code
+            ...code,
+            // Image
+            ...image,
+            // Learn
+            ...learn,
+            // System
+            ...system,
+            // Voice
+            ...voice,
+        };
+    },
+    delimiters:['[[',']]']
+}).mount('#app');
+</script>
+</body>
+</html>

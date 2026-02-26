@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 視覺邊緣計算 — 築未科技</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Inter','Noto Sans TC',sans-serif;background:#0a0a0f;color:#e2e8f0}
+        .glass{background:rgba(15,23,42,.75);backdrop-filter:blur(12px);border:1px solid rgba(51,65,85,.4)}
+        .card{border-radius:16px;padding:20px}
+        .scroll-area{overflow-y:auto;overscroll-behavior:contain}
+        .scroll-area::-webkit-scrollbar{width:4px}
+        .scroll-area::-webkit-scrollbar-thumb{background:rgba(100,116,139,.3);border-radius:2px}
+        .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:9999px;font-size:11px;font-weight:600}
+        .badge-ok{background:rgba(16,185,129,.15);color:#34d399}
+        .badge-warn{background:rgba(245,158,11,.15);color:#fbbf24}
+        .badge-err{background:rgba(239,68,68,.15);color:#f87171}
+        .badge-info{background:rgba(59,130,246,.15);color:#60a5fa}
+        .btn{padding:8px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;border:none}
+        .btn-primary{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff}
+        .btn-primary:hover{filter:brightness(1.1)}
+        .btn-danger{background:rgba(239,68,68,.2);color:#f87171;border:1px solid rgba(239,68,68,.3)}
+        .btn-danger:hover{background:rgba(239,68,68,.3)}
+        .btn-secondary{background:rgba(51,65,85,.5);color:#94a3b8;border:1px solid rgba(71,85,105,.4)}
+        .btn-secondary:hover{background:rgba(51,65,85,.7);color:#e2e8f0}
+        .gauge{width:80px;height:80px;border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center}
+        .gauge-ring{position:absolute;inset:0;border-radius:50%;border:4px solid rgba(51,65,85,.3)}
+        .tab-active{color:#3b82f6;border-bottom:2px solid #3b82f6}
+        .alert-row{border-left:3px solid;padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:6px}
+        .alert-critical{border-color:#ef4444;background:rgba(239,68,68,.08)}
+        .alert-warning{border-color:#f59e0b;background:rgba(245,158,11,.08)}
+        .alert-info{border-color:#3b82f6;background:rgba(59,130,246,.08)}
+        .drop-zone{border:2px dashed rgba(59,130,246,.4);border-radius:16px;padding:40px;text-align:center;transition:all .2s;cursor:pointer}
+        .drop-zone:hover,.drop-zone.dragover{border-color:#3b82f6;background:rgba(59,130,246,.05)}
+        .detection-box{position:absolute;border:2px solid #22d3ee;border-radius:4px}
+        .detection-label{position:absolute;top:-18px;left:0;background:#22d3ee;color:#000;font-size:10px;padding:1px 6px;border-radius:3px;white-space:nowrap}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+        .pulse{animation:pulse 2s infinite}
+        .fade-in{animation:fadeIn .3s ease-out}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    </style>
+</head>
+<body class="min-h-screen">
+
+<div id="app">
+    <!-- Header -->
+    <header class="glass sticky top-0 z-30 px-6 py-3 flex items-center gap-4 border-b border-slate-700/40">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow">V</div>
+        <div class="flex-1">
+            <h1 class="text-base font-bold text-white">AI 視覺邊緣計算</h1>
+            <div class="flex items-center gap-2 text-[11px]">
+                <span :class="health.status==='ok'?'text-emerald-400':'text-rose-400'">{{ health.status==='ok'?'● 服務正常':'○ 連線中' }}</span>
+                <span class="text-slate-500">· Ollama {{ health.ollama?'✓':'✗' }}</span>
+                <span class="text-slate-500">· YOLO {{ health.yolo_loaded?'✓':'✗' }}</span>
+                <span class="text-slate-500">· KB {{ health.knowledge_count }}</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="badge" :class="wsConnected?'badge-ok':'badge-err'">{{ wsConnected?'WS 已連線':'WS 離線' }}</span>
+        </div>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="flex gap-1 px-6 pt-3 border-b border-slate-800/60">
+        <button v-for="t in tabs" :key="t.id" @click="activeTab=t.id"
+            class="px-4 py-2 text-sm font-medium transition-colors"
+            :class="activeTab===t.id?'tab-active text-blue-400':'text-slate-500 hover:text-slate-300'">
+            {{ t.label }}
+        </button>
+    </nav>
+
+    <main class="p-6 max-w-7xl mx-auto">
+
+        <!-- ===== 總覽 ===== -->
+        <div v-show="activeTab==='overview'" class="fade-in space-y-6">
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="glass card text-center">
+                    <div class="text-2xl font-bold text-cyan-400">{{ health.stats?.total_inferences || 0 }}</div>
+                    <div class="text-xs text-slate-500 mt-1">總推理次數</div>
+                </div>
+                <div class="glass card text-center">
+                    <div class="text-2xl font-bold text-emerald-400">{{ health.stats?.total_detections || 0 }}</div>
+                    <div class="text-xs text-slate-500 mt-1">偵測物件數</div>
+                </div>
+                <div class="glass card text-center">
+                    <div class="text-2xl font-bold text-amber-400">{{ health.stats?.avg_inference_ms || 0 }} ms</div>
+                    <div class="text-xs text-slate-500 mt-1">平均推理耗時</div>
+                </div>
+                <div class="glass card text-center">
+                    <div class="text-2xl font-bold text-rose-400">{{ alerts.length }}</div>
+                    <div class="text-xs text-slate-500 mt-1">告警數量</div>
+                </div>
+            </div>
+
+            <!-- 系統狀態 -->
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="glass card">
+                    <h3 class="text-sm font-semibold text-white mb-3">服務狀態</h3>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between"><span class="text-slate-400">Ollama VLM</span><span :class="health.ollama?'badge badge-ok':'badge badge-err'">{{ health.ollama?'就緒':'離線' }}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">YOLO 偵測</span><span :class="health.yolo_loaded?'badge badge-ok':'badge badge-warn'">{{ health.yolo_loaded?'已載入':'未載入' }}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">視覺監控</span><span :class="monitorStatus.running?'badge badge-ok':'badge badge-warn'">{{ monitorStatus.running?'運行中':'停止' }}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">監控來源</span><span class="text-slate-300">{{ Object.keys(monitorStatus.sources||{}).length }} 個</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">知識庫</span><span class="text-slate-300">{{ health.knowledge_count }} 筆</span></div>
+                    </div>
+                </div>
+                <div class="glass card">
+                    <h3 class="text-sm font-semibold text-white mb-3">最近告警</h3>
+                    <div class="space-y-1 max-h-48 scroll-area" v-if="alerts.length">
+                        <div v-for="a in alerts.slice(0,5)" :key="a.id"
+                            class="alert-row text-xs"
+                            :class="'alert-'+a.level">
+                            <div class="font-semibold">{{ a.message }}</div>
+                            <div class="text-slate-500 mt-0.5">{{ a.source_name }} · {{ formatTime(a.timestamp) }}</div>
+                        </div>
+                    </div>
+                    <p v-else class="text-xs text-slate-600 text-center py-6">暫無告警</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 視覺分析 ===== -->
+        <div v-show="activeTab==='analyze'" class="fade-in space-y-6">
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- 上傳區 -->
+                <div>
+                    <div class="drop-zone" :class="{dragover}" 
+                        @dragover.prevent="dragover=true" @dragleave="dragover=false"
+                        @drop.prevent="handleDrop" @click="$refs.fileInput.click()">
+                        <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="handleFileSelect">
+                        <svg class="w-12 h-12 mx-auto text-slate-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <p class="text-sm text-slate-400">拖放圖片或點擊上傳</p>
+                        <p class="text-xs text-slate-600 mt-1">支援 PNG, JPG, WebP</p>
+                    </div>
+
+                    <!-- 設定 -->
+                    <div class="glass card mt-4 space-y-3">
+                        <div>
+                            <label class="text-xs text-slate-400 block mb-1">分析模式</label>
+                            <select v-model="analyzeOpts.mode" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200">
+                                <option value="hybrid">混合（YOLO + VLM）</option>
+                                <option value="vlm_only">僅 VLM</option>
+                                <option value="yolo">僅 YOLO</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400 block mb-1">VLM 提供者</label>
+                            <select v-model="analyzeOpts.provider" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200">
+                                <option value="auto">自動</option>
+                                <option value="ollama">Ollama</option>
+                                <option value="gemini">Gemini</option>
+                                <option value="claude">Claude</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400 block mb-1">自訂 Prompt（可選）</label>
+                            <textarea v-model="analyzeOpts.prompt" rows="2" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200 resize-none" placeholder="留空使用預設分析 prompt"></textarea>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                                <input type="checkbox" v-model="analyzeOpts.enhance" class="rounded">
+                                圖片增強
+                            </label>
+                            <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                                <input type="checkbox" v-model="analyzeOpts.save_to_kb" class="rounded" checked>
+                                寫入知識庫
+                            </label>
+                        </div>
+                        <button @click="runAnalysis" :disabled="!selectedFile || analyzing" class="btn btn-primary w-full" :class="{pulse:analyzing}">
+                            {{ analyzing ? '分析中...' : '開始分析' }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 結果區 -->
+                <div>
+                    <div v-if="previewUrl" class="relative mb-4">
+                        <img :src="previewUrl" class="w-full rounded-xl border border-slate-700/40" style="max-height:400px;object-fit:contain">
+                        <!-- YOLO 偵測框（簡化顯示） -->
+                    </div>
+                    <div v-if="analyzeResult" class="glass card space-y-3 fade-in">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-white">分析結果</h3>
+                            <span class="badge badge-info">{{ analyzeResult.inference_ms }} ms</span>
+                        </div>
+                        <div v-if="analyzeResult.description" class="text-sm text-slate-300">{{ analyzeResult.description }}</div>
+                        <div v-if="analyzeResult.objects?.length" class="flex flex-wrap gap-1">
+                            <span v-for="o in analyzeResult.objects" class="badge badge-ok">{{ o }}</span>
+                        </div>
+                        <div v-if="analyzeResult.detections?.length">
+                            <div class="text-xs text-slate-500 mb-1">YOLO 偵測 ({{ analyzeResult.detection_count }})</div>
+                            <div class="flex flex-wrap gap-1">
+                                <span v-for="d in analyzeResult.detections.slice(0,15)" class="badge badge-info">{{ d.class }} {{ (d.confidence*100).toFixed(0) }}%</span>
+                            </div>
+                        </div>
+                        <div v-if="analyzeResult.anomalies?.length">
+                            <div class="text-xs text-slate-500 mb-1">異常</div>
+                            <div v-for="a in analyzeResult.anomalies" class="text-xs text-amber-400">⚠ {{ a }}</div>
+                        </div>
+                        <div v-if="analyzeResult.safety_violations?.length">
+                            <div class="text-xs text-slate-500 mb-1">安全問題</div>
+                            <div v-for="s in analyzeResult.safety_violations" class="text-xs text-rose-400">🚨 {{ s }}</div>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs text-slate-500">
+                            <span>信心度: {{ (analyzeResult.confidence*100).toFixed(0) }}%</span>
+                            <span>· 提供者: {{ analyzeResult.provider }}</span>
+                            <span>· 模型: {{ analyzeResult.model }}</span>
+                        </div>
+                    </div>
+                    <div v-else-if="!previewUrl" class="glass card text-center py-12">
+                        <p class="text-sm text-slate-500">上傳圖片後開始分析</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 監控 ===== -->
+        <div v-show="activeTab==='monitor'" class="fade-in space-y-6">
+            <div class="flex items-center justify-between">
+                <h2 class="text-base font-semibold text-white">即時視覺監控</h2>
+                <div class="flex gap-2">
+                    <button v-if="!monitorStatus.running" @click="startMonitor" class="btn btn-primary text-xs">啟動監控</button>
+                    <button v-else @click="stopMonitor" class="btn btn-danger text-xs">停止監控</button>
+                    <button @click="showAddSource=true" class="btn btn-secondary text-xs">+ 新增來源</button>
+                </div>
+            </div>
+
+            <!-- 新增來源表單 -->
+            <div v-if="showAddSource" class="glass card fade-in">
+                <h3 class="text-sm font-semibold text-white mb-3">新增監控來源</h3>
+                <div class="grid md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">名稱</label>
+                        <input v-model="newSource.name" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200" placeholder="例：工地攝影機 A">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">類型</label>
+                        <select v-model="newSource.type" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200">
+                            <option value="screenshot">螢幕截圖</option>
+                            <option value="rtsp">RTSP 串流</option>
+                            <option value="camera">本地攝影機</option>
+                            <option value="url">圖片 URL</option>
+                        </select>
+                    </div>
+                    <div v-if="newSource.type==='rtsp'||newSource.type==='url'">
+                        <label class="text-xs text-slate-400 block mb-1">URL</label>
+                        <input v-model="newSource.url" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200" placeholder="rtsp://... 或 https://...">
+                    </div>
+                    <div v-if="newSource.type==='camera'">
+                        <label class="text-xs text-slate-400 block mb-1">攝影機 ID</label>
+                        <input v-model.number="newSource.camera_id" type="number" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200" min="0">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">擷取間隔（秒）</label>
+                        <input v-model.number="newSource.interval_sec" type="number" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200" min="5">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">分析模式</label>
+                        <select v-model="newSource.analysis_mode" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200">
+                            <option value="hybrid">混合</option>
+                            <option value="vlm_only">僅 VLM</option>
+                            <option value="yolo">僅 YOLO</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-2 mt-4">
+                    <button @click="addSource" class="btn btn-primary text-xs">新增</button>
+                    <button @click="showAddSource=false" class="btn btn-secondary text-xs">取消</button>
+                </div>
+            </div>
+
+            <!-- 監控來源列表 -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div v-for="(s, sid) in monitorStatus.sources||{}" :key="sid" class="glass card">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-sm font-semibold text-white">{{ s.name }}</h4>
+                        <span class="badge" :class="s.enabled?'badge-ok':'badge-warn'">{{ s.enabled?'啟用':'停用' }}</span>
+                    </div>
+                    <div class="text-xs text-slate-500 space-y-1">
+                        <div>類型: {{ s.type }}</div>
+                        <div>間隔: {{ s.interval_sec }}s</div>
+                        <div>模式: {{ s.analysis_mode }}</div>
+                        <div v-if="s.last_capture">最後擷取: {{ formatTime(s.last_capture) }}</div>
+                    </div>
+                    <div class="flex gap-2 mt-3">
+                        <button @click="captureNow(sid)" class="btn btn-secondary text-xs flex-1">立即擷取</button>
+                        <button @click="removeSource(sid)" class="btn btn-danger text-xs">移除</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 施工 AI ===== -->
+        <div v-show="activeTab==='construction'" class="fade-in space-y-6">
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <div class="drop-zone" @click="$refs.constructionFile.click()">
+                        <input ref="constructionFile" type="file" accept="image/*" class="hidden" @change="handleConstructionFile">
+                        <svg class="w-12 h-12 mx-auto text-slate-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                        <p class="text-sm text-slate-400">上傳工地照片</p>
+                    </div>
+                    <div v-if="constructionPreview" class="mt-4">
+                        <img :src="constructionPreview" class="w-full rounded-xl border border-slate-700/40" style="max-height:300px;object-fit:contain">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-4">
+                        <button @click="runConstruction('safety')" :disabled="!constructionFile||constructionLoading" class="btn btn-primary text-xs" :class="{pulse:constructionLoading}">🦺 安全檢查</button>
+                        <button @click="runConstruction('progress')" :disabled="!constructionFile||constructionLoading" class="btn btn-primary text-xs">📊 進度分析</button>
+                        <button @click="runConstruction('anomaly')" :disabled="!constructionFile||constructionLoading" class="btn btn-primary text-xs">🔍 異常偵測</button>
+                        <button @click="runConstruction('full')" :disabled="!constructionFile||constructionLoading" class="btn btn-primary text-xs">📋 完整分析</button>
+                    </div>
+                </div>
+                <div>
+                    <div v-if="constructionResult" class="glass card fade-in scroll-area" style="max-height:600px">
+                        <h3 class="text-sm font-semibold text-white mb-3">施工分析結果</h3>
+                        <pre class="text-xs text-slate-300 whitespace-pre-wrap">{{ JSON.stringify(constructionResult, null, 2) }}</pre>
+                    </div>
+                    <div v-else class="glass card text-center py-12">
+                        <p class="text-sm text-slate-500">上傳工地照片後選擇分析類型</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 告警 ===== -->
+        <div v-show="activeTab==='alerts'" class="fade-in space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="text-base font-semibold text-white">告警記錄</h2>
+                <div class="flex gap-2">
+                    <button @click="alertFilter=''" class="btn text-xs" :class="alertFilter===''?'btn-primary':'btn-secondary'">全部</button>
+                    <button @click="alertFilter='critical'" class="btn text-xs" :class="alertFilter==='critical'?'btn-danger':'btn-secondary'">嚴重</button>
+                    <button @click="alertFilter='warning'" class="btn text-xs" :class="alertFilter==='warning'?'btn-secondary':'btn-secondary'" style="border-color:rgba(245,158,11,.4)">警告</button>
+                </div>
+            </div>
+            <div class="space-y-2">
+                <div v-for="a in filteredAlerts" :key="a.id" class="alert-row" :class="'alert-'+a.level">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-semibold">{{ a.message }}</span>
+                        <span class="badge" :class="a.level==='critical'?'badge-err':a.level==='warning'?'badge-warn':'badge-info'">{{ a.level }}</span>
+                    </div>
+                    <div class="text-xs text-slate-500 mt-1">{{ a.source_name }} · {{ a.category }} · {{ formatTime(a.timestamp) }}</div>
+                </div>
+                <p v-if="!filteredAlerts.length" class="text-center text-sm text-slate-600 py-8">暫無告警</p>
+            </div>
+        </div>
+
+        <!-- ===== 深度分析 ===== -->
+        <div v-show="activeTab==='deep'" class="fade-in space-y-6">
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- 左側：上傳 + 設定 -->
+                <div class="space-y-4">
+                    <div class="drop-zone" :class="{dragover:deepDragover}"
+                        @dragover.prevent="deepDragover=true" @dragleave="deepDragover=false"
+                        @drop.prevent="handleDeepDrop" @click="$refs.deepFile.click()">
+                        <input ref="deepFile" type="file" accept="image/*,video/*" class="hidden" @change="handleDeepFileSelect">
+                        <svg class="w-12 h-12 mx-auto text-slate-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        <p class="text-sm text-slate-400">拖放圖片或影片，或點擊上傳</p>
+                        <p class="text-xs text-slate-600 mt-1">支援 PNG, JPG, MP4, AVI, MOV</p>
+                    </div>
+                    <div v-if="deepFileName" class="text-xs text-slate-400 text-center">已選擇: {{ deepFileName }}</div>
+
+                    <!-- 串流 URL -->
+                    <div class="glass card">
+                        <label class="text-xs text-slate-400 block mb-1">或輸入串流 URL</label>
+                        <input v-model="deepStreamUrl" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200" placeholder="https://... 或 rtsp://...">
+                    </div>
+
+                    <!-- 參數 -->
+                    <div class="glass card space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs text-slate-400 block mb-1">信心閾值</label>
+                                <input v-model.number="deepOpts.conf" type="number" step="0.05" min="0.1" max="0.9" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-400 block mb-1">最大幀數（影片）</label>
+                                <input v-model.number="deepOpts.max_frames" type="number" min="1" max="30" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200">
+                            </div>
+                        </div>
+                        <button @click="runDeepAnalysis" :disabled="(!deepFile && !deepStreamUrl) || deepAnalyzing" class="btn btn-primary w-full" :class="{pulse:deepAnalyzing}">
+                            {{ deepAnalyzing ? '深度分析中...' : '開始深度分析' }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 右側：結果 -->
+                <div class="space-y-4">
+                    <div v-if="deepResult" class="fade-in space-y-4">
+                        <!-- 摘要卡片 -->
+                        <div class="glass card">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-sm font-semibold text-white">分析結果</h3>
+                                <span class="badge badge-info">{{ deepResult.processing_ms?.toFixed(0) }} ms</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 text-center mb-3">
+                                <div class="bg-slate-800/40 rounded-lg p-2">
+                                    <div class="text-lg font-bold text-cyan-400">{{ deepResult.summary?.total || 0 }}</div>
+                                    <div class="text-[10px] text-slate-500">物件總數</div>
+                                </div>
+                                <div class="bg-slate-800/40 rounded-lg p-2">
+                                    <div class="text-lg font-bold text-emerald-400">{{ deepResult.vehicle_summary?.total || 0 }}</div>
+                                    <div class="text-[10px] text-slate-500">車輛</div>
+                                </div>
+                                <div class="bg-slate-800/40 rounded-lg p-2">
+                                    <div class="text-lg font-bold text-amber-400">{{ deepResult.person_summary?.total || 0 }}</div>
+                                    <div class="text-[10px] text-slate-500">人員</div>
+                                </div>
+                            </div>
+                            <div v-if="deepResult.scene_description" class="text-xs text-slate-300 mb-2">{{ deepResult.scene_description.substring(0,300) }}</div>
+                        </div>
+
+                        <!-- 車輛詳情 -->
+                        <div v-if="deepResult.vehicle_summary?.total>0" class="glass card">
+                            <h4 class="text-xs font-semibold text-white mb-2">車輛統計</h4>
+                            <div class="text-xs text-slate-400 space-y-1">
+                                <div>大車: {{ deepResult.vehicle_summary.large || 0 }} · 小車: {{ deepResult.vehicle_summary.small || 0 }} · 二輪: {{ deepResult.vehicle_summary.two_wheel || 0 }}</div>
+                                <div v-if="Object.keys(deepResult.vehicle_summary.by_type||{}).length">車型: <span v-for="(v,k) in deepResult.vehicle_summary.by_type" class="badge badge-info mr-1">{{k}}×{{v}}</span></div>
+                                <div v-if="Object.keys(deepResult.vehicle_summary.by_color||{}).length">顏色: <span v-for="(v,k) in deepResult.vehicle_summary.by_color" class="badge badge-ok mr-1">{{k}}×{{v}}</span></div>
+                                <div v-if="deepResult.vehicle_summary.plates?.length">車牌: <span v-for="p in deepResult.vehicle_summary.plates" class="badge badge-warn mr-1">{{p}}</span></div>
+                            </div>
+                        </div>
+
+                        <!-- 人員詳情 -->
+                        <div v-if="deepResult.person_summary?.total>0" class="glass card">
+                            <h4 class="text-xs font-semibold text-white mb-2">人員統計</h4>
+                            <div class="text-xs text-slate-400">
+                                總數: {{ deepResult.person_summary.total }} · 男: {{ deepResult.person_summary.male || 0 }} · 女: {{ deepResult.person_summary.female || 0 }} · 未確定: {{ deepResult.person_summary.unknown || 0 }}
+                            </div>
+                        </div>
+
+                        <!-- 場景物件 -->
+                        <div v-if="Object.keys(deepResult.scene_objects||{}).length" class="glass card">
+                            <h4 class="text-xs font-semibold text-white mb-2">場景物件</h4>
+                            <div class="flex flex-wrap gap-1">
+                                <span v-for="(v,k) in deepResult.scene_objects" class="badge badge-info">{{k}}×{{v}}</span>
+                            </div>
+                        </div>
+
+                        <!-- 報告連結 -->
+                        <div class="glass card text-xs text-slate-500">
+                            <div>Report ID: {{ deepResult.id }}</div>
+                            <div class="flex gap-2 mt-1">
+                                <a v-if="deepResult.id" :href="API+'/api/vision/deep/report/'+deepResult.id" target="_blank" class="text-blue-400 hover:underline">JSON 報告</a>
+                                <a v-if="deepResult.id" :href="API+'/api/vision/deep/report/'+deepResult.id+'/text'" target="_blank" class="text-blue-400 hover:underline">文字報告</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="glass card text-center py-12">
+                        <p class="text-sm text-slate-500">上傳圖片/影片或輸入串流 URL 後開始深度分析</p>
+                        <p class="text-xs text-slate-600 mt-2">YOLO 全物件偵測 + VLM 深度分類 + 標註圖 + 結構化報告</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 學習模組 ===== -->
+        <div v-show="activeTab==='learning'" class="fade-in space-y-6">
+            <div class="flex items-center justify-between">
+                <h2 class="text-base font-semibold text-white">AI 學習模組</h2>
+                <button @click="loadLearning" class="btn btn-secondary text-xs">重新整理</button>
+            </div>
+
+            <!-- 領域卡片 -->
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div v-for="(info, domain) in learningDomains" :key="domain" class="glass card cursor-pointer hover:border-blue-500/40 transition-colors" @click="loadDomainDetail(domain)">
+                    <h4 class="text-sm font-semibold text-white">{{ info.name }}</h4>
+                    <p class="text-xs text-slate-500 mt-1">{{ info.description }}</p>
+                    <div class="text-xs text-slate-400 mt-2">分析次數: {{ info.analyses || 0 }}</div>
+                </div>
+            </div>
+
+            <!-- 學習總結 -->
+            <div v-if="learningSummary" class="glass card">
+                <h3 class="text-sm font-semibold text-white mb-3">學習總結</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                    <div class="bg-slate-800/40 rounded-lg p-3">
+                        <div class="text-xl font-bold text-cyan-400">{{ learningSummary.total_learning_records }}</div>
+                        <div class="text-[10px] text-slate-500">學習紀錄</div>
+                    </div>
+                    <div class="bg-slate-800/40 rounded-lg p-3">
+                        <div class="text-xl font-bold text-emerald-400">{{ learningSummary.active_domains }}</div>
+                        <div class="text-[10px] text-slate-500">活躍領域</div>
+                    </div>
+                    <div class="bg-slate-800/40 rounded-lg p-3">
+                        <div class="text-xl font-bold text-amber-400">{{ learningSummary.available_domains?.length || 0 }}</div>
+                        <div class="text-[10px] text-slate-500">可用領域</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 最近建議 -->
+            <div v-if="learningSuggestions.length" class="glass card">
+                <h3 class="text-sm font-semibold text-white mb-3">最近改進建議</h3>
+                <div class="space-y-3">
+                    <div v-for="s in learningSuggestions" :key="s.id" class="bg-slate-800/30 rounded-lg p-3">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="badge badge-info">{{ s.domain }}</span>
+                            <span class="text-xs text-slate-500">物件: {{ s.total_objects }} · 信心: {{ (s.avg_confidence*100).toFixed(0) }}%</span>
+                        </div>
+                        <div v-for="sg in s.suggestions" class="text-xs text-slate-400 mt-1 whitespace-pre-line">{{ sg }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 歷史 ===== -->
+        <div v-show="activeTab==='history'" class="fade-in space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="text-base font-semibold text-white">推理歷史</h2>
+                <button @click="loadHistory" class="btn btn-secondary text-xs">重新整理</button>
+            </div>
+            <div class="space-y-2">
+                <div v-for="h in history" :key="h.id" class="glass card py-3 px-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-white">{{ h.source }}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="badge badge-info">{{ h.inference_ms }} ms</span>
+                            <span class="text-xs text-slate-500">{{ formatTime(h.timestamp) }}</span>
+                        </div>
+                    </div>
+                    <p v-if="h.description" class="text-xs text-slate-400 mt-1 line-clamp-2">{{ h.description }}</p>
+                    <div class="flex flex-wrap gap-1 mt-1">
+                        <span v-for="d in (h.detections||[]).slice(0,8)" class="badge badge-info text-[10px]">{{ d.class }}</span>
+                        <span v-if="h.detection_count>8" class="text-[10px] text-slate-500">+{{ h.detection_count-8 }}</span>
+                    </div>
+                </div>
+                <p v-if="!history.length" class="text-center text-sm text-slate-600 py-8">暫無推理歷史</p>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+const API = window.location.origin;
+
+const { createApp, ref, reactive, computed, onMounted, onUnmounted } = Vue;
+
+createApp({
+    setup() {
+        const activeTab = ref('overview');
+        const tabs = [
+            { id: 'overview', label: '總覽' },
+            { id: 'deep', label: '深度分析' },
+            { id: 'analyze', label: '視覺分析' },
+            { id: 'monitor', label: '監控' },
+            { id: 'construction', label: '施工 AI' },
+            { id: 'learning', label: '學習' },
+            { id: 'alerts', label: '告警' },
+            { id: 'history', label: '歷史' },
+        ];
+
+        // Health
+        const health = reactive({ status: '', ollama: false, yolo_loaded: false, knowledge_count: 0, stats: {} });
+        const wsConnected = ref(false);
+        let ws = null;
+        let healthTimer = null;
+
+        async function fetchHealth() {
+            try {
+                const r = await fetch(`${API}/health`);
+                const d = await r.json();
+                Object.assign(health, d);
+            } catch {}
+        }
+
+        // WebSocket
+        function connectWS() {
+            const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+            ws = new WebSocket(`${proto}://${location.host}/ws/vision`);
+            ws.onopen = () => { wsConnected.value = true; };
+            ws.onclose = () => { wsConnected.value = false; setTimeout(connectWS, 3000); };
+            ws.onmessage = (e) => {
+                try {
+                    const msg = JSON.parse(e.data);
+                    if (msg.type === 'alert') alerts.unshift(msg.alert);
+                    if (msg.type === 'monitor_update') fetchMonitorStatus();
+                } catch {}
+            };
+        }
+
+        // Analyze
+        const selectedFile = ref(null);
+        const previewUrl = ref('');
+        const analyzing = ref(false);
+        const analyzeResult = ref(null);
+        const dragover = ref(false);
+        const analyzeOpts = reactive({ mode: 'hybrid', provider: 'auto', prompt: '', enhance: false, save_to_kb: true });
+
+        function handleFileSelect(e) {
+            const f = e.target.files[0];
+            if (f) { selectedFile.value = f; previewUrl.value = URL.createObjectURL(f); analyzeResult.value = null; }
+        }
+        function handleDrop(e) {
+            dragover.value = false;
+            const f = e.dataTransfer.files[0];
+            if (f && f.type.startsWith('image/')) { selectedFile.value = f; previewUrl.value = URL.createObjectURL(f); analyzeResult.value = null; }
+        }
+        async function runAnalysis() {
+            if (!selectedFile.value) return;
+            analyzing.value = true;
+            try {
+                const fd = new FormData();
+                fd.append('file', selectedFile.value);
+                fd.append('mode', analyzeOpts.mode);
+                fd.append('provider', analyzeOpts.provider);
+                fd.append('prompt', analyzeOpts.prompt);
+                fd.append('enhance', analyzeOpts.enhance);
+                fd.append('save_to_kb', analyzeOpts.save_to_kb);
+                const r = await fetch(`${API}/api/vision/analyze`, { method: 'POST', body: fd });
+                analyzeResult.value = await r.json();
+            } catch (e) { alert('分析失敗: ' + e.message); }
+            analyzing.value = false;
+        }
+
+        // Monitor
+        const monitorStatus = reactive({ running: false, sources: {}, active_tasks: 0, total_alerts: 0 });
+        const showAddSource = ref(false);
+        const newSource = reactive({ name: '', type: 'screenshot', url: '', camera_id: 0, interval_sec: 30, analysis_mode: 'hybrid' });
+
+        async function fetchMonitorStatus() {
+            try {
+                const r = await fetch(`${API}/api/monitor/status`);
+                Object.assign(monitorStatus, await r.json());
+            } catch {}
+        }
+        async function startMonitor() {
+            await fetch(`${API}/api/monitor/start`, { method: 'POST' });
+            fetchMonitorStatus();
+        }
+        async function stopMonitor() {
+            await fetch(`${API}/api/monitor/stop`, { method: 'POST' });
+            fetchMonitorStatus();
+        }
+        async function addSource() {
+            await fetch(`${API}/api/monitor/sources`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...newSource }),
+            });
+            showAddSource.value = false;
+            Object.assign(newSource, { name: '', type: 'screenshot', url: '', camera_id: 0, interval_sec: 30, analysis_mode: 'hybrid' });
+            fetchMonitorStatus();
+        }
+        async function removeSource(sid) {
+            await fetch(`${API}/api/monitor/sources/${sid}`, { method: 'DELETE' });
+            fetchMonitorStatus();
+        }
+        async function captureNow(sid) {
+            try {
+                const r = await fetch(`${API}/api/monitor/capture-now/${sid}`, { method: 'POST' });
+                const d = await r.json();
+                alert('擷取完成！偵測 ' + (d.detection_count || 0) + ' 個物件');
+            } catch (e) { alert('擷取失敗: ' + e.message); }
+        }
+
+        // Construction
+        const constructionFile = ref(null);
+        const constructionPreview = ref('');
+        const constructionResult = ref(null);
+        const constructionLoading = ref(false);
+
+        function handleConstructionFile(e) {
+            const f = e.target.files[0];
+            if (f) { constructionFile.value = f; constructionPreview.value = URL.createObjectURL(f); constructionResult.value = null; }
+        }
+        async function runConstruction(type) {
+            if (!constructionFile.value) return;
+            constructionLoading.value = true;
+            try {
+                const fd = new FormData();
+                fd.append('file', constructionFile.value);
+                fd.append('provider', 'auto');
+                const endpoints = { safety: '/api/construction/safety', progress: '/api/construction/progress', anomaly: '/api/construction/anomaly', full: '/api/construction/full-analysis' };
+                const r = await fetch(`${API}${endpoints[type]}`, { method: 'POST', body: fd });
+                constructionResult.value = await r.json();
+            } catch (e) { alert('分析失敗: ' + e.message); }
+            constructionLoading.value = false;
+        }
+
+        // Deep Analysis
+        const deepFile = ref(null);
+        const deepFileName = ref('');
+        const deepStreamUrl = ref('');
+        const deepDragover = ref(false);
+        const deepAnalyzing = ref(false);
+        const deepResult = ref(null);
+        const deepOpts = reactive({ conf: 0.25, max_frames: 10 });
+
+        function handleDeepFileSelect(e) {
+            const f = e.target.files[0];
+            if (f) { deepFile.value = f; deepFileName.value = f.name; deepResult.value = null; }
+        }
+        function handleDeepDrop(e) {
+            deepDragover.value = false;
+            const f = e.dataTransfer.files[0];
+            if (f) { deepFile.value = f; deepFileName.value = f.name; deepResult.value = null; }
+        }
+        async function runDeepAnalysis() {
+            deepAnalyzing.value = true;
+            try {
+                const fd = new FormData();
+                if (deepFile.value) {
+                    const isVideo = deepFile.value.type.startsWith('video/');
+                    fd.append('file', deepFile.value);
+                    fd.append('conf', deepOpts.conf);
+                    if (isVideo) fd.append('max_frames', deepOpts.max_frames);
+                    const endpoint = isVideo ? '/api/vision/deep/video' : '/api/vision/deep/image';
+                    const r = await fetch(`${API}${endpoint}`, { method: 'POST', body: fd });
+                    deepResult.value = await r.json();
+                } else if (deepStreamUrl.value) {
+                    fd.append('stream_url', deepStreamUrl.value);
+                    fd.append('conf', deepOpts.conf);
+                    fd.append('max_frames', deepOpts.max_frames);
+                    const r = await fetch(`${API}/api/vision/deep/stream`, { method: 'POST', body: fd });
+                    deepResult.value = await r.json();
+                }
+            } catch (e) { alert('深度分析失敗: ' + e.message); }
+            deepAnalyzing.value = false;
+        }
+
+        // Learning Module
+        const learningDomains = reactive({});
+        const learningSummary = ref(null);
+        const learningSuggestions = reactive([]);
+
+        async function loadLearning() {
+            try {
+                const [r1, r2, r3] = await Promise.all([
+                    fetch(`${API}/api/vision/learning/domains`),
+                    fetch(`${API}/api/vision/learning/summary`),
+                    fetch(`${API}/api/vision/learning/suggestions?limit=5`),
+                ]);
+                const d1 = await r1.json();
+                Object.assign(learningDomains, d1.domains || {});
+                learningSummary.value = await r2.json();
+                const d3 = await r3.json();
+                learningSuggestions.splice(0, learningSuggestions.length, ...(d3.suggestions || []));
+            } catch {}
+        }
+        async function loadDomainDetail(domain) {
+            try {
+                const r = await fetch(`${API}/api/vision/learning/domains?domain=${domain}`);
+                const d = await r.json();
+                alert(JSON.stringify(d, null, 2));
+            } catch {}
+        }
+
+        // Alerts
+        const alerts = reactive([]);
+        const alertFilter = ref('');
+        const filteredAlerts = computed(() => alertFilter.value ? alerts.filter(a => a.level === alertFilter.value) : alerts);
+
+        async function fetchAlerts() {
+            try {
+                const r = await fetch(`${API}/api/monitor/alerts?limit=100`);
+                const d = await r.json();
+                alerts.splice(0, alerts.length, ...(d.alerts || []));
+            } catch {}
+        }
+
+        // History
+        const history = reactive([]);
+        async function loadHistory() {
+            try {
+                const r = await fetch(`${API}/api/vision/history?limit=50`);
+                const d = await r.json();
+                history.splice(0, history.length, ...(d.history || []));
+            } catch {}
+        }
+
+        function formatTime(ts) {
+            if (!ts) return '';
+            try { return new Date(ts).toLocaleString('zh-TW', { hour12: false }); } catch { return ts; }
+        }
+
+        onMounted(() => {
+            fetchHealth();
+            fetchMonitorStatus();
+            fetchAlerts();
+            loadHistory();
+            loadLearning();
+            connectWS();
+            healthTimer = setInterval(() => { fetchHealth(); fetchMonitorStatus(); fetchAlerts(); }, 10000);
+        });
+        onUnmounted(() => { if (healthTimer) clearInterval(healthTimer); if (ws) ws.close(); });
+
+        return {
+            activeTab, tabs, health, wsConnected,
+            selectedFile, previewUrl, analyzing, analyzeResult, dragover, analyzeOpts,
+            handleFileSelect, handleDrop, runAnalysis,
+            deepFile, deepFileName, deepStreamUrl, deepDragover, deepAnalyzing, deepResult, deepOpts,
+            handleDeepFileSelect, handleDeepDrop, runDeepAnalysis,
+            learningDomains, learningSummary, learningSuggestions, loadLearning, loadDomainDetail,
+            monitorStatus, showAddSource, newSource,
+            fetchMonitorStatus, startMonitor, stopMonitor, addSource, removeSource, captureNow,
+            constructionFile, constructionPreview, constructionResult, constructionLoading,
+            handleConstructionFile, runConstruction,
+            alerts, alertFilter, filteredAlerts,
+            history, loadHistory,
+            formatTime, API,
+        };
+    },
+    delimiters: ['{{', '}}'],
+}).mount('#app');
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# Construction Brain — 依賴清單
+# pip install -r requirements.txt
+
+# --- 語音辨識（faster-whisper，速度 x2-4）---
+faster-whisper>=1.0.0
+
+# --- 向量資料庫 ---
+chromadb>=1.0.0
+
+# --- YOLO 視覺偵測 ---
+ultralytics>=8.0.0
+
+# --- Web 框架（LINE Webhook / API）---
+fastapi>=0.100.0
+uvicorn>=0.20.0
+python-multipart>=0.0.6
+
+# --- 圖片處理 ---
+Pillow>=10.0.0
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+
+# --- S-Curve 圖表（可選）---
+# matplotlib>=3.7.0
+
+# --- 環境變數 ---
+python-dotenv>=1.0.0
+
+# --- HTTP 客戶端 ---
+httpx>=0.24.0

@@ -1,0 +1,83 @@
+{
+    "name": "男神拍拍 - AI 攝影助手",
+    "short_name": "男神拍拍",
+    "description": "智慧男性拍照軟件，AI 修圖與姿勢參考指南",
+    "start_url": "/photo_app/index.html",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#1a1a2e",
+    "theme_color": "#6366f1",
+    "icons": [
+        {
+            "src": "/photo_app/icons/icon-72.png",
+            "sizes": "72x72",
+            "type": "image/png"
+        },
+        {
+            "src": "/photo_app/icons/icon-96.png",
+            "sizes": "96x96",
+            "type": "image/png"
+        },
+        {
+            "src": "/photo_app/icons/icon-128.png",
+            "sizes": "128x128",
+            "type": "image/png"
+        },
+        {
+            "src": "/photo_app/icons/icon-144.png",
+            "sizes": "144x144",
+            "type": "image/png"
+        },
+        {
+            "src": "/photo_app/icons/icon-152.png",
+            "sizes": "152x152",
+            "type": "image/png"
+        },
+        {
+            "src": "/photo_app/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/photo_app/icons/icon-384.png",
+            "sizes": "384x384",
+            "type": "image/png"
+        },
+        {
+            "src": "/photo_app/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "categories": ["photo", "entertainment", "lifestyle"],
+    "screenshots": [
+        {
+            "src": "/photo_app/screenshots/main.png",
+            "sizes": "750x1334",
+            "type": "image/png",
+            "label": "拍照主介面"
+        },
+        {
+            "src": "/photo_app/screenshots/edit.png",
+            "sizes": "750x1334",
+            "type": "image/png",
+            "label": "AI 修圖介面"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "拍照",
+            "short_name": "拍照",
+            "description": "開啟相機拍照",
+            "url": "/photo_app/index.html?page=camera",
+            "icons": [{ "src": "/photo_app/icons/camera-96.png", "sizes": "96x96" }]
+        },
+        {
+            "name": "相簿",
+            "short_name": "相簿",
+            "description": "查看已拍攝的照片",
+            "url": "/photo_app/index.html?page=gallery",
+            "icons": [{ "src": "/photo_app/icons/gallery-96.png", "sizes": "96x96" }]
+        }
+    ]
+}

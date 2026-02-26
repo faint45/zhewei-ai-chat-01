@@ -1,0 +1,1 @@
+import discord\nimport os, subprocess, asyncio\n\n# 配置你的 Discord Token\nTOKEN = \

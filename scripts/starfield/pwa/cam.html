@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0f">
+<link rel="manifest" href="/cam/manifest.json">
+<link rel="apple-touch-icon" href="/cam/icon-192.png">
+<title>UFO Cam</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #0a0a0f; color: #e5e5e5;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif;
+    height: 100vh; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px; background: rgba(10,10,15,0.9);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    z-index: 10;
+  }
+  .top-bar h1 { font-size: 16px; font-weight: 700; }
+  .top-bar h1 span { color: #ef4444; }
+  .status { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-off { background: #555; }
+  .dot-on { background: #22c55e; animation: pulse 1.5s infinite; }
+  .dot-stream { background: #ef4444; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .cam-area {
+    flex: 1; position: relative; background: #000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #preview {
+    width: 100%; height: 100%; object-fit: cover;
+    /* 鏡像由 JS 控制，後鏡頭預設不翻轉 */
+  }
+  .cam-overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+  }
+  .cam-overlay .info {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(0,0,0,0.6); border-radius: 8px; padding: 6px 10px;
+    font-size: 11px; color: #aaa;
+  }
+  .cam-overlay .fps-badge {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(0,0,0,0.6); border-radius: 8px; padding: 6px 10px;
+    font-size: 13px; font-weight: 700; color: #22c55e;
+  }
+
+  .controls {
+    padding: 12px 16px 20px;
+    background: rgba(10,10,15,0.95);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+  .ctrl-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .ctrl-row:last-child { margin-bottom: 0; }
+
+  .btn {
+    flex: 1; padding: 12px; border: none; border-radius: 12px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-start { background: #16a34a; color: #fff; }
+  .btn-start:active { background: #15803d; transform: scale(0.97); }
+  .btn-stop { background: #dc2626; color: #fff; }
+  .btn-stop:active { background: #b91c1c; transform: scale(0.97); }
+  .btn-settings { background: #27272a; color: #ccc; flex: 0 0 48px; }
+  .btn-settings:active { background: #3f3f46; }
+  .btn-flip { background: #27272a; color: #ccc; flex: 0 0 48px; }
+
+  .settings-panel {
+    display: none; padding: 12px; margin-top: 8px;
+    background: #18181b; border-radius: 12px;
+  }
+  .settings-panel.open { display: block; }
+  .setting-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 13px;
+  }
+  .setting-item:last-child { border-bottom: none; }
+  .setting-item label { color: #aaa; }
+  .setting-item select, .setting-item input {
+    background: #27272a; border: 1px solid #3f3f46; color: #fff;
+    border-radius: 8px; padding: 6px 10px; font-size: 13px;
+  }
+
+  .stat-bar {
+    display: flex; gap: 16px; font-size: 11px; color: #666;
+    justify-content: center;
+  }
+  .stat-bar b { color: #aaa; }
+
+  /* 連線設定畫面 */
+  .setup-screen {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 24px;
+  }
+  .setup-screen h2 { font-size: 24px; margin-bottom: 8px; }
+  .setup-screen p { color: #888; font-size: 14px; margin-bottom: 24px; text-align: center; }
+  .setup-input {
+    width: 100%; max-width: 360px; padding: 14px 16px;
+    background: #18181b; border: 1px solid #3f3f46; border-radius: 12px;
+    color: #fff; font-size: 16px; margin-bottom: 12px; text-align: center;
+  }
+  .setup-input::placeholder { color: #555; }
+  .setup-btn {
+    width: 100%; max-width: 360px; padding: 14px;
+    background: #16a34a; color: #fff; border: none; border-radius: 12px;
+    font-size: 16px; font-weight: 700; cursor: pointer;
+  }
+  .setup-btn:active { background: #15803d; }
+  .setup-hint {
+    margin-top: 16px; font-size: 12px; color: #555;
+    text-align: center; max-width: 360px;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ===== 頂部狀態列 ===== -->
+<div class="top-bar">
+  <h1>🛸 <span>UFO</span> Cam</h1>
+  <div class="status">
+    <div class="dot dot-off" id="statusDot"></div>
+    <span id="statusText">未連線</span>
+  </div>
+</div>
+
+<!-- ===== 連線設定畫面 ===== -->
+<div class="setup-screen" id="setupScreen">
+  <h2>📡 連線設定</h2>
+  <p id="setupDesc">輸入電腦的 IP 位址，iPhone 攝影機畫面將串流到 UFO 偵測系統</p>
+  <div id="manualInputs">
+    <input type="text" class="setup-input" id="serverIp"
+           placeholder="電腦 IP（例如 192.168.1.100）"
+           inputmode="url" autocomplete="off">
+    <input type="text" class="setup-input" id="serverPort"
+           placeholder="Port（預設 8035）" value="8035"
+           inputmode="numeric">
+  </div>
+  <button class="setup-btn" onclick="doConnect()">🔗 連線並開始</button>
+  <div class="setup-hint" id="setupHint">
+    確保 iPhone 和電腦在同一個 WiFi 網路<br>
+    電腦 IP 可在 UFO Dashboard 設定頁查看
+  </div>
+</div>
+
+<!-- ===== 攝影機畫面 ===== -->
+<div class="cam-area hidden" id="camArea">
+  <video id="preview" autoplay playsinline muted></video>
+  <canvas id="captureCanvas" class="hidden"></canvas>
+  <div class="cam-overlay">
+    <div class="info">
+      <span id="resInfo">-</span> |
+      <span id="lensInfo">主鏡頭</span>
+    </div>
+    <div class="fps-badge" id="fpsBadge">-- FPS</div>
+  </div>
+</div>
+
+<!-- ===== 底部控制列 ===== -->
+<div class="controls hidden" id="controls">
+  <div class="ctrl-row">
+    <button class="btn btn-start" id="btnStream" onclick="toggleStream()">▶ 開始串流</button>
+    <button class="btn btn-flip" onclick="flipCamera()">🔄</button>
+    <button class="btn btn-settings" onclick="toggleSettings()">⚙️</button>
+  </div>
+
+  <div class="settings-panel" id="settingsPanel">
+    <div class="setting-item">
+      <label>解析度</label>
+      <select id="selRes" onchange="applySettings()">
+        <option value="3840x2160">4K (3840×2160)</option>
+        <option value="1920x1080" selected>1080p (1920×1080)</option>
+        <option value="1280x720">720p (1280×720)</option>
+        <option value="640x480">480p (640×480)</option>
+      </select>
+    </div>
+    <div class="setting-item">
+      <label>畫質 (JPEG %)</label>
+      <input type="range" id="qualitySlider" min="30" max="95" value="75"
+             oninput="document.getElementById('qualityVal').textContent=this.value"
+             onchange="applySettings()">
+      <span id="qualityVal">75</span>
+    </div>
+    <div class="setting-item">
+      <label>目標 FPS</label>
+      <select id="selFps" onchange="applySettings()">
+        <option value="5">5 FPS（省電）</option>
+        <option value="10">10 FPS</option>
+        <option value="15" selected>15 FPS</option>
+        <option value="24">24 FPS</option>
+        <option value="30">30 FPS</option>
+      </select>
+    </div>
+    <div class="setting-item">
+      <label>鏡像翻轉</label>
+      <input type="checkbox" id="chkMirror" onchange="applyMirror()">
+    </div>
+    <div class="setting-item">
+      <label>手電筒</label>
+      <input type="checkbox" id="chkTorch" onchange="toggleTorch()">
+    </div>
+  </div>
+
+  <div class="stat-bar" id="statBar">
+    <span>已傳送: <b id="sentFrames">0</b> 幀</span>
+    <span>流量: <b id="sentBytes">0</b> KB</span>
+    <span>延遲: <b id="latency">-</b> ms</span>
+  </div>
+</div>
+
+<script>
+// ===== 全域狀態 =====
+let ws = null;
+let stream = null;
+let streaming = false;
+let frameTimer = null;
+let facingMode = 'environment'; // 'environment' = 後鏡頭, 'user' = 前鏡頭
+let sentFrames = 0;
+let sentBytes = 0;
+let serverUrl = '';
+let currentTrack = null;
+
+// ===== 連線模式偵測 =====
+const isExternal = location.hostname.includes('.') && !location.hostname.match(/^\d/);
+// 外網模式（如 ufocam.zhe-wei.net）→ 直接用當前 host
+// 內網模式（如 192.168.1.100:8035）→ 用當前 host 或手動輸入
+
+function doConnect() {
+  if (isExternal) {
+    // 外網：直接用當前域名
+    serverUrl = location.host;
+  } else {
+    const ip = document.getElementById('serverIp').value.trim();
+    const port = document.getElementById('serverPort').value.trim() || '8035';
+    if (!ip) {
+      // 如果沒輸入 IP，嘗試用當前 host
+      serverUrl = location.host;
+    } else {
+      serverUrl = `${ip}:${port}`;
+    }
+  }
+  localStorage.setItem('ufo_cam_server', serverUrl);
+
+  // 開啟攝影機
+  startCamera().then(() => {
+    document.getElementById('setupScreen').classList.add('hidden');
+    document.getElementById('camArea').classList.remove('hidden');
+    document.getElementById('controls').classList.remove('hidden');
+    setStatus('ready', '已就緒');
+  }).catch(err => {
+    alert('無法開啟攝影機：' + err.message);
+  });
+}
+
+// ===== 攝影機 =====
+async function startCamera() {
+  const [w, h] = document.getElementById('selRes').value.split('x').map(Number);
+  const constraints = {
+    video: {
+      facingMode: facingMode,
+      width: { ideal: w },
+      height: { ideal: h },
+      frameRate: { ideal: 30 },
+    },
+    audio: false
+  };
+
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+  }
+
+  stream = await navigator.mediaDevices.getUserMedia(constraints);
+  const video = document.getElementById('preview');
+  video.srcObject = stream;
+  await video.play();
+
+  currentTrack = stream.getVideoTracks()[0];
+  const settings = currentTrack.getSettings();
+  document.getElementById('resInfo').textContent = `${settings.width}×${settings.height}`;
+
+  return stream;
+}
+
+async function flipCamera() {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  const isFront = facingMode === 'user';
+  document.getElementById('lensInfo').textContent = isFront ? '前鏡頭' : '主鏡頭';
+  // 前鏡頭自動鏡像，後鏡頭不鏡像
+  document.getElementById('chkMirror').checked = isFront;
+  applyMirror();
+  await startCamera();
+}
+
+async function toggleTorch() {
+  if (!currentTrack) return;
+  const on = document.getElementById('chkTorch').checked;
+  try {
+    await currentTrack.applyConstraints({ advanced: [{ torch: on }] });
+  } catch (e) {
+    console.warn('手電筒不支援:', e);
+    document.getElementById('chkTorch').checked = false;
+  }
+}
+
+function applyMirror() {
+  const mirror = document.getElementById('chkMirror').checked;
+  document.getElementById('preview').style.transform = mirror ? 'scaleX(-1)' : 'none';
+}
+
+async function applySettings() {
+  if (stream) await startCamera();
+}
+
+// ===== WebSocket 串流 =====
+function toggleStream() {
+  if (streaming) stopStream();
+  else startStream();
+}
+
+function startStream() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${proto}//${serverUrl}/ws/cam-feed`;
+
+  try {
+    ws = new WebSocket(wsUrl);
+  } catch (e) {
+    setStatus('off', '連線失敗');
+    alert('無法連線到伺服器：' + e.message);
+    return;
+  }
+
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => {
+    streaming = true;
+    setStatus('stream', '串流中');
+    document.getElementById('btnStream').textContent = '⏹ 停止串流';
+    document.getElementById('btnStream').className = 'btn btn-stop';
+    sentFrames = 0;
+    sentBytes = 0;
+
+    // 發送裝置資訊
+    const settings = currentTrack ? currentTrack.getSettings() : {};
+    ws.send(JSON.stringify({
+      type: 'init',
+      device: 'iPhone',
+      userAgent: navigator.userAgent,
+      width: settings.width || 0,
+      height: settings.height || 0,
+    }));
+
+    // 開始擷取幀
+    const fps = parseInt(document.getElementById('selFps').value);
+    const interval = Math.round(1000 / fps);
+    frameTimer = setInterval(captureAndSend, interval);
+  };
+
+  ws.onclose = () => {
+    streaming = false;
+    if (frameTimer) clearInterval(frameTimer);
+    setStatus('ready', '已斷線');
+    document.getElementById('btnStream').textContent = '▶ 開始串流';
+    document.getElementById('btnStream').className = 'btn btn-start';
+  };
+
+  ws.onerror = (e) => {
+    console.error('WebSocket error:', e);
+    setStatus('off', '連線錯誤');
+  };
+
+  ws.onmessage = (e) => {
+    // 伺服器回傳確認 / 指令
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'ack') {
+        const lat = Date.now() - msg.ts;
+        document.getElementById('latency').textContent = lat;
+      }
+    } catch (_) {}
+  };
+}
+
+function stopStream() {
+  if (frameTimer) clearInterval(frameTimer);
+  if (ws) ws.close();
+  streaming = false;
+  setStatus('ready', '已停止');
+  document.getElementById('btnStream').textContent = '▶ 開始串流';
+  document.getElementById('btnStream').className = 'btn btn-start';
+}
+
+function captureAndSend() {
+  if (!ws || ws.readyState !== WebSocket.OPEN || !stream) return;
+
+  const video = document.getElementById('preview');
+  const canvas = document.getElementById('captureCanvas');
+  const ctx = canvas.getContext('2d');
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0);
+
+  const quality = parseInt(document.getElementById('qualitySlider').value) / 100;
+  canvas.toBlob(blob => {
+    if (!blob || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+    // 發送二進位 JPEG
+    blob.arrayBuffer().then(buf => {
+      ws.send(buf);
+      sentFrames++;
+      sentBytes += buf.byteLength;
+      document.getElementById('sentFrames').textContent = sentFrames;
+      document.getElementById('sentBytes').textContent = Math.round(sentBytes / 1024);
+
+      // FPS 計算
+      document.getElementById('fpsBadge').textContent =
+        document.getElementById('selFps').value + ' FPS';
+    });
+  }, 'image/jpeg', quality);
+}
+
+// ===== UI =====
+function setStatus(mode, text) {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'dot ' + (mode === 'stream' ? 'dot-stream' : mode === 'ready' ? 'dot-on' : 'dot-off');
+  document.getElementById('statusText').textContent = text;
+}
+
+function toggleSettings() {
+  document.getElementById('settingsPanel').classList.toggle('open');
+}
+
+// ===== 初始化 =====
+if (isExternal) {
+  // 外網模式：隱藏手動輸入，簡化 UI
+  document.getElementById('manualInputs').classList.add('hidden');
+  document.getElementById('setupDesc').textContent = '點擊下方按鈕開啟攝影機並串流到 UFO 偵測系統';
+  document.getElementById('setupHint').innerHTML =
+    '🌐 外網模式：' + location.hostname + '<br>攝影機畫面將透過安全連線 (WSS) 傳輸';
+} else {
+  // 內網模式：恢復上次的伺服器位址
+  const saved = localStorage.getItem('ufo_cam_server');
+  if (saved) {
+    const parts = saved.split(':');
+    if (parts.length >= 2) {
+      document.getElementById('serverIp').value = parts.slice(0, -1).join(':');
+      document.getElementById('serverPort').value = parts[parts.length - 1];
+    }
+  }
+}
+
+// 註冊 Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/cam/sw.js').catch(() => {});
+}
+
+// 防止螢幕休眠（Wake Lock API）
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      await navigator.wakeLock.request('screen');
+    }
+  } catch (_) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') requestWakeLock();
+});
+requestWakeLock();
+</script>
+</body>
+</html>

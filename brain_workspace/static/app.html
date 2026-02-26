@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>築未科技 — 應用平台</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Segoe UI','Noto Sans TC',system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+:root{--sidebar-w:240px;--sidebar-collapsed:64px;--topbar-h:56px}
+
+/* Sidebar */
+.sidebar{width:var(--sidebar-w);transition:width .25s cubic-bezier(.4,0,.2,1);background:#0f172a;overflow:hidden;z-index:50}
+.sidebar.collapsed{width:var(--sidebar-collapsed)}
+.sidebar.collapsed .nav-label,.sidebar.collapsed .logo-text,.sidebar.collapsed .user-info{display:none}
+.sidebar.collapsed .nav-item{justify-content:center;padding:0 8px}
+.sidebar.collapsed .nav-icon{margin:0}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 20px;color:#94a3b8;cursor:pointer;border-radius:10px;margin:2px 8px;transition:all .15s;font-size:14px;white-space:nowrap}
+.nav-item:hover{background:rgba(59,130,246,.1);color:#e2e8f0}
+.nav-item.active{background:rgba(59,130,246,.15);color:#3b82f6;font-weight:600}
+.nav-icon{width:20px;text-align:center;flex-shrink:0;font-size:16px}
+.nav-divider{height:1px;background:#1e293b;margin:8px 16px}
+
+/* Task Tracker */
+.task-panel{position:fixed;bottom:20px;right:20px;width:340px;max-height:400px;background:#1e293b;border:1px solid #334155;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.4);z-index:100;overflow:hidden;transition:all .25s}
+.task-panel.minimized{width:auto;max-height:auto;border-radius:50px;cursor:pointer}
+.task-panel.minimized .task-body{display:none}
+.task-badge{background:#ef4444;color:white;font-size:10px;min-width:18px;height:18px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;font-weight:700}
+.progress-bar{height:6px;background:#334155;border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width .3s}
+
+/* Mobile */
+.mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:45}
+@media(max-width:768px){
+  .sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);width:280px!important;z-index:50}
+  .sidebar.mobile-open{transform:translateX(0)}
+  .mobile-overlay.show{display:block}
+  .task-panel{width:calc(100% - 32px);right:16px;bottom:16px}
+}
+
+/* Content */
+.content-frame{border:none;width:100%;height:100%;background:#0f172a}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:#334155;border-radius:2px}
+
+/* Loading */
+.module-loading{display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;flex-direction:column;gap:12px}
+.spinner{width:32px;height:32px;border:3px solid #334155;border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Dashboard cards */
+.dash-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;transition:all .2s}
+.dash-card:hover{border-color:#3b82f6;transform:translateY(-2px);box-shadow:0 8px 24px rgba(59,130,246,.1)}
+.quick-btn{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;color:#e2e8f0}
+.quick-btn:hover{background:#263348;border-color:#3b82f6;transform:translateY(-2px)}
+.quick-btn i{font-size:24px;margin-bottom:8px;display:block}
+</style>
+</head>
+<body class="bg-[#0f172a] text-slate-200">
+
+<!-- Login Gate -->
+<div id="loginGate" class="fixed inset-0 z-[999] bg-[#0f172a] flex items-center justify-center" style="display:none">
+<div class="w-full max-w-sm p-6">
+  <div class="text-center mb-8">
+    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4 shadow-lg shadow-blue-500/20">Z</div>
+    <h1 class="text-xl font-bold text-white">築未科技</h1>
+    <p class="text-sm text-slate-500 mt-1">應用平台登入</p>
+  </div>
+  <div class="bg-slate-800/60 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
+    <div id="loginErr" class="hidden mb-4 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm text-center"></div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">帳號</label>
+        <input id="loginUser" type="text" class="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none" placeholder="帳號">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">密碼</label>
+        <input id="loginPass" type="password" class="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none" placeholder="密碼"
+          onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button onclick="doLogin()" class="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold text-sm hover:brightness-110 transition">登入</button>
+    </div>
+    <p class="text-center mt-4 text-xs text-slate-500">還沒有帳號？<a href="/jarvis-register" class="text-blue-400">註冊</a></p>
+  </div>
+</div>
+</div>
+
+<!-- Main App -->
+<div id="mainApp" class="h-screen flex" style="display:none">
+
+<!-- Mobile Overlay -->
+<div class="mobile-overlay" id="mobileOverlay" onclick="toggleSidebar()"></div>
+
+<!-- Sidebar -->
+<aside class="sidebar flex flex-col" id="sidebar">
+  <div class="p-4 flex items-center gap-3 flex-shrink-0">
+    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">Z</div>
+    <span class="logo-text font-bold text-white text-sm">築未科技</span>
+  </div>
+
+  <nav class="flex-1 overflow-y-auto py-2" id="navList">
+    <div class="nav-item active" data-page="dashboard" onclick="goPage('dashboard')">
+      <i class="fas fa-th-large nav-icon"></i><span class="nav-label">主控台</span>
+    </div>
+    <div class="nav-item" data-page="ai" onclick="goPage('ai')">
+      <i class="fas fa-robot nav-icon"></i><span class="nav-label">AI 助理</span>
+    </div>
+    <div class="nav-item" data-page="studio" onclick="goPage('studio')">
+      <i class="fas fa-palette nav-icon"></i><span class="nav-label">AI 創作室</span>
+    </div>
+    <div class="nav-item" data-page="construction" onclick="goPage('construction')">
+      <i class="fas fa-hard-hat nav-icon"></i><span class="nav-label">營建管理</span>
+    </div>
+    <div class="nav-item" data-page="vision" onclick="goPage('vision')">
+      <i class="fas fa-eye nav-icon"></i><span class="nav-label">視覺辨識</span>
+    </div>
+    <div class="nav-item" data-page="code" onclick="goPage('code')">
+      <i class="fas fa-code nav-icon"></i><span class="nav-label">代碼工具</span>
+    </div>
+    <div class="nav-item" data-page="transfer" onclick="goPage('transfer')">
+      <i class="fas fa-exchange-alt nav-icon"></i><span class="nav-label">檔案傳輸</span>
+    </div>
+    <div class="nav-divider" id="adminDivider" style="display:none"></div>
+    <div class="nav-item" data-page="admin" id="adminNav" style="display:none" onclick="goPage('admin')">
+      <i class="fas fa-cog nav-icon"></i><span class="nav-label">系統管理</span>
+    </div>
+  </nav>
+
+  <!-- User -->
+  <div class="p-4 border-t border-slate-800 flex-shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0" id="userAvatar">A</div>
+      <div class="user-info min-w-0 flex-1">
+        <div class="text-sm font-medium text-slate-200 truncate" id="userName">—</div>
+        <div class="text-xs text-slate-500" id="userRole">—</div>
+      </div>
+      <button onclick="doLogout()" class="text-slate-500 hover:text-rose-400 transition" title="登出"><i class="fas fa-sign-out-alt"></i></button>
+    </div>
+  </div>
+</aside>
+
+<!-- Main Content -->
+<div class="flex-1 flex flex-col min-w-0">
+  <!-- Top Bar -->
+  <header class="h-14 flex items-center px-4 gap-3 border-b border-slate-800 flex-shrink-0 bg-[#0f172a]">
+    <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white md:hidden"><i class="fas fa-bars text-lg"></i></button>
+    <button onclick="toggleCollapse()" class="text-slate-400 hover:text-white hidden md:block"><i class="fas fa-bars text-lg"></i></button>
+    <div class="flex-1"></div>
+    <div id="topStatus" class="text-xs text-slate-500"></div>
+    <button onclick="toggleTaskPanel()" class="relative text-slate-400 hover:text-white" title="處理狀態">
+      <i class="fas fa-bolt"></i>
+      <span class="task-badge absolute -top-1 -right-2" id="taskBadge" style="display:none">0</span>
+    </button>
+    <button onclick="refreshPage()" class="text-slate-400 hover:text-white" title="重新整理"><i class="fas fa-sync-alt"></i></button>
+  </header>
+
+  <!-- Content Area -->
+  <main class="flex-1 overflow-hidden relative" id="contentArea">
+    <!-- Dashboard (inline) -->
+    <div id="pageDashboard" class="h-full overflow-y-auto p-6" style="padding-bottom:80px"></div>
+    <!-- iframe pages -->
+    <iframe id="pageFrame" class="content-frame" style="display:none" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"></iframe>
+    <!-- Loading -->
+    <div id="pageLoading" class="module-loading" style="display:none"><div class="spinner"></div><span class="text-sm">載入中...</span></div>
+  </main>
+</div>
+</div>
+
+<!-- Task Tracker Panel -->
+<div class="task-panel minimized" id="taskPanel" onclick="if(this.classList.contains('minimized'))toggleTaskPanel()">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+    <div class="flex items-center gap-2">
+      <i class="fas fa-bolt text-amber-400"></i>
+      <span class="text-sm font-semibold text-white">處理狀態</span>
+      <span class="task-badge" id="taskBadge2" style="display:none">0</span>
+    </div>
+    <button onclick="event.stopPropagation();toggleTaskPanel()" class="text-slate-400 hover:text-white text-sm"><i class="fas fa-chevron-down"></i></button>
+  </div>
+  <div class="task-body overflow-y-auto" style="max-height:300px">
+    <div id="taskList" class="p-3 space-y-3">
+      <div class="text-center text-slate-500 text-xs py-6">目前沒有進行中的任務</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API=window.location.origin;
+const JARVIS=API;
+const BRIDGE='https://bridge.zhe-wei.net';
+const CMS='https://cms.zhe-wei.net';
+const VISION='https://vision.zhe-wei.net';
+const CODESIM='https://codesim.zhe-wei.net';
+
+let token=localStorage.getItem('zw_token')||localStorage.getItem('jarvis_token')||'';
+let user=null;
+let currentPage='dashboard';
+let taskPollTimer=null;
+
+// ── Pages Config ──
+const PAGES={
+  dashboard:{title:'主控台',inline:true},
+  ai:{title:'AI 助理',url:'/jarvis'},
+  studio:{title:'AI 創作室',url:BRIDGE+'/ai-studio'},
+  construction:{title:'營建管理',url:CMS},
+  vision:{title:'視覺辨識',url:VISION},
+  code:{title:'代碼工具',url:CODESIM},
+  transfer:{title:'檔案傳輸',url:'/transfer'},
+  admin:{title:'系統管理',url:'/admin-commercial'},
+};
+
+// ── Auth ──
+async function doLogin(){
+  const u=document.getElementById('loginUser').value.trim();
+  const p=document.getElementById('loginPass').value.trim();
+  const err=document.getElementById('loginErr');
+  if(!u||!p){err.textContent='請輸入帳號密碼';err.classList.remove('hidden');return}
+  try{
+    const r=await fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const d=await r.json();
+    if(d.ok&&d.token){
+      token=d.token;
+      localStorage.setItem('zw_token',token);
+      localStorage.setItem('jarvis_token',token);
+      localStorage.setItem('jarvis_user',JSON.stringify(d.user||{}));
+      err.classList.add('hidden');
+      await initApp();
+    }else{
+      err.textContent=d.error||'登入失敗';err.classList.remove('hidden');
+    }
+  }catch(e){err.textContent='連線失敗';err.classList.remove('hidden')}
+}
+
+function doLogout(){
+  token='';user=null;
+  localStorage.removeItem('zw_token');
+  localStorage.removeItem('jarvis_token');
+  localStorage.removeItem('jarvis_user');
+  localStorage.removeItem('portal_token');
+  localStorage.removeItem('portal_user');
+  document.getElementById('mainApp').style.display='none';
+  document.getElementById('loginGate').style.display='flex';
+}
+
+async function checkAuth(){
+  if(!token)return false;
+  try{
+    const r=await fetch(API+'/api/auth/me',{headers:{'Authorization':'Bearer '+token}});
+    const d=await r.json();
+    if(d.ok&&d.user){user=d.user;return true}
+  }catch(e){}
+  return false;
+}
+
+// ── Init ──
+async function initApp(){
+  const ok=await checkAuth();
+  if(!ok){
+    document.getElementById('loginGate').style.display='flex';
+    document.getElementById('mainApp').style.display='none';
+    return;
+  }
+  document.getElementById('loginGate').style.display='none';
+  document.getElementById('mainApp').style.display='flex';
+
+  // User info
+  const name=user.username||'User';
+  document.getElementById('userName').textContent=name;
+  document.getElementById('userRole').textContent=user.role||'user';
+  document.getElementById('userAvatar').textContent=name.charAt(0).toUpperCase();
+
+  // Admin nav
+  const isAdmin=['superadmin','admin'].includes(user.role);
+  document.getElementById('adminNav').style.display=isAdmin?'':'none';
+  document.getElementById('adminDivider').style.display=isAdmin?'':'none';
+
+  goPage('dashboard');
+  startTaskPoll();
+}
+
+// ── Navigation ──
+function goPage(page){
+  currentPage=page;
+  // Update nav
+  document.querySelectorAll('.nav-item').forEach(el=>{
+    el.classList.toggle('active',el.dataset.page===page);
+  });
+  // Close mobile sidebar
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('mobileOverlay').classList.remove('show');
+
+  const cfg=PAGES[page];
+  const dash=document.getElementById('pageDashboard');
+  const frame=document.getElementById('pageFrame');
+  const loading=document.getElementById('pageLoading');
+
+  if(cfg.inline){
+    frame.style.display='none';
+    loading.style.display='none';
+    dash.style.display='block';
+    if(page==='dashboard')renderDashboard();
+  }else{
+    dash.style.display='none';
+    frame.style.display='none';
+    loading.style.display='flex';
+    // Build URL with token for jarvis pages
+    let url=cfg.url;
+    if(url.startsWith('/')&&token){
+      url+=url.includes('?')?'&':'?';
+      url+='_token='+encodeURIComponent(token);
+    }
+    frame.onload=()=>{loading.style.display='none';frame.style.display='block'};
+    frame.src=url;
+  }
+  document.getElementById('topStatus').textContent=cfg.title;
+}
+
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('mobileOverlay');
+  sb.classList.toggle('mobile-open');
+  ov.classList.toggle('show');
+}
+
+function toggleCollapse(){
+  document.getElementById('sidebar').classList.toggle('collapsed');
+}
+
+function refreshPage(){
+  if(currentPage==='dashboard')renderDashboard();
+  else{const f=document.getElementById('pageFrame');if(f.src)f.src=f.src}
+}
+
+// ── Dashboard ──
+async function renderDashboard(){
+  const el=document.getElementById('pageDashboard');
+  const name=user?.username||'User';
+  const role=user?.role||'';
+  const isAdmin=['superadmin','admin'].includes(role);
+  const hour=new Date().getHours();
+  const greeting=hour<12?'早安':hour<18?'午安':'晚安';
+
+  // Fetch stats in parallel
+  let health={},usage={},tasks={};
+  try{
+    const [h,u,t]=await Promise.all([
+      fetch(API+'/health').then(r=>r.json()).catch(()=>({})),
+      fetch(API+'/api/usage/today',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json()).catch(()=>({})),
+      fetch(API+'/api/agent/tasks',{headers:{'Authorization':'Bearer '+token}}).then(r=>r.json()).catch(()=>({})),
+    ]);
+    health=h;usage=u;tasks=t;
+  }catch(e){}
+
+  const sysOk=health.status==='healthy';
+  const todayCount=usage.total_requests||usage.count||0;
+  const todayCost=usage.total_cost||usage.cost||0;
+  const taskCount=tasks.count||0;
+  const recentTasks=(tasks.tasks||[]).slice(0,5);
+
+  el.innerHTML=`
+  <div class="max-w-5xl mx-auto">
+    <div class="mb-8">
+      <h1 class="text-2xl font-bold text-white">${greeting}，${name}</h1>
+      <p class="text-slate-400 text-sm mt-1">${role==='superadmin'?'超級管理員':role==='admin'?'管理員':'用戶'} · ${new Date().toLocaleDateString('zh-TW',{weekday:'long',month:'long',day:'numeric'})}</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div class="dash-card">
+        <div class="text-2xl font-bold ${sysOk?'text-emerald-400':'text-rose-400'}">${sysOk?'正常':'異常'}</div>
+        <div class="text-xs text-slate-500 mt-1">系統狀態</div>
+      </div>
+      <div class="dash-card">
+        <div class="text-2xl font-bold text-blue-400">${todayCount}</div>
+        <div class="text-xs text-slate-500 mt-1">今日 AI 請求</div>
+      </div>
+      <div class="dash-card">
+        <div class="text-2xl font-bold text-amber-400">$${todayCost.toFixed(2)}</div>
+        <div class="text-xs text-slate-500 mt-1">今日花費</div>
+      </div>
+      <div class="dash-card">
+        <div class="text-2xl font-bold text-purple-400">${taskCount}</div>
+        <div class="text-xs text-slate-500 mt-1">總任務數</div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <h2 class="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">快速操作</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+      <div class="quick-btn" onclick="goPage('ai')">
+        <i class="fas fa-robot text-blue-400"></i>
+        <div class="text-sm">問 AI</div>
+      </div>
+      <div class="quick-btn" onclick="goPage('studio')">
+        <i class="fas fa-palette text-purple-400"></i>
+        <div class="text-sm">生成圖片</div>
+      </div>
+      <div class="quick-btn" onclick="goPage('construction')">
+        <i class="fas fa-hard-hat text-orange-400"></i>
+        <div class="text-sm">營建管理</div>
+      </div>
+      <div class="quick-btn" onclick="goPage('transfer')">
+        <i class="fas fa-exchange-alt text-pink-400"></i>
+        <div class="text-sm">傳檔案</div>
+      </div>
+    </div>
+
+    ${isAdmin?`
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+      <div class="quick-btn" onclick="goPage('vision')">
+        <i class="fas fa-eye text-emerald-400"></i>
+        <div class="text-sm">視覺辨識</div>
+      </div>
+      <div class="quick-btn" onclick="goPage('code')">
+        <i class="fas fa-code text-cyan-400"></i>
+        <div class="text-sm">代碼工具</div>
+      </div>
+      <div class="quick-btn" onclick="goPage('admin')">
+        <i class="fas fa-cog text-slate-400"></i>
+        <div class="text-sm">系統管理</div>
+      </div>
+      <div class="quick-btn" onclick="window.open('/health-dashboard','_blank')">
+        <i class="fas fa-heartbeat text-rose-400"></i>
+        <div class="text-sm">健康檢查</div>
+      </div>
+    </div>`:''}
+
+    <!-- Recent Tasks -->
+    <h2 class="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">最近任務</h2>
+    <div class="space-y-2 mb-8">
+      ${recentTasks.length?recentTasks.map(t=>{
+        const icon=t.status==='done'?'check-circle text-emerald-400':t.status==='running'?'spinner fa-spin text-blue-400':t.status==='error'?'times-circle text-rose-400':'clock text-slate-500';
+        return `<div class="dash-card !p-3 flex items-center gap-3">
+          <i class="fas fa-${icon}"></i>
+          <div class="flex-1 min-w-0"><div class="text-sm truncate">${t.objective||t.id}</div><div class="text-xs text-slate-500">${t.updated_at||t.created_at||''}</div></div>
+          <span class="text-xs px-2 py-1 rounded-full ${t.status==='done'?'bg-emerald-500/10 text-emerald-400':t.status==='running'?'bg-blue-500/10 text-blue-400':'bg-slate-700 text-slate-400'}">${t.status}</span>
+        </div>`}).join('')
+      :'<div class="text-center text-slate-500 text-sm py-4">暫無任務</div>'}
+    </div>
+
+    <!-- System Info (admin only) -->
+    ${isAdmin?`
+    <h2 class="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">系統資訊</h2>
+    <div class="dash-card mb-8">
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        <div><span class="text-slate-500">引擎：</span>${health.engine||'—'}</div>
+        <div><span class="text-slate-500">模式：</span>${health.mode||'—'}</div>
+        <div><span class="text-slate-500">Ollama：</span>${health.ollama?'<span class="text-emerald-400">在線</span>':'<span class="text-rose-400">離線</span>'}</div>
+        <div><span class="text-slate-500">Vision：</span>${health.venv_vision?'<span class="text-emerald-400">就緒</span>':'<span class="text-slate-500">未安裝</span>'}</div>
+      </div>
+    </div>`:''}
+  </div>`;
+}
+
+// ── Task Tracker ──
+function toggleTaskPanel(){
+  const p=document.getElementById('taskPanel');
+  p.classList.toggle('minimized');
+}
+
+async function pollTasks(){
+  try{
+    const r=await fetch(API+'/api/agent/tasks',{headers:{'Authorization':'Bearer '+token}});
+    const d=await r.json();
+    if(!d.ok)return;
+    const all=d.tasks||[];
+    const running=all.filter(t=>t.status==='running'||t.status==='queued');
+    const recent=all.slice(0,8);
+    // Badge
+    const cnt=running.length;
+    ['taskBadge','taskBadge2'].forEach(id=>{
+      const el=document.getElementById(id);
+      el.style.display=cnt>0?'inline-flex':'none';
+      el.textContent=cnt;
+    });
+    // List
+    const list=document.getElementById('taskList');
+    if(recent.length===0){
+      list.innerHTML='<div class="text-center text-slate-500 text-xs py-6">目前沒有任務</div>';
+      return;
+    }
+    list.innerHTML=recent.map(t=>{
+      const isRun=t.status==='running';
+      const isDone=t.status==='done';
+      const isErr=t.status==='error';
+      const icon=isDone?'✅':isErr?'❌':isRun?'🔄':'⏳';
+      const pct=isDone?100:isRun?Math.min(90,Math.floor(Math.random()*60+30)):0;
+      const color=isDone?'bg-emerald-500':isErr?'bg-rose-500':isRun?'bg-blue-500':'bg-slate-600';
+      return `<div class="bg-slate-800/60 rounded-lg p-3">
+        <div class="flex items-center gap-2 mb-1">
+          <span>${icon}</span>
+          <span class="text-xs text-slate-300 flex-1 truncate">${t.objective||t.id}</span>
+          <span class="text-[10px] text-slate-500">${t.status}</span>
+        </div>
+        ${isRun?`<div class="progress-bar"><div class="progress-fill ${color}" style="width:${pct}%"></div></div>`:''}
+      </div>`}).join('');
+  }catch(e){}
+}
+
+function startTaskPoll(){
+  pollTasks();
+  if(taskPollTimer)clearInterval(taskPollTimer);
+  taskPollTimer=setInterval(pollTasks,5000);
+}
+
+// ── Boot ──
+(async()=>{
+  if(token){
+    await initApp();
+  }else{
+    document.getElementById('loginGate').style.display='flex';
+  }
+})();
+</script>
+</body>
+</html>

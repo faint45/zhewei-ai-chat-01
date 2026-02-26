@@ -1,0 +1,12 @@
+{
+  "id": "host_command_policy",
+  "name": "local-command 白名單",
+  "description": "只允許執行特定的 .exe 或 .bat，防止 AI 幻覺導致誤刪檔案",
+  "version": "1.0.0",
+  "enabled": true,
+  "allowed_builtins": ["dir", "cd", "where", "type", "echo", "echo."],
+  "allowed_extensions": [".bat", ".cmd", ".exe"],
+  "allowed_script_dirs": ["scripts", "ops"],
+  "allowed_executables": ["python.exe", "cmd.exe", "powershell.exe", "calc.exe", "notepad.exe"],
+  "allowed_path_patterns": ["scripts/*.bat", "scripts/*.cmd", "ops/*.bat", "ops/*.cmd", "*.bat", "*.cmd"]
+}

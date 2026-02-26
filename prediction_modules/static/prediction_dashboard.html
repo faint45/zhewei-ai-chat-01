@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>易經科學預測系統 - 築未科技</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <style>
+        .hexagram-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .risk-high { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .risk-medium { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); }
+        .risk-low { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); }
+        .pulse-animation {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app" class="min-h-screen">
+        <!-- 頂部導航 -->
+        <nav class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <h1 class="text-2xl font-bold">🔮 易經科學預測系統</h1>
+                        <span class="text-sm opacity-75">結合傳統智慧與現代科學</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2">
+                            <div :class="wsConnected ? 'bg-green-400' : 'bg-red-400'" 
+                                 class="w-3 h-3 rounded-full" 
+                                 :class="{'pulse-animation': wsConnected}"></div>
+                            <span class="text-sm">{{ wsConnected ? '即時連線' : '離線' }}</span>
+                        </div>
+                        <button @click="refreshData" 
+                                class="bg-white text-purple-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition">
+                            🔄 重新整理
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主要內容 -->
+        <div class="container mx-auto px-4 py-8">
+            <!-- 分頁導航 -->
+            <div class="bg-white rounded-lg shadow-md mb-6">
+                <div class="flex border-b">
+                    <button v-for="tab in tabs" :key="tab.id"
+                            @click="activeTab = tab.id"
+                            :class="activeTab === tab.id ? 'border-b-2 border-purple-600 text-purple-600' : 'text-gray-600'"
+                            class="px-6 py-4 font-medium hover:text-purple-600 transition">
+                        {{ tab.icon }} {{ tab.name }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- 總覽分頁 -->
+            <div v-show="activeTab === 'overview'" class="space-y-6">
+                <!-- 科學異常指標 -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">電離層異常</p>
+                                <p class="text-3xl font-bold text-purple-600">{{ (anomalyData.ionosphere_anomaly * 100).toFixed(1) }}%</p>
+                            </div>
+                            <div class="text-4xl">⚡</div>
+                        </div>
+                        <div class="mt-4 bg-gray-200 rounded-full h-2">
+                            <div class="bg-purple-600 h-2 rounded-full" 
+                                 :style="{width: (anomalyData.ionosphere_anomaly * 100) + '%'}"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">地磁異常</p>
+                                <p class="text-3xl font-bold text-indigo-600">{{ (anomalyData.geomagnetic_anomaly * 100).toFixed(1) }}%</p>
+                            </div>
+                            <div class="text-4xl">🧲</div>
+                        </div>
+                        <div class="mt-4 bg-gray-200 rounded-full h-2">
+                            <div class="bg-indigo-600 h-2 rounded-full" 
+                                 :style="{width: (anomalyData.geomagnetic_anomaly * 100) + '%'}"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">地震活動度</p>
+                                <p class="text-3xl font-bold text-red-600">{{ (anomalyData.seismic_activity * 100).toFixed(1) }}%</p>
+                            </div>
+                            <div class="text-4xl">🌍</div>
+                        </div>
+                        <div class="mt-4 bg-gray-200 rounded-full h-2">
+                            <div class="bg-red-600 h-2 rounded-full" 
+                                 :style="{width: (anomalyData.seismic_activity * 100) + '%'}"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">氣壓異常</p>
+                                <p class="text-3xl font-bold text-blue-600">{{ (anomalyData.pressure_anomaly * 100).toFixed(1) }}%</p>
+                            </div>
+                            <div class="text-4xl">🌡️</div>
+                        </div>
+                        <div class="mt-4 bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full" 
+                                 :style="{width: (anomalyData.pressure_anomaly * 100) + '%'}"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 最新預測 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div v-for="pred in latestPredictions" :key="pred.id"
+                         class="bg-white rounded-lg shadow-md p-6 hover:shadow-xl transition">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-xl font-bold">{{ getPredictionTypeText(pred.prediction_type) }}</h3>
+                            <span class="text-2xl">{{ getPredictionIcon(pred.prediction_type) }}</span>
+                        </div>
+                        
+                        <div class="hexagram-card text-white rounded-lg p-4 mb-4">
+                            <p class="text-sm opacity-75">卦象</p>
+                            <p class="text-2xl font-bold">{{ pred.hexagram_name }}</p>
+                            <p class="text-sm">第 {{ pred.hexagram_number }} 卦</p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">風險等級</span>
+                                <span class="font-bold" :class="getRiskColor(pred.risk_level)">
+                                    {{ pred.risk_level.toFixed(1) }}%
+                                </span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">預測時間</span>
+                                <span class="text-sm">{{ formatTime(pred.timestamp) }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">預測期間</span>
+                                <span class="text-sm">{{ pred.forecast_period }}</span>
+                            </div>
+                        </div>
+
+                        <button @click="viewPredictionDetail(pred)" 
+                                class="mt-4 w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition">
+                            查看詳情
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 統計數據 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold mb-4">📊 預測準確度統計</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="text-center p-4 bg-purple-50 rounded-lg">
+                            <p class="text-gray-600 text-sm">總預測次數</p>
+                            <p class="text-3xl font-bold text-purple-600">{{ statistics.total_predictions }}</p>
+                        </div>
+                        <div class="text-center p-4 bg-green-50 rounded-lg">
+                            <p class="text-gray-600 text-sm">已驗證次數</p>
+                            <p class="text-3xl font-bold text-green-600">{{ statistics.verified_predictions }}</p>
+                        </div>
+                        <div class="text-center p-4 bg-blue-50 rounded-lg">
+                            <p class="text-gray-600 text-sm">平均準確度</p>
+                            <p class="text-3xl font-bold text-blue-600">{{ statistics.average_accuracy }}%</p>
+                        </div>
+                        <div class="text-center p-4 bg-indigo-50 rounded-lg">
+                            <p class="text-gray-600 text-sm">成功率</p>
+                            <p class="text-3xl font-bold text-indigo-600">{{ statistics.success_rate }}%</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 地震預測分頁 -->
+            <div v-show="activeTab === 'earthquake'" class="space-y-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-2xl font-bold">🌍 地震預測</h3>
+                        <button @click="createPrediction('earthquake')" 
+                                class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition">
+                            立即預測
+                        </button>
+                    </div>
+
+                    <div v-if="currentPrediction && currentPrediction.prediction_type === 'earthquake'"
+                         class="border-2 border-purple-200 rounded-lg p-6 mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-lg font-bold mb-4">卦象解讀</h4>
+                                <div class="hexagram-card text-white rounded-lg p-6">
+                                    <p class="text-3xl font-bold mb-2">{{ currentPrediction.hexagram_name }}</p>
+                                    <p class="text-sm opacity-75 mb-4">{{ currentPrediction.prediction_details.trigrams }}</p>
+                                    <p class="text-sm">{{ currentPrediction.prediction_details.hexagram_interpretation }}</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 class="text-lg font-bold mb-4">預測結果</h4>
+                                <div class="space-y-4">
+                                    <div class="p-4 bg-red-50 rounded-lg">
+                                        <p class="text-sm text-gray-600">風險等級</p>
+                                        <p class="text-4xl font-bold text-red-600">{{ currentPrediction.risk_level.toFixed(1) }}%</p>
+                                        <p class="text-sm text-gray-600 mt-2">{{ currentPrediction.prediction_details.risk_category }}</p>
+                                    </div>
+
+                                    <div class="p-4 bg-gray-50 rounded-lg">
+                                        <p class="text-sm font-bold mb-2">預測指標：</p>
+                                        <ul class="space-y-1">
+                                            <li v-for="indicator in currentPrediction.prediction_details.indicators" 
+                                                class="text-sm">• {{ indicator }}</li>
+                                        </ul>
+                                    </div>
+
+                                    <div class="p-4 bg-yellow-50 rounded-lg">
+                                        <p class="text-sm font-bold mb-2">建議措施：</p>
+                                        <p class="text-sm">{{ currentPrediction.prediction_details.recommendation }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 近期地震數據 -->
+                    <div>
+                        <h4 class="text-lg font-bold mb-4">📍 近期地震記錄（7天內）</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left">時間</th>
+                                        <th class="px-4 py-2 text-left">位置</th>
+                                        <th class="px-4 py-2 text-left">規模</th>
+                                        <th class="px-4 py-2 text-left">深度</th>
+                                        <th class="px-4 py-2 text-left">來源</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="eq in earthquakeData" :key="eq.timestamp" 
+                                        class="border-b hover:bg-gray-50">
+                                        <td class="px-4 py-2 text-sm">{{ formatTime(eq.timestamp) }}</td>
+                                        <td class="px-4 py-2 text-sm">{{ eq.location }}</td>
+                                        <td class="px-4 py-2">
+                                            <span :class="getMagnitudeColor(eq.magnitude)" 
+                                                  class="font-bold">M {{ eq.magnitude.toFixed(1) }}</span>
+                                        </td>
+                                        <td class="px-4 py-2 text-sm">{{ eq.depth.toFixed(1) }} km</td>
+                                        <td class="px-4 py-2 text-sm">{{ eq.source }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 氣象預測分頁 -->
+            <div v-show="activeTab === 'weather'" class="space-y-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-2xl font-bold">🌤️ 氣象預測</h3>
+                        <button @click="createPrediction('weather')" 
+                                class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                            立即預測
+                        </button>
+                    </div>
+
+                    <div v-if="currentPrediction && currentPrediction.prediction_type === 'weather'"
+                         class="border-2 border-blue-200 rounded-lg p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-lg font-bold mb-4">卦象解讀</h4>
+                                <div class="hexagram-card text-white rounded-lg p-6">
+                                    <p class="text-3xl font-bold mb-2">{{ currentPrediction.hexagram_name }}</p>
+                                    <p class="text-sm">{{ currentPrediction.prediction_details.hexagram_interpretation }}</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 class="text-lg font-bold mb-4">預測結果</h4>
+                                <div class="space-y-4">
+                                    <div class="p-4 bg-blue-50 rounded-lg">
+                                        <p class="text-sm text-gray-600">天氣類型</p>
+                                        <p class="text-3xl font-bold text-blue-600">{{ currentPrediction.prediction_details.weather_type }}</p>
+                                    </div>
+
+                                    <div class="p-4 bg-orange-50 rounded-lg">
+                                        <p class="text-sm text-gray-600">嚴重程度</p>
+                                        <p class="text-3xl font-bold text-orange-600">{{ currentPrediction.risk_level.toFixed(1) }}%</p>
+                                    </div>
+
+                                    <div class="p-4 bg-gray-50 rounded-lg">
+                                        <p class="text-sm font-bold mb-2">預測指標：</p>
+                                        <ul class="space-y-1">
+                                            <li v-for="indicator in currentPrediction.prediction_details.indicators" 
+                                                class="text-sm">• {{ indicator }}</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 經濟預測分頁 -->
+            <div v-show="activeTab === 'economy'" class="space-y-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-2xl font-bold">📈 經濟預測</h3>
+                        <button @click="createPrediction('economy')" 
+                                class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
+                            立即預測
+                        </button>
+                    </div>
+
+                    <div v-if="currentPrediction && currentPrediction.prediction_type === 'economy'"
+                         class="border-2 border-green-200 rounded-lg p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-lg font-bold mb-4">卦象解讀</h4>
+                                <div class="hexagram-card text-white rounded-lg p-6">
+                                    <p class="text-3xl font-bold mb-2">{{ currentPrediction.hexagram_name }}</p>
+                                    <p class="text-sm">{{ currentPrediction.prediction_details.hexagram_interpretation }}</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 class="text-lg font-bold mb-4">預測結果</h4>
+                                <div class="space-y-4">
+                                    <div class="p-4 bg-green-50 rounded-lg">
+                                        <p class="text-sm text-gray-600">市場趨勢</p>
+                                        <p class="text-3xl font-bold text-green-600">{{ currentPrediction.prediction_details.trend }}</p>
+                                    </div>
+
+                                    <div class="p-4 bg-indigo-50 rounded-lg">
+                                        <p class="text-sm text-gray-600">信心指數</p>
+                                        <p class="text-3xl font-bold text-indigo-600">{{ currentPrediction.risk_level.toFixed(1) }}%</p>
+                                    </div>
+
+                                    <div class="p-4 bg-gray-50 rounded-lg">
+                                        <p class="text-sm font-bold mb-2">預測指標：</p>
+                                        <ul class="space-y-1">
+                                            <li v-for="indicator in currentPrediction.prediction_details.indicators" 
+                                                class="text-sm">• {{ indicator }}</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 歷史記錄分頁 -->
+            <div v-show="activeTab === 'history'" class="space-y-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-2xl font-bold mb-6">📜 預測歷史記錄</h3>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left">時間</th>
+                                    <th class="px-4 py-2 text-left">類型</th>
+                                    <th class="px-4 py-2 text-left">卦象</th>
+                                    <th class="px-4 py-2 text-left">風險等級</th>
+                                    <th class="px-4 py-2 text-left">狀態</th>
+                                    <th class="px-4 py-2 text-left">準確度</th>
+                                    <th class="px-4 py-2 text-left">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="pred in historyPredictions" :key="pred.id" 
+                                    class="border-b hover:bg-gray-50">
+                                    <td class="px-4 py-2 text-sm">{{ formatTime(pred.timestamp) }}</td>
+                                    <td class="px-4 py-2">
+                                        <span class="px-2 py-1 bg-purple-100 text-purple-600 rounded text-sm">
+                                            {{ getPredictionTypeText(pred.prediction_type) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-2 text-sm">{{ pred.hexagram_name }}</td>
+                                    <td class="px-4 py-2">
+                                        <span :class="getRiskColor(pred.risk_level)" class="font-bold">
+                                            {{ pred.risk_level.toFixed(1) }}%
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <span :class="getStatusBadge(pred.status)" 
+                                              class="px-2 py-1 rounded text-sm">
+                                            {{ getStatusText(pred.status) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <span v-if="pred.accuracy_score !== null" class="font-bold text-green-600">
+                                            {{ pred.accuracy_score.toFixed(1) }}%
+                                        </span>
+                                        <span v-else class="text-gray-400">-</span>
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <button @click="validatePrediction(pred)" 
+                                                v-if="pred.status === 'pending'"
+                                                class="text-blue-600 hover:text-blue-800 text-sm">
+                                            驗證
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 驗證對話框 -->
+        <div v-if="showValidationDialog" 
+             class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-xl font-bold mb-4">驗證預測結果</h3>
+                
+                <div class="space-y-4">
+                    <div v-if="validatingPrediction.prediction_type === 'earthquake'">
+                        <label class="block text-sm font-medium mb-2">是否發生地震？</label>
+                        <select v-model="validationData.occurred" class="w-full border rounded-lg px-3 py-2">
+                            <option :value="true">是</option>
+                            <option :value="false">否</option>
+                        </select>
+
+                        <div v-if="validationData.occurred">
+                            <label class="block text-sm font-medium mb-2 mt-4">地震規模</label>
+                            <input v-model.number="validationData.magnitude" type="number" step="0.1"
+                                   class="w-full border rounded-lg px-3 py-2">
+                            
+                            <label class="block text-sm font-medium mb-2 mt-4">距預測幾天後發生</label>
+                            <input v-model.number="validationData.days_from_prediction" type="number"
+                                   class="w-full border rounded-lg px-3 py-2">
+                        </div>
+                    </div>
+
+                    <div v-if="validatingPrediction.prediction_type === 'weather'">
+                        <label class="block text-sm font-medium mb-2">實際天氣類型</label>
+                        <select v-model="validationData.weather_type" class="w-full border rounded-lg px-3 py-2">
+                            <option>正常</option>
+                            <option>降雨</option>
+                            <option>高溫</option>
+                            <option>強風</option>
+                        </select>
+
+                        <label class="block text-sm font-medium mb-2 mt-4">嚴重程度 (0-100)</label>
+                        <input v-model.number="validationData.severity" type="number"
+                               class="w-full border rounded-lg px-3 py-2">
+                    </div>
+
+                    <div v-if="validatingPrediction.prediction_type === 'economy'">
+                        <label class="block text-sm font-medium mb-2">實際市場趨勢</label>
+                        <select v-model="validationData.trend" class="w-full border rounded-lg px-3 py-2">
+                            <option>上升</option>
+                            <option>下降</option>
+                            <option>震盪</option>
+                            <option>持平</option>
+                        </select>
+
+                        <label class="block text-sm font-medium mb-2 mt-4">實際波動率 (0-1)</label>
+                        <input v-model.number="validationData.volatility" type="number" step="0.01"
+                               class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                </div>
+
+                <div class="flex space-x-4 mt-6">
+                    <button @click="submitValidation" 
+                            class="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
+                        提交驗證
+                    </button>
+                    <button @click="showValidationDialog = false" 
+                            class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
+                        取消
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    activeTab: 'overview',
+                    tabs: [
+                        { id: 'overview', name: '總覽', icon: '📊' },
+                        { id: 'earthquake', name: '地震預測', icon: '🌍' },
+                        { id: 'weather', name: '氣象預測', icon: '🌤️' },
+                        { id: 'economy', name: '經濟預測', icon: '📈' },
+                        { id: 'history', name: '歷史記錄', icon: '📜' }
+                    ],
+                    wsConnected: false,
+                    ws: null,
+                    anomalyData: {
+                        ionosphere_anomaly: 0,
+                        geomagnetic_anomaly: 0,
+                        seismic_activity: 0,
+                        pressure_anomaly: 0,
+                        atmospheric_pressure: 1013
+                    },
+                    latestPredictions: [],
+                    historyPredictions: [],
+                    currentPrediction: null,
+                    earthquakeData: [],
+                    statistics: {
+                        total_predictions: 0,
+                        verified_predictions: 0,
+                        average_accuracy: 0,
+                        success_rate: 0
+                    },
+                    showValidationDialog: false,
+                    validatingPrediction: null,
+                    validationData: {}
+                }
+            },
+            mounted() {
+                this.initWebSocket();
+                this.refreshData();
+            },
+            methods: {
+                initWebSocket() {
+                    const wsUrl = `ws://${window.location.hostname}:8025/ws/predictions`;
+                    this.ws = new WebSocket(wsUrl);
+                    
+                    this.ws.onopen = () => {
+                        this.wsConnected = true;
+                        this.ws.send(JSON.stringify({ type: 'subscribe' }));
+                    };
+                    
+                    this.ws.onmessage = (event) => {
+                        const message = JSON.parse(event.data);
+                        if (message.type === 'new_prediction') {
+                            this.latestPredictions.unshift(message.data);
+                            if (this.latestPredictions.length > 3) {
+                                this.latestPredictions.pop();
+                            }
+                        }
+                    };
+                    
+                    this.ws.onclose = () => {
+                        this.wsConnected = false;
+                        setTimeout(() => this.initWebSocket(), 5000);
+                    };
+                },
+                async refreshData() {
+                    await Promise.all([
+                        this.fetchAnomalyData(),
+                        this.fetchHistory(),
+                        this.fetchStatistics(),
+                        this.fetchEarthquakeData()
+                    ]);
+                },
+                async fetchAnomalyData() {
+                    try {
+                        const response = await fetch('/api/scientific/anomaly');
+                        this.anomalyData = await response.json();
+                    } catch (error) {
+                        console.error('獲取異常數據失敗:', error);
+                    }
+                },
+                async fetchHistory() {
+                    try {
+                        const response = await fetch('/api/prediction/history?limit=50');
+                        const data = await response.json();
+                        this.historyPredictions = data.predictions;
+                        this.latestPredictions = data.predictions.slice(0, 3);
+                    } catch (error) {
+                        console.error('獲取歷史記錄失敗:', error);
+                    }
+                },
+                async fetchStatistics() {
+                    try {
+                        const response = await fetch('/api/prediction/statistics');
+                        this.statistics = await response.json();
+                    } catch (error) {
+                        console.error('獲取統計數據失敗:', error);
+                    }
+                },
+                async fetchEarthquakeData() {
+                    try {
+                        const response = await fetch('/api/scientific/earthquake?days=7');
+                        const data = await response.json();
+                        this.earthquakeData = data.data.slice(0, 20);
+                    } catch (error) {
+                        console.error('獲取地震數據失敗:', error);
+                    }
+                },
+                async createPrediction(type) {
+                    try {
+                        const response = await fetch('/api/prediction/predict', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                prediction_type: type,
+                                use_time_casting: false
+                            })
+                        });
+                        this.currentPrediction = await response.json();
+                        await this.refreshData();
+                    } catch (error) {
+                        console.error('創建預測失敗:', error);
+                        alert('預測失敗，請稍後再試');
+                    }
+                },
+                validatePrediction(prediction) {
+                    this.validatingPrediction = prediction;
+                    this.validationData = {};
+                    this.showValidationDialog = true;
+                },
+                async submitValidation() {
+                    try {
+                        const response = await fetch('/api/prediction/validate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                prediction_id: this.validatingPrediction.id,
+                                actual_event: this.validationData
+                            })
+                        });
+                        const result = await response.json();
+                        alert(`驗證完成！準確度: ${result.accuracy_score.toFixed(1)}%`);
+                        this.showValidationDialog = false;
+                        await this.refreshData();
+                    } catch (error) {
+                        console.error('驗證失敗:', error);
+                        alert('驗證失敗，請稍後再試');
+                    }
+                },
+                viewPredictionDetail(prediction) {
+                    this.currentPrediction = prediction;
+                    this.activeTab = prediction.prediction_type;
+                },
+                getPredictionTypeText(type) {
+                    const map = {
+                        'earthquake': '地震',
+                        'weather': '氣象',
+                        'economy': '經濟'
+                    };
+                    return map[type] || type;
+                },
+                getPredictionIcon(type) {
+                    const map = {
+                        'earthquake': '🌍',
+                        'weather': '🌤️',
+                        'economy': '📈'
+                    };
+                    return map[type] || '📊';
+                },
+                getRiskColor(risk) {
+                    if (risk >= 70) return 'text-red-600';
+                    if (risk >= 40) return 'text-orange-600';
+                    return 'text-green-600';
+                },
+                getMagnitudeColor(mag) {
+                    if (mag >= 6.0) return 'text-red-600';
+                    if (mag >= 5.0) return 'text-orange-600';
+                    if (mag >= 4.0) return 'text-yellow-600';
+                    return 'text-green-600';
+                },
+                getStatusBadge(status) {
+                    const map = {
+                        'pending': 'bg-yellow-100 text-yellow-600',
+                        'verified': 'bg-green-100 text-green-600',
+                        'failed': 'bg-red-100 text-red-600'
+                    };
+                    return map[status] || 'bg-gray-100 text-gray-600';
+                },
+                getStatusText(status) {
+                    const map = {
+                        'pending': '待驗證',
+                        'verified': '已驗證',
+                        'failed': '失敗'
+                    };
+                    return map[status] || status;
+                },
+                formatTime(timestamp) {
+                    if (!timestamp) return '-';
+                    const date = new Date(timestamp);
+                    return date.toLocaleString('zh-TW');
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

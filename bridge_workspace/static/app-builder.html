@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>App Builder - 構想即系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body{font-family:'Noto Sans TC',sans-serif;margin:0;height:100vh;overflow:hidden}
+        code,pre,.mono{font-family:'JetBrains Mono',monospace}
+        ::-webkit-scrollbar{width:5px}
+        ::-webkit-scrollbar-track{background:#0f172a}
+        ::-webkit-scrollbar-thumb{background:#475569;border-radius:3px}
+        @keyframes fade-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .fade-up{animation:fade-up .25s ease-out}
+        @keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(139,92,246,.5)}70%{box-shadow:0 0 0 8px rgba(139,92,246,0)}100%{box-shadow:0 0 0 0 rgba(139,92,246,0)}}
+        .pulse-ring{animation:pulse-ring 1.2s infinite}
+        .gradient-text{background:linear-gradient(135deg,#22d3ee,#a855f7,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .glass{background:rgba(15,23,42,.7);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.08)}
+        .tpl-card{transition:all .15s}
+        .tpl-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3)}
+        #codeStream{white-space:pre-wrap;word-break:break-all;tab-size:2}
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col h-screen">
+
+<!-- 頂部 -->
+<nav class="flex-shrink-0 glass border-b border-slate-800 px-4 py-2.5 z-50">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <a href="/" class="text-slate-400 hover:text-white transition" title="返回 Smart Bridge"><i class="fas fa-arrow-left"></i></a>
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center">
+                <i class="fas fa-wand-magic-sparkles text-white text-sm"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-sm gradient-text leading-tight">App Builder</h1>
+                <p class="text-[10px] text-slate-500 leading-tight">構想即系統 · 即時串流</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <span id="statusBadge" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-violet-500/20 text-violet-300">
+                <span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"></span>生成中
+            </span>
+            <button onclick="toggleView('code')" id="btnCode" class="px-2.5 py-1 rounded-lg text-xs text-slate-500 hover:text-white hover:bg-slate-800 transition" title="原始碼">
+                <i class="fas fa-code"></i>
+            </button>
+            <button onclick="toggleHistory()" class="px-2.5 py-1 rounded-lg text-xs text-slate-500 hover:text-white hover:bg-slate-800 transition" title="歷史">
+                <i class="fas fa-clock-rotate-left"></i>
+            </button>
+        </div>
+    </div>
+</nav>
+
+<!-- 主體 -->
+<div class="flex-1 flex overflow-hidden">
+
+    <!-- 左側 -->
+    <div id="leftPanel" class="w-full lg:w-[400px] flex-shrink-0 flex flex-col border-r border-slate-800/60">
+
+        <!-- 輸入區 -->
+        <div class="p-3 flex-shrink-0 border-b border-slate-800/40">
+            <div class="relative">
+                <textarea id="ideaInput" rows="2" placeholder="描述你的構想，按 Enter 即時生成..."
+                    class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 pr-12 text-sm resize-none focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition placeholder:text-slate-600"></textarea>
+                <button onclick="generate()" id="genBtn"
+                    class="absolute right-2 bottom-2 w-8 h-8 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 rounded-lg flex items-center justify-center transition text-white text-xs" title="生成 (Enter)">
+                    <i class="fas fa-bolt"></i>
+                </button>
+            </div>
+            <div id="refineBox" class="mt-2 hidden">
+                <textarea id="refineInput" rows="2" placeholder="修改要求..."
+                    class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm resize-none focus:outline-none focus:border-amber-500/50 transition placeholder:text-slate-600"></textarea>
+            </div>
+            <!-- 即時狀態 -->
+            <div id="streamStatus" class="mt-2 hidden">
+                <div class="flex items-center justify-between text-[10px]">
+                    <span id="statusText" class="text-violet-300">串流生成中...</span>
+                    <span id="charCount" class="text-slate-600 mono">0 chars</span>
+                </div>
+                <div class="mt-1 h-1 bg-slate-900 rounded-full overflow-hidden">
+                    <div id="progressBar" class="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-300" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 快捷範本 -->
+        <div class="p-3 flex-shrink-0 border-b border-slate-800/40">
+            <div class="text-[10px] text-slate-500 mb-2 font-medium uppercase tracking-wider">快捷範本 · 一鍵生成</div>
+            <div class="grid grid-cols-2 gap-1.5" id="templates">
+                <button onclick="quickGen('專案看板：可拖拉卡片、設定優先級和截止日期、進度統計')" class="tpl-card text-left p-2.5 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition">
+                    <div class="text-xs font-medium text-slate-200"><i class="fas fa-columns text-cyan-400 mr-1"></i>專案看板</div>
+                    <div class="text-[10px] text-slate-500 mt-0.5">拖拉卡片 · 進度追蹤</div>
+                </button>
+                <button onclick="quickGen('記帳本：收入支出記錄、分類統計圖表、月度報表、預算管理')" class="tpl-card text-left p-2.5 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition">
+                    <div class="text-xs font-medium text-slate-200"><i class="fas fa-wallet text-green-400 mr-1"></i>記帳本</div>
+                    <div class="text-[10px] text-slate-500 mt-0.5">收支統計 · 圖表分析</div>
+                </button>
+                <button onclick="quickGen('番茄鐘計時器：25分鐘工作+5分鐘休息、任務清單、完成統計、音效提醒')" class="tpl-card text-left p-2.5 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition">
+                    <div class="text-xs font-medium text-slate-200"><i class="fas fa-clock text-red-400 mr-1"></i>番茄鐘</div>
+                    <div class="text-[10px] text-slate-500 mt-0.5">專注計時 · 任務管理</div>
+                </button>
+                <button onclick="quickGen('密碼管理器：生成強密碼、分類儲存、搜尋、複製、AES加密')" class="tpl-card text-left p-2.5 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition">
+                    <div class="text-xs font-medium text-slate-200"><i class="fas fa-key text-amber-400 mr-1"></i>密碼管理</div>
+                    <div class="text-[10px] text-slate-500 mt-0.5">生成 · 加密儲存</div>
+                </button>
+                <button onclick="quickGen('Markdown 編輯器：即時預覽、語法高亮、匯出HTML/PDF、自動儲存')" class="tpl-card text-left p-2.5 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition">
+                    <div class="text-xs font-medium text-slate-200"><i class="fas fa-pen-fancy text-purple-400 mr-1"></i>Markdown</div>
+                    <div class="text-[10px] text-slate-500 mt-0.5">即時預覽 · 匯出</div>
+                </button>
+                <button onclick="quickGen('習慣追蹤器：每日打卡、連續天數、統計圖表、多習慣管理、提醒')" class="tpl-card text-left p-2.5 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800/50 transition">
+                    <div class="text-xs font-medium text-slate-200"><i class="fas fa-check-double text-emerald-400 mr-1"></i>習慣追蹤</div>
+                    <div class="text-[10px] text-slate-500 mt-0.5">每日打卡 · 連續統計</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- 歷史列表 -->
+        <div class="flex-1 overflow-y-auto p-3">
+            <div class="text-[10px] text-slate-500 mb-2 font-medium uppercase tracking-wider">歷史記錄</div>
+            <div id="historyList" class="space-y-1.5"></div>
+        </div>
+    </div>
+
+    <!-- 右側：預覽 / 原始碼 -->
+    <div class="flex-1 flex flex-col bg-slate-950 min-w-0">
+        <!-- 工具列 -->
+        <div id="previewToolbar" class="flex-shrink-0 glass border-b border-slate-800/50 px-4 py-1.5 flex items-center justify-between hidden">
+            <div class="flex items-center gap-3 text-[10px] text-slate-400">
+                <span id="buildInfo"></span>
+            </div>
+            <div class="flex items-center gap-1">
+                <button onclick="setPreviewSize('mobile')" class="px-2 py-1 rounded text-xs text-slate-500 hover:text-white hover:bg-slate-800 transition" title="手機"><i class="fas fa-mobile-screen"></i></button>
+                <button onclick="setPreviewSize('tablet')" class="px-2 py-1 rounded text-xs text-slate-500 hover:text-white hover:bg-slate-800 transition" title="平板"><i class="fas fa-tablet-screen-button"></i></button>
+                <button onclick="setPreviewSize('desktop')" class="px-2 py-1 rounded text-xs text-slate-500 hover:text-white hover:bg-slate-800 transition" title="桌面"><i class="fas fa-desktop"></i></button>
+                <div class="w-px h-3 bg-slate-800 mx-1"></div>
+                <button onclick="iterateApp()" class="px-2 py-1 rounded text-xs text-slate-500 hover:text-amber-400 hover:bg-slate-800 transition" title="迭代修改"><i class="fas fa-pen-to-square"></i></button>
+                <button onclick="openInNewTab()" class="px-2 py-1 rounded text-xs text-slate-500 hover:text-white hover:bg-slate-800 transition" title="新分頁"><i class="fas fa-up-right-from-square"></i></button>
+                <button onclick="downloadHtml()" class="px-2 py-1 rounded text-xs text-slate-500 hover:text-white hover:bg-slate-800 transition" title="下載"><i class="fas fa-download"></i></button>
+                <button onclick="copyHtml()" class="px-2 py-1 rounded text-xs text-slate-500 hover:text-white hover:bg-slate-800 transition" title="複製"><i class="fas fa-copy"></i></button>
+            </div>
+        </div>
+
+        <!-- 預覽 iframe -->
+        <div id="previewArea" class="flex-1 flex items-center justify-center p-2 overflow-hidden">
+            <div id="emptyState" class="text-center fade-up">
+                <div class="text-5xl mb-3">⚡</div>
+                <h2 class="text-lg font-bold text-slate-300 mb-1">構想即系統</h2>
+                <p class="text-xs text-slate-500 max-w-xs">輸入想法或點擊範本，AI 即時串流生成完整應用</p>
+                <p class="text-[10px] text-slate-600 mt-2">Groq 70B · 免費 · 秒級回應</p>
+            </div>
+            <iframe id="preview" title="App Preview" class="hidden rounded-xl border border-slate-800 bg-white shadow-2xl transition-all duration-300" style="width:100%;height:100%"></iframe>
+        </div>
+
+        <!-- 原始碼面板 -->
+        <div id="codeArea" class="flex-1 overflow-auto p-3 hidden">
+            <pre id="codeStream" class="text-[11px] text-slate-300 mono leading-relaxed"></pre>
+        </div>
+    </div>
+</div>
+
+<script>
+const BASE = location.origin;
+let currentHtml = '';
+let currentBuildId = '';
+let isGenerating = false;
+let currentView = 'preview'; // 'preview' | 'code'
+let abortCtrl = null;
+
+function quickGen(idea) {
+    document.getElementById('ideaInput').value = idea;
+    generate();
+}
+
+async function generate() {
+    if (isGenerating) { if (abortCtrl) abortCtrl.abort(); return; }
+    const idea = document.getElementById('ideaInput').value.trim();
+    if (!idea) return;
+    const refine = document.getElementById('refineInput')?.value?.trim() || '';
+
+    isGenerating = true;
+    abortCtrl = new AbortController();
+    const btn = document.getElementById('genBtn');
+    const badge = document.getElementById('statusBadge');
+    const streamSt = document.getElementById('streamStatus');
+    const stxt = document.getElementById('statusText');
+    const bar = document.getElementById('progressBar');
+    const charCnt = document.getElementById('charCount');
+    const codeEl = document.getElementById('codeStream');
+
+    btn.innerHTML = '<i class="fas fa-stop"></i>';
+    badge.classList.remove('hidden');
+    badge.classList.add('flex');
+    streamSt.classList.remove('hidden');
+    stxt.textContent = '⚡ 串流生成中...';
+    bar.style.width = '5%';
+    codeEl.textContent = '';
+    currentHtml = '';
+
+    // 切到原始碼視圖看串流
+    toggleView('code');
+
+    let charTotal = 0;
+    try {
+        const r = await fetch(BASE + '/api/app-builder/stream', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({idea, refine}),
+            signal: abortCtrl.signal,
+        });
+
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, {stream: true});
+
+            let lines = buf.split('\n');
+            buf = lines.pop();
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                try {
+                    const d = JSON.parse(line.slice(6));
+                    if (d.type === 'chunk') {
+                        charTotal += d.content.length;
+                        codeEl.textContent += d.content;
+                        charCnt.textContent = charTotal + ' chars';
+                        bar.style.width = Math.min(5 + (charTotal / 80), 95) + '%';
+                        // 自動滾到底
+                        codeEl.parentElement.scrollTop = codeEl.parentElement.scrollHeight;
+                    } else if (d.type === 'done') {
+                        currentHtml = d.html;
+                        currentBuildId = d.build_id;
+                        bar.style.width = '100%';
+                        stxt.textContent = `✅ ${d.provider} · ${d.duration_ms}ms · ${(d.size_bytes/1024).toFixed(1)}KB`;
+                        showBuildInfo(d);
+                        // 自動切到預覽
+                        setTimeout(() => {
+                            showPreview(d.html);
+                            toggleView('preview');
+                        }, 300);
+                        loadHistory();
+                        document.getElementById('refineBox').classList.remove('hidden');
+                        document.getElementById('refineInput').value = '';
+                    } else if (d.type === 'error') {
+                        stxt.textContent = '❌ ' + d.message;
+                        bar.style.width = '0%';
+                    }
+                } catch(e) {}
+            }
+        }
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            stxt.textContent = '❌ ' + e.message;
+            bar.style.width = '0%';
+        }
+    }
+
+    isGenerating = false;
+    abortCtrl = null;
+    btn.innerHTML = '<i class="fas fa-bolt"></i>';
+    badge.classList.add('hidden');
+    badge.classList.remove('flex');
+}
+
+function showPreview(html) {
+    const iframe = document.getElementById('preview');
+    document.getElementById('emptyState').classList.add('hidden');
+    iframe.classList.remove('hidden');
+    document.getElementById('previewToolbar').classList.remove('hidden');
+    iframe.srcdoc = html;
+}
+
+function showBuildInfo(data) {
+    document.getElementById('buildInfo').innerHTML =
+        `<i class="fas fa-microchip mr-1"></i>${data.provider} · ${data.duration_ms}ms · ${(data.size_bytes/1024).toFixed(1)}KB`;
+}
+
+function toggleView(view) {
+    currentView = view || (currentView === 'preview' ? 'code' : 'preview');
+    document.getElementById('previewArea').classList.toggle('hidden', currentView === 'code');
+    document.getElementById('codeArea').classList.toggle('hidden', currentView === 'preview');
+    document.getElementById('btnCode').classList.toggle('text-violet-400', currentView === 'code');
+    document.getElementById('btnCode').classList.toggle('text-slate-500', currentView === 'preview');
+}
+
+function setPreviewSize(size) {
+    const iframe = document.getElementById('preview');
+    if (size === 'mobile') { iframe.style.width = '375px'; iframe.style.height = '667px'; }
+    else if (size === 'tablet') { iframe.style.width = '768px'; iframe.style.height = '100%'; }
+    else { iframe.style.width = '100%'; iframe.style.height = '100%'; }
+}
+
+function iterateApp() {
+    document.getElementById('refineBox').classList.remove('hidden');
+    document.getElementById('refineInput').focus();
+}
+
+function openInNewTab() {
+    if (!currentBuildId) return;
+    window.open(BASE + '/api/app-builder/builds/' + currentBuildId, '_blank');
+}
+
+function downloadHtml() {
+    if (!currentHtml) return;
+    const blob = new Blob([currentHtml], {type: 'text/html'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (currentBuildId || 'app') + '.html';
+    a.click();
+}
+
+function copyHtml() {
+    if (!currentHtml) return;
+    navigator.clipboard.writeText(currentHtml).then(() => {
+        const btn = event.target.closest('button');
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check text-green-400"></i>';
+        setTimeout(() => btn.innerHTML = orig, 1200);
+    });
+}
+
+function toggleHistory() {
+    const lp = document.getElementById('leftPanel');
+    lp.classList.toggle('hidden');
+}
+
+async function loadHistory() {
+    try {
+        const r = await fetch(BASE + '/api/app-builder/builds');
+        const data = await r.json();
+        const list = document.getElementById('historyList');
+        if (!data.builds || data.builds.length === 0) {
+            list.innerHTML = '<div class="text-[10px] text-slate-600 text-center py-3">尚無記錄</div>';
+            return;
+        }
+        list.innerHTML = data.builds.map(b => `
+            <div class="bg-slate-900/60 rounded-lg p-2.5 hover:bg-slate-800/80 transition cursor-pointer group" onclick="loadBuild('${b.id}')">
+                <div class="text-xs font-medium text-slate-300 truncate">${escHtml(b.idea)}</div>
+                <div class="flex items-center gap-2 mt-1 text-[10px] text-slate-600">
+                    <span>${b.provider}</span>
+                    <span>${b.duration_ms}ms</span>
+                    <span>${(b.size_bytes/1024).toFixed(1)}KB</span>
+                    <span class="ml-auto">${new Date(b.created_at).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
+                    <button onclick="event.stopPropagation();deleteBuild('${b.id}')" class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition" title="刪除">
+                        <i class="fas fa-trash-can text-[9px]"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } catch(e) { console.error(e); }
+}
+
+async function loadBuild(id) {
+    try {
+        const r = await fetch(BASE + '/api/app-builder/builds/' + id);
+        const html = await r.text();
+        currentHtml = html;
+        currentBuildId = id;
+        showPreview(html);
+        document.getElementById('codeStream').textContent = html;
+        document.getElementById('buildInfo').innerHTML = `<span class="text-slate-500">${id}</span>`;
+        document.getElementById('previewToolbar').classList.remove('hidden');
+        toggleView('preview');
+    } catch(e) { console.error(e); }
+}
+
+async function deleteBuild(id) {
+    if (!confirm('確定刪除？')) return;
+    await fetch(BASE + '/api/app-builder/builds/' + id, {method:'DELETE'});
+    loadHistory();
+}
+
+function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// 快捷鍵：Enter 生成，Ctrl+Enter 也生成
+document.getElementById('ideaInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); }
+});
+document.getElementById('refineInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); }
+});
+
+loadHistory();
+</script>
+</body>
+</html>

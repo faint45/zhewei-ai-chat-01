@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>築未科技 — SaaS 管理後台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: { colors: {
+    brand: { 50:'#f0f9ff', 100:'#e0f2fe', 500:'#0ea5e9', 600:'#0284c7', 700:'#0369a1', 900:'#0c4a6e' }
+  }}}
+}
+</script>
+<style>
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+.card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; }
+.btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.btn-primary { background: #0ea5e9; color: white; }
+.btn-primary:hover { background: #0284c7; }
+.btn-danger { background: #ef4444; color: white; }
+.btn-danger:hover { background: #dc2626; }
+.btn-outline { border: 1px solid #475569; color: #94a3b8; }
+.btn-outline:hover { border-color: #0ea5e9; color: #0ea5e9; }
+.badge { padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
+.badge-green { background: #065f46; color: #6ee7b7; }
+.badge-yellow { background: #713f12; color: #fde047; }
+.badge-red { background: #7f1d1d; color: #fca5a5; }
+.badge-blue { background: #1e3a5f; color: #7dd3fc; }
+.stat-num { font-size: 2rem; font-weight: 700; line-height: 1; }
+input, select { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 8px 12px; color: #e2e8f0; width: 100%; }
+input:focus, select:focus { outline: none; border-color: #0ea5e9; }
+.tab-active { border-bottom: 2px solid #0ea5e9; color: #0ea5e9; }
+.fade-in { animation: fadeIn .3s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Header -->
+<header class="border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <div class="w-10 h-10 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold text-lg">築</div>
+    <div>
+      <h1 class="text-lg font-bold text-white">SaaS 管理後台</h1>
+      <p class="text-xs text-slate-400">租戶 · 帳單 · 用量 · 知識庫 · 監控</p>
+    </div>
+  </div>
+  <div class="flex items-center gap-3">
+    <span id="adminUser" class="text-sm text-slate-400"></span>
+    <button onclick="location.href='/jarvis'" class="btn btn-outline text-sm">← 返回主系統</button>
+  </div>
+</header>
+
+<!-- Tabs -->
+<nav class="border-b border-slate-700 px-6 flex gap-6">
+  <button class="py-3 text-sm font-medium tab-active" data-tab="overview" onclick="switchTab('overview')">📊 總覽</button>
+  <button class="py-3 text-sm font-medium text-slate-400 hover:text-white" data-tab="licenses" onclick="switchTab('licenses')">🔑 License 管理</button>
+  <button class="py-3 text-sm font-medium text-slate-400 hover:text-white" data-tab="usage" onclick="switchTab('usage')">📈 用量統計</button>
+  <button class="py-3 text-sm font-medium text-slate-400 hover:text-white" data-tab="kb" onclick="switchTab('kb')">📚 知識庫同步</button>
+  <button class="py-3 text-sm font-medium text-slate-400 hover:text-white" data-tab="tenants" onclick="switchTab('tenants')">🏢 租戶管理</button>
+  <button class="py-3 text-sm font-medium text-slate-400 hover:text-white" data-tab="billing" onclick="switchTab('billing')">💳 帳單訂閱</button>
+  <button class="py-3 text-sm font-medium text-slate-400 hover:text-white" data-tab="monitor" onclick="switchTab('monitor')">🔍 系統監控</button>
+</nav>
+
+<!-- Content -->
+<main class="p-6 max-w-7xl mx-auto">
+
+<!-- ===== 總覽 Tab ===== -->
+<div id="tab-overview" class="fade-in">
+  <!-- Stats Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="card">
+      <p class="text-slate-400 text-sm mb-1">License 狀態</p>
+      <p class="stat-num" id="statLicense">-</p>
+      <p class="text-xs text-slate-500 mt-1" id="statLicenseSub"></p>
+    </div>
+    <div class="card">
+      <p class="text-slate-400 text-sm mb-1">今日 AI 呼叫</p>
+      <p class="stat-num text-brand-500" id="statCalls">0</p>
+      <p class="text-xs text-slate-500 mt-1" id="statCallsSub"></p>
+    </div>
+    <div class="card">
+      <p class="text-slate-400 text-sm mb-1">今日 Token</p>
+      <p class="stat-num text-emerald-400" id="statTokens">0</p>
+      <p class="text-xs text-slate-500 mt-1" id="statTokensSub"></p>
+    </div>
+    <div class="card">
+      <p class="text-slate-400 text-sm mb-1">知識庫版本</p>
+      <p class="stat-num text-amber-400" id="statKBVer">v0</p>
+      <p class="text-xs text-slate-500 mt-1" id="statKBSub"></p>
+    </div>
+  </div>
+
+  <!-- System Status -->
+  <div class="card mb-6">
+    <h3 class="font-bold mb-3">🖥️ 系統狀態</h3>
+    <div id="systemStatusGrid" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="card">
+    <h3 class="font-bold mb-3">⚡ 快速操作</h3>
+    <div class="flex flex-wrap gap-3">
+      <button onclick="switchTab('licenses');showGenForm()" class="btn btn-primary">🔑 生成 License</button>
+      <button onclick="exportKB()" class="btn btn-outline">📦 匯出知識庫</button>
+      <button onclick="refreshAll()" class="btn btn-outline">🔄 重新整理</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== License Tab ===== -->
+<div id="tab-licenses" class="hidden fade-in">
+  <!-- Generate Form -->
+  <div class="card mb-6" id="genForm">
+    <h3 class="font-bold mb-4">🔑 生成新 License</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div>
+        <label class="text-sm text-slate-400 mb-1 block">客戶名稱</label>
+        <input id="genCustomer" placeholder="例：王大明工程行">
+      </div>
+      <div>
+        <label class="text-sm text-slate-400 mb-1 block">方案</label>
+        <select id="genTier">
+          <option value="free">免費體驗版</option>
+          <option value="professional" selected>專業版 (NT$1,500-3,000/月)</option>
+          <option value="enterprise">企業版 (NT$8,000-15,000/月)</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-sm text-slate-400 mb-1 block">有效天數</label>
+        <input id="genDays" type="number" value="365">
+      </div>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="text-sm text-slate-400 mb-1 block">最大裝置數</label>
+        <input id="genDevices" type="number" value="1">
+      </div>
+      <div>
+        <label class="text-sm text-slate-400 mb-1 block">備註</label>
+        <input id="genNotes" placeholder="選填">
+      </div>
+    </div>
+    <button onclick="generateLicense()" class="btn btn-primary">生成 License</button>
+    <div id="genResult" class="mt-4 hidden"></div>
+  </div>
+
+  <!-- License List -->
+  <div class="card">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold">📋 已發放 License</h3>
+      <button onclick="loadLicenses()" class="btn btn-outline text-sm">🔄 重新整理</button>
+    </div>
+    <div id="licenseTable" class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-400 border-b border-slate-700">
+            <th class="pb-2">License ID</th>
+            <th class="pb-2">客戶</th>
+            <th class="pb-2">方案</th>
+            <th class="pb-2">狀態</th>
+            <th class="pb-2">到期日</th>
+            <th class="pb-2">操作</th>
+          </tr>
+        </thead>
+        <tbody id="licenseBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 用量 Tab ===== -->
+<div id="tab-usage" class="hidden fade-in">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Today Summary -->
+    <div class="card">
+      <h3 class="font-bold mb-3">📊 今日摘要</h3>
+      <div id="usageToday" class="space-y-3"></div>
+    </div>
+    <!-- Quota -->
+    <div class="card">
+      <h3 class="font-bold mb-3">📋 配額狀態</h3>
+      <div id="usageQuota" class="space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- System Usage -->
+  <div class="card mt-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold">📈 系統用量（近 30 天）</h3>
+      <select id="usageDays" onchange="loadSystemUsage()" class="w-32">
+        <option value="7">近 7 天</option>
+        <option value="30" selected>近 30 天</option>
+        <option value="90">近 90 天</option>
+      </select>
+    </div>
+    <div id="usageSystem"></div>
+  </div>
+</div>
+
+<!-- ===== 知識庫 Tab ===== -->
+<div id="tab-kb" class="hidden fade-in">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <div class="card">
+      <h3 class="font-bold mb-3">📚 快照版本</h3>
+      <div id="kbVersionInfo"></div>
+    </div>
+    <div class="card">
+      <h3 class="font-bold mb-3">⚡ 操作</h3>
+      <div class="space-y-3">
+        <button onclick="exportKB()" class="btn btn-primary w-full">📦 完整匯出</button>
+        <button onclick="exportAllCollections()" class="btn btn-outline w-full">📦 批次匯出所有 Collection</button>
+        <div class="flex gap-2">
+          <input id="deltaVersion" type="number" placeholder="起始版本號" class="flex-1">
+          <button onclick="exportDelta()" class="btn btn-outline">差量匯出</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h3 class="font-bold mb-3">📁 快照檔案</h3>
+    <div id="kbSnapshots"></div>
+  </div>
+</div>
+
+<!-- ===== 租戶管理 Tab ===== -->
+<div id="tab-tenants" class="hidden fade-in">
+  <!-- Create Tenant -->
+  <div class="card mb-6">
+    <h3 class="font-bold mb-4">🏢 建立新租戶</h3>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div>
+        <label class="text-sm text-slate-400 mb-1 block">公司名稱</label>
+        <input id="tenantName" placeholder="例：大明營造有限公司">
+      </div>
+      <div>
+        <label class="text-sm text-slate-400 mb-1 block">識別碼 (slug)</label>
+        <input id="tenantSlug" placeholder="例：daming_construction">
+      </div>
+      <div>
+        <label class="text-sm text-slate-400 mb-1 block">訂閱方案</label>
+        <select id="tenantPlan">
+          <option value="free">免費版</option>
+          <option value="basic" selected>基礎版 (NT$499/月)</option>
+          <option value="pro">專業版 (NT$999/月)</option>
+          <option value="enterprise">企業版 (NT$4,999/月)</option>
+        </select>
+      </div>
+      <div class="flex items-end">
+        <button onclick="createTenant()" class="btn btn-primary w-full">建立租戶</button>
+      </div>
+    </div>
+    <div id="tenantCreateResult" class="hidden"></div>
+  </div>
+
+  <!-- Tenant List -->
+  <div class="card mb-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold">📋 租戶列表</h3>
+      <button onclick="loadTenants()" class="btn btn-outline text-sm">🔄 重新整理</button>
+    </div>
+    <div id="tenantList" class="space-y-3"></div>
+  </div>
+
+  <!-- Tenant Detail -->
+  <div class="card hidden" id="tenantDetail">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold">📊 租戶詳情 — <span id="tenantDetailName" class="text-brand-500"></span></h3>
+      <button onclick="document.getElementById('tenantDetail')?.classList.add('hidden')" class="btn btn-outline text-sm">✕ 關閉</button>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div class="p-4 rounded-lg bg-slate-800">
+        <p class="text-xs text-slate-400 mb-1">知識庫筆數</p>
+        <p class="text-2xl font-bold text-brand-500" id="tenantDetailEntries">0</p>
+      </div>
+      <div class="p-4 rounded-lg bg-slate-800">
+        <p class="text-xs text-slate-400 mb-1">配額使用</p>
+        <p class="text-2xl font-bold text-emerald-400" id="tenantDetailQuota">-</p>
+      </div>
+      <div class="p-4 rounded-lg bg-slate-800">
+        <p class="text-xs text-slate-400 mb-1">共用大智庫</p>
+        <p class="text-2xl font-bold text-amber-400" id="tenantDetailMaster">0</p>
+      </div>
+    </div>
+    <div id="tenantDetailCollections" class="space-y-2"></div>
+  </div>
+</div>
+
+<!-- ===== 帳單訂閱 Tab ===== -->
+<div id="tab-billing" class="hidden fade-in">
+  <!-- Plans Overview -->
+  <div class="card mb-6">
+    <h3 class="font-bold mb-4">💰 訂閱方案</h3>
+    <div id="billingPlans" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+    <p class="text-xs text-slate-500 mt-3" id="billingSandbox"></p>
+  </div>
+
+  <!-- Quick Payment Test -->
+  <div class="card mb-6">
+    <h3 class="font-bold mb-4">🧪 付款測試（Sandbox）</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div>
+        <label class="text-sm text-slate-400 mb-1 block">方案</label>
+        <select id="payPlan">
+          <option value="basic">基礎版 NT$499</option>
+          <option value="pro" selected>專業版 NT$999</option>
+          <option value="enterprise">企業版 NT$4,999</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-sm text-slate-400 mb-1 block">付款方式</label>
+        <select id="payType">
+          <option value="once">一次付清</option>
+          <option value="subscribe">定期定額（月繳）</option>
+        </select>
+      </div>
+      <div class="flex items-end">
+        <button onclick="createPayment()" class="btn btn-primary w-full">建立付款訂單</button>
+      </div>
+    </div>
+    <div id="payResult" class="hidden"></div>
+  </div>
+
+  <!-- Payment History -->
+  <div class="card">
+    <h3 class="font-bold mb-4">📜 付款紀錄</h3>
+    <div id="paymentHistory">
+      <p class="text-slate-500 text-sm">付款紀錄需從 PostgreSQL 查詢，請使用 API：<code class="bg-slate-800 px-2 py-0.5 rounded text-xs">GET /api/payment/query/{order_id}</code></p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 系統監控 Tab ===== -->
+<div id="tab-monitor" class="hidden fade-in">
+  <!-- Dashboard Summary -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="card">
+      <p class="text-slate-400 text-sm mb-1">今日 AI 呼叫</p>
+      <p class="stat-num text-brand-500" id="monCalls">0</p>
+    </div>
+    <div class="card">
+      <p class="text-slate-400 text-sm mb-1">今日 Token</p>
+      <p class="stat-num text-emerald-400" id="monTokens">0</p>
+    </div>
+    <div class="card">
+      <p class="text-slate-400 text-sm mb-1">今日成本</p>
+      <p class="stat-num text-amber-400" id="monCost">$0</p>
+    </div>
+    <div class="card">
+      <p class="text-slate-400 text-sm mb-1">日誌筆數</p>
+      <p class="stat-num text-purple-400" id="monLogCount">0</p>
+    </div>
+  </div>
+
+  <!-- Log Level Distribution -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <div class="card">
+      <h3 class="font-bold mb-3">📊 日誌等級分佈</h3>
+      <div id="monLogDist" class="space-y-2"></div>
+    </div>
+    <div class="card">
+      <h3 class="font-bold mb-3">🔥 Provider 用量</h3>
+      <div id="monProviders" class="space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- Recent Errors -->
+  <div class="card mb-6">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="font-bold">🚨 最近錯誤</h3>
+      <button onclick="loadMonitor()" class="btn btn-outline text-sm">🔄 重新整理</button>
+    </div>
+    <div id="monErrors" class="space-y-2 max-h-64 overflow-y-auto"></div>
+  </div>
+
+  <!-- Recent Logs -->
+  <div class="card">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="font-bold">📝 最近日誌</h3>
+      <div class="flex gap-2">
+        <select id="monLogLevel" onchange="loadLogs()" class="w-28">
+          <option value="">全部</option>
+          <option value="ERROR">ERROR</option>
+          <option value="WARNING">WARNING</option>
+          <option value="INFO">INFO</option>
+          <option value="DEBUG">DEBUG</option>
+        </select>
+        <select id="monLogLimit" onchange="loadLogs()" class="w-20">
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+    </div>
+    <div id="monLogs" class="space-y-1 max-h-96 overflow-y-auto font-mono text-xs"></div>
+  </div>
+</div>
+
+</main>
+
+<script>
+const API = '';
+const TOKEN = localStorage.getItem('jarvis_token') || '';
+const HEADERS = { 'Content-Type': 'application/json' };
+if (TOKEN) HEADERS['Authorization'] = `Bearer ${TOKEN}`;
+
+async function api(path, opts = {}) {
+  try {
+    const r = await fetch(API + path, { headers: HEADERS, ...opts });
+    return await r.json();
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// ── Tab 切換 ──
+function switchTab(tab) {
+  document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
+  document.getElementById('tab-' + tab)?.classList.remove('hidden');
+  document.querySelectorAll('[data-tab]').forEach(btn => {
+    btn.classList.toggle('tab-active', btn.dataset.tab === tab);
+    btn.classList.toggle('text-slate-400', btn.dataset.tab !== tab);
+  });
+  if (tab === 'licenses') loadLicenses();
+  if (tab === 'usage') { loadUsageToday(); loadUsageQuota(); loadSystemUsage(); }
+  if (tab === 'kb') { loadKBInfo(); loadKBSnapshots(); }
+  if (tab === 'tenants') loadTenants();
+  if (tab === 'billing') loadBillingPlans();
+  if (tab === 'monitor') loadMonitor();
+}
+
+// ── 總覽 ──
+async function loadOverview() {
+  const r = await api('/api/commercial/system-status');
+  if (!r.ok) return;
+
+  // License
+  const lic = r.license || {};
+  const el = document.getElementById('statLicense');
+  if (lic.valid) {
+    el.textContent = lic.tier_name || lic.tier;
+    el.className = 'stat-num text-emerald-400';
+    document.getElementById('statLicenseSub')?.textContent = `${lic.customer_name} · 剩餘 ${lic.days_remaining} 天`;
+  } else {
+    el.textContent = '未啟用';
+    el.className = 'stat-num text-red-400';
+    document.getElementById('statLicenseSub')?.textContent = '免費體驗版';
+  }
+
+  // Usage
+  const usage = r.usage_today || {};
+  document.getElementById('statCalls')?.textContent = (usage.calls || 0).toLocaleString();
+  document.getElementById('statCallsSub')?.textContent = `成功率 ${usage.success_rate || 0}%`;
+  document.getElementById('statTokens')?.textContent = (usage.tokens || 0).toLocaleString();
+  document.getElementById('statTokensSub')?.textContent = `≈ $${usage.cost_usd || 0}`;
+
+  // KB
+  const kb = r.kb_version || {};
+  document.getElementById('statKBVer')?.textContent = `v${kb.current_version || 0}`;
+  document.getElementById('statKBSub')?.textContent = `${kb.total_snapshots || 0} 個快照`;
+
+  // System Status Grid
+  const grid = document.getElementById('systemStatusGrid');
+  const offline = r.offline || {};
+  const quota = r.quota || {};
+  grid.innerHTML = `
+    <div class="p-3 rounded-lg bg-slate-800">
+      <p class="text-xs text-slate-400">License</p>
+      <p class="font-bold ${lic.valid ? 'text-emerald-400' : 'text-red-400'}">${lic.valid ? '✅ 有效' : '❌ 無效'}</p>
+    </div>
+    <div class="p-3 rounded-lg bg-slate-800">
+      <p class="text-xs text-slate-400">離線狀態</p>
+      <p class="font-bold ${offline.ok ? 'text-emerald-400' : 'text-amber-400'}">${offline.ok ? `✅ 寬限 ${offline.grace_remaining||0} 天` : '⚠️ 需連線'}</p>
+    </div>
+    <div class="p-3 rounded-lg bg-slate-800">
+      <p class="text-xs text-slate-400">配額</p>
+      <p class="font-bold ${quota.allowed !== false ? 'text-emerald-400' : 'text-red-400'}">${quota.quota === 'unlimited' ? '♾️ 無限' : `${(quota.remaining||{}).calls||0} 次剩餘`}</p>
+    </div>
+    <div class="p-3 rounded-lg bg-slate-800">
+      <p class="text-xs text-slate-400">方案</p>
+      <p class="font-bold text-brand-500">${lic.tier_name || lic.tier || 'free'}</p>
+    </div>
+  `;
+}
+
+// ── License 管理 ──
+async function loadLicenses() {
+  const r = await api('/api/commercial/license/list');
+  const body = document.getElementById('licenseBody');
+  if (!r.ok || !r.licenses) { body.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-slate-500">無資料</td></tr>'; return; }
+  body.innerHTML = r.licenses.map(l => `
+    <tr class="border-b border-slate-800 hover:bg-slate-800/50">
+      <td class="py-2 font-mono text-xs">${l.license_id}</td>
+      <td class="py-2">${l.customer_name}</td>
+      <td class="py-2"><span class="badge badge-blue">${l.tier}</span></td>
+      <td class="py-2"><span class="badge ${l.status==='active'?'badge-green':l.status==='revoked'?'badge-red':'badge-yellow'}">${l.status}</span></td>
+      <td class="py-2 text-xs">${l.expires_at || '-'}</td>
+      <td class="py-2">
+        ${l.status === 'active' ? `<button onclick="revokeLicense('${l.license_id}')" class="text-xs text-red-400 hover:text-red-300">撤銷</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function showGenForm() { document.getElementById('genForm')?.scrollIntoView({ behavior: 'smooth' }); }
+
+async function generateLicense() {
+  const body = {
+    customer_name: document.getElementById('genCustomer')?.value,
+    tier: document.getElementById('genTier')?.value,
+    duration_days: parseInt(document.getElementById('genDays')?.value) || 365,
+    max_devices: parseInt(document.getElementById('genDevices')?.value) || 1,
+    notes: document.getElementById('genNotes')?.value,
+  };
+  if (!body.customer_name) { alert('請輸入客戶名稱'); return; }
+  const r = await api('/api/commercial/license/generate', { method: 'POST', body: JSON.stringify(body) });
+  const div = document.getElementById('genResult');
+  div.classList.remove('hidden');
+  if (r.ok) {
+    div.innerHTML = `
+      <div class="p-4 rounded-lg bg-emerald-900/30 border border-emerald-700">
+        <p class="font-bold text-emerald-400 mb-2">✅ License 已生成</p>
+        <p class="text-sm mb-1"><strong>License ID:</strong> <code class="bg-slate-800 px-2 py-0.5 rounded">${r.license_key}</code></p>
+        <p class="text-sm mb-1"><strong>方案:</strong> ${r.payload?.tier_name}</p>
+        <p class="text-sm mb-1"><strong>到期日:</strong> ${r.payload?.expires_at}</p>
+        <p class="text-sm mb-3"><strong>License 資料（給客戶）:</strong></p>
+        <textarea class="w-full h-20 bg-slate-900 text-xs font-mono p-2 rounded border border-slate-600" readonly onclick="this.select()">${r.license_data}</textarea>
+        <p class="text-xs text-slate-400 mt-2">⬆️ 請複製此資料給客戶，用於安裝時啟用</p>
+      </div>`;
+    loadLicenses();
+  } else {
+    div.innerHTML = `<div class="p-3 rounded-lg bg-red-900/30 border border-red-700 text-red-400">${r.error}</div>`;
+  }
+}
+
+async function revokeLicense(id) {
+  if (!confirm(`確定撤銷 ${id}？此操作不可逆。`)) return;
+  const r = await api('/api/commercial/license/revoke', { method: 'POST', body: JSON.stringify({ license_id: id }) });
+  if (r.ok) { alert('已撤銷'); loadLicenses(); }
+  else alert(r.error || '操作失敗');
+}
+
+// ── 用量統計 ──
+async function loadUsageToday() {
+  const r = await api('/api/usage/today');
+  const div = document.getElementById('usageToday');
+  if (!r.ok) { div.innerHTML = '<p class="text-slate-500">無資料</p>'; return; }
+  div.innerHTML = `
+    <div class="flex justify-between"><span class="text-slate-400">呼叫次數</span><span class="font-bold">${(r.calls||0).toLocaleString()}</span></div>
+    <div class="flex justify-between"><span class="text-slate-400">Token 數</span><span class="font-bold">${(r.tokens||0).toLocaleString()}</span></div>
+    <div class="flex justify-between"><span class="text-slate-400">估算成本</span><span class="font-bold text-amber-400">$${r.cost_usd||0}</span></div>
+    <div class="flex justify-between"><span class="text-slate-400">成功率</span><span class="font-bold text-emerald-400">${r.success_rate||0}%</span></div>
+  `;
+}
+
+async function loadUsageQuota() {
+  const r = await api('/api/usage/quota');
+  const div = document.getElementById('usageQuota');
+  if (!r.ok) { div.innerHTML = '<p class="text-slate-500">無資料</p>'; return; }
+  if (r.quota === 'unlimited') {
+    div.innerHTML = '<p class="text-2xl font-bold text-emerald-400">♾️ 無限配額</p><p class="text-sm text-slate-400">方案: ' + r.plan + '</p>';
+    return;
+  }
+  const usage = r.usage || {};
+  const quota = r.quota || {};
+  const remaining = r.remaining || {};
+  const pct = quota.monthly_calls ? Math.round(usage.calls / quota.monthly_calls * 100) : 0;
+  div.innerHTML = `
+    <div class="flex justify-between"><span class="text-slate-400">方案</span><span class="font-bold">${r.plan}</span></div>
+    <div class="flex justify-between"><span class="text-slate-400">已用/配額</span><span class="font-bold">${usage.calls||0} / ${quota.monthly_calls||0}</span></div>
+    <div class="w-full bg-slate-700 rounded-full h-2 mt-1"><div class="h-2 rounded-full ${pct>80?'bg-red-500':pct>50?'bg-amber-500':'bg-emerald-500'}" style="width:${Math.min(100,pct)}%"></div></div>
+    <div class="flex justify-between"><span class="text-slate-400">剩餘呼叫</span><span class="font-bold text-brand-500">${remaining.calls||0}</span></div>
+  `;
+}
+
+async function loadSystemUsage() {
+  const days = document.getElementById('usageDays')?.value;
+  const r = await api(`/api/usage/system?days=${days}`);
+  const div = document.getElementById('usageSystem');
+  if (!r.ok) { div.innerHTML = '<p class="text-slate-500">無資料或權限不足</p>'; return; }
+
+  let html = '';
+  // By Provider
+  if (r.by_provider && r.by_provider.length) {
+    html += '<h4 class="font-bold text-sm mb-2 mt-4">按 Provider</h4><div class="grid grid-cols-2 md:grid-cols-4 gap-3">';
+    r.by_provider.forEach(p => {
+      html += `<div class="p-3 rounded-lg bg-slate-800"><p class="text-xs text-slate-400">${p.provider}</p><p class="font-bold">${(p.calls||0).toLocaleString()} 次</p><p class="text-xs text-slate-500">${(p.tokens||0).toLocaleString()} tokens</p></div>`;
+    });
+    html += '</div>';
+  }
+  // By User
+  if (r.by_user && r.by_user.length) {
+    html += '<h4 class="font-bold text-sm mb-2 mt-4">按用戶（Top 20）</h4><table class="w-full text-sm"><thead><tr class="text-left text-slate-400 border-b border-slate-700"><th class="pb-2">用戶</th><th class="pb-2">呼叫</th><th class="pb-2">Token</th><th class="pb-2">成本</th></tr></thead><tbody>';
+    r.by_user.forEach(u => {
+      html += `<tr class="border-b border-slate-800"><td class="py-1">${u.user_id}</td><td>${(u.calls||0).toLocaleString()}</td><td>${(u.tokens||0).toLocaleString()}</td><td>$${(u.cost||0).toFixed(4)}</td></tr>`;
+    });
+    html += '</tbody></table>';
+  }
+  // Totals
+  const t = r.totals || {};
+  html += `<div class="mt-4 p-3 rounded-lg bg-slate-800 flex justify-around"><div class="text-center"><p class="text-xs text-slate-400">總呼叫</p><p class="font-bold text-lg">${(t.calls||0).toLocaleString()}</p></div><div class="text-center"><p class="text-xs text-slate-400">總 Token</p><p class="font-bold text-lg">${(t.tokens||0).toLocaleString()}</p></div><div class="text-center"><p class="text-xs text-slate-400">總成本</p><p class="font-bold text-lg text-amber-400">$${t.cost_usd||0}</p></div></div>`;
+
+  div.innerHTML = html || '<p class="text-slate-500">暫無用量資料</p>';
+}
+
+// ── 知識庫 ──
+async function loadKBInfo() {
+  const r = await api('/api/commercial/kb/snapshot-info');
+  const div = document.getElementById('kbVersionInfo');
+  if (!r.ok) { div.innerHTML = '<p class="text-slate-500">無資料</p>'; return; }
+  let html = `<p class="text-2xl font-bold text-amber-400 mb-2">v${r.current_version||0}</p>`;
+  html += `<p class="text-sm text-slate-400 mb-3">${r.total_snapshots||0} 個快照</p>`;
+  if (r.history && r.history.length) {
+    html += '<div class="space-y-1">';
+    r.history.slice(-5).reverse().forEach(h => {
+      html += `<div class="text-xs p-2 rounded bg-slate-800 flex justify-between"><span>v${h.version} ${h.delta_from ? '(Δ from v'+h.delta_from+')' : ''}</span><span>${h.items} items · ${h.size_mb} MB</span></div>`;
+    });
+    html += '</div>';
+  }
+  div.innerHTML = html;
+}
+
+async function loadKBSnapshots() {
+  const r = await api('/api/commercial/kb/snapshots');
+  const div = document.getElementById('kbSnapshots');
+  if (!r.ok || !r.snapshots || !r.snapshots.length) { div.innerHTML = '<p class="text-slate-500">尚無快照檔案</p>'; return; }
+  div.innerHTML = '<div class="space-y-2">' + r.snapshots.map(s =>
+    `<div class="flex justify-between items-center p-2 rounded bg-slate-800 text-sm"><span class="font-mono text-xs">${s.filename}</span><span class="text-slate-400">${s.size_mb} MB · ${s.modified}</span></div>`
+  ).join('') + '</div>';
+}
+
+async function exportKB() {
+  const r = await api('/api/commercial/kb/export', { method: 'POST', body: JSON.stringify({}) });
+  if (r.ok) { alert(`✅ 匯出成功！\nv${r.version} — ${r.items} items (${r.size_mb} MB)\n${r.filename}`); loadKBInfo(); loadKBSnapshots(); }
+  else alert('匯出失敗: ' + (r.error || '未知錯誤'));
+}
+
+async function exportAllCollections() {
+  const r = await api('/api/commercial/kb/export', { method: 'POST', body: JSON.stringify({ collection: '' }) });
+  if (r.ok) { alert(`✅ 匯出成功！${r.items} items`); loadKBInfo(); loadKBSnapshots(); }
+  else alert('匯出失敗: ' + (r.error || '未知錯誤'));
+}
+
+async function exportDelta() {
+  const since = parseInt(document.getElementById('deltaVersion')?.value);
+  if (!since) { alert('請輸入起始版本號'); return; }
+  const r = await api('/api/commercial/kb/export-delta', { method: 'POST', body: JSON.stringify({ since_version: since }) });
+  if (r.ok) { alert(`✅ 差量匯出成功！\nv${r.delta_from}→v${r.version} — ${r.items} new items`); loadKBInfo(); loadKBSnapshots(); }
+  else alert('差量匯出失敗: ' + (r.error || '未知錯誤'));
+}
+
+// ── 租戶管理 ──
+async function createTenant() {
+  const name = document.getElementById('tenantName')?.value.trim();
+  const slug = document.getElementById('tenantSlug')?.value.trim();
+  const plan = document.getElementById('tenantPlan')?.value;
+  if (!name || !slug) { alert('請填寫公司名稱和識別碼'); return; }
+  const r = await api('/api/tenants', { method: 'POST', body: JSON.stringify({ name, slug, plan }) });
+  const div = document.getElementById('tenantCreateResult');
+  div.classList.remove('hidden');
+  if (r.ok) {
+    div.innerHTML = `<div class="p-3 rounded-lg bg-emerald-900/30 border border-emerald-700 text-emerald-400">
+      ✅ 租戶已建立 — ID: <code class="bg-slate-800 px-2 py-0.5 rounded">${r.tenant_id}</code> · slug: ${r.slug}
+    </div>`;
+    document.getElementById('tenantName')?.value = '';
+    document.getElementById('tenantSlug')?.value = '';
+    loadTenants();
+  } else {
+    div.innerHTML = `<div class="p-3 rounded-lg bg-red-900/30 border border-red-700 text-red-400">${r.error || '建立失敗'}</div>`;
+  }
+}
+
+async function loadTenants() {
+  const div = document.getElementById('tenantList');
+  div.innerHTML = '<p class="text-slate-500">載入中...</p>';
+  // 從 PG 取得租戶列表
+  const r = await api('/api/tenants');
+  if (!r.ok || !r.tenants || !r.tenants.length) {
+    div.innerHTML = '<p class="text-slate-500">尚無租戶，請先建立</p>';
+    return;
+  }
+  // 逐一取得 KB 統計
+  const cards = [];
+  for (const t of r.tenants) {
+    const stats = await api(`/api/tenants/${t.slug}/stats`);
+    const quota = await api(`/api/tenants/${t.slug}/kb-quota`);
+    cards.push({ tenant: t, stats: stats.ok ? stats : {}, quota: quota.ok ? quota : {} });
+  }
+  div.innerHTML = cards.map(c => {
+    const t = c.tenant;
+    const s = c.stats;
+    const q = c.quota;
+    const colls = Object.keys(s.collections || {});
+    const usedPct = q.limit > 0 ? Math.round((q.used || 0) / q.limit * 100) : 0;
+    const planBadge = { free: 'badge-yellow', basic: 'badge-blue', pro: 'badge-green', enterprise: 'badge-green' };
+    return `
+    <div class="p-4 rounded-lg bg-slate-800 hover:bg-slate-700/50 cursor-pointer transition" onclick="showTenantDetail('${t.slug}')">
+      <div class="flex justify-between items-start">
+        <div>
+          <p class="font-bold text-white">${t.name}</p>
+          <p class="text-xs text-slate-400 mt-1"><code>${t.slug}</code> · ${colls.length} 個知識庫 · ${s.total_entries || 0} 筆</p>
+        </div>
+        <div class="text-right">
+          <span class="badge ${planBadge[t.plan] || 'badge-yellow'}">${t.plan}</span>
+          <p class="text-xs text-slate-500 mt-1">${t.created_at ? t.created_at.substring(0,10) : ''}</p>
+        </div>
+      </div>
+      ${q.limit > 0 ? `<div class="w-full bg-slate-600 rounded-full h-1.5 mt-2"><div class="h-1.5 rounded-full ${usedPct>80?'bg-red-500':usedPct>50?'bg-amber-500':'bg-emerald-500'}" style="width:${Math.min(100,usedPct)}%"></div></div><p class="text-xs text-slate-500 mt-1">${q.used||0} / ${q.limit} 筆 (${usedPct}%)</p>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function showTenantDetail(slug) {
+  const panel = document.getElementById('tenantDetail');
+  panel.classList.remove('hidden');
+  document.getElementById('tenantDetailName')?.textContent = slug;
+  const stats = await api(`/api/tenants/${slug}/stats`);
+  const quota = await api(`/api/tenants/${slug}/kb-quota`);
+  if (stats.ok) {
+    document.getElementById('tenantDetailEntries')?.textContent = (stats.total_entries || 0).toLocaleString();
+    document.getElementById('tenantDetailMaster')?.textContent = (stats.master_count || 0).toLocaleString();
+    const colls = stats.collections || {};
+    const collDiv = document.getElementById('tenantDetailCollections');
+    if (Object.keys(colls).length) {
+      collDiv.innerHTML = '<h4 class="font-bold text-sm mb-2">知識庫 Collections</h4>' +
+        Object.entries(colls).map(([name, count]) =>
+          `<div class="flex justify-between p-2 rounded bg-slate-900 text-sm"><span class="font-mono text-xs">${name}</span><span class="text-brand-500 font-bold">${count} 筆</span></div>`
+        ).join('');
+    } else {
+      collDiv.innerHTML = '<p class="text-slate-500 text-sm">尚無知識庫資料</p>';
+    }
+  }
+  if (quota.ok) {
+    if (quota.limit === -1) {
+      document.getElementById('tenantDetailQuota')?.textContent = '♾️ 無限';
+    } else {
+      document.getElementById('tenantDetailQuota')?.textContent = `${quota.used || 0} / ${quota.limit || 0}`;
+    }
+  }
+  panel.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ── 帳單訂閱 ──
+async function loadBillingPlans() {
+  const r = await api('/api/payment/plans');
+  const div = document.getElementById('billingPlans');
+  if (!r.ok) { div.innerHTML = '<p class="text-slate-500">付款模組不可用</p>'; return; }
+  const planColors = { basic: 'brand-500', pro: 'emerald-400', enterprise: 'amber-400' };
+  const planFeatures = {
+    basic: ['1 個角色', '2,000 筆知識庫', '基礎 AI 對話'],
+    pro: ['15 個角色', '50,000 筆知識庫', '全部 AI 模型', '視覺分析'],
+    enterprise: ['無限角色', '無限知識庫', '全部功能', '專屬支援', 'API 存取'],
+  };
+  div.innerHTML = (r.plans || []).map(p => {
+    const color = planColors[p.id] || 'brand-500';
+    const features = planFeatures[p.id] || [];
+    return `
+    <div class="p-5 rounded-xl bg-slate-800 border border-slate-700 hover:border-${color} transition">
+      <p class="text-lg font-bold text-${color}">${p.name}</p>
+      <p class="text-3xl font-bold text-white mt-2">NT$${p.price.toLocaleString()}<span class="text-sm text-slate-400 font-normal">/${p.period === 'monthly' ? '月' : p.period}</span></p>
+      <ul class="mt-4 space-y-2 text-sm text-slate-300">
+        ${features.map(f => `<li class="flex items-center gap-2"><span class="text-emerald-400">✓</span> ${f}</li>`).join('')}
+      </ul>
+    </div>`;
+  }).join('');
+  document.getElementById('billingSandbox')?.textContent = r.sandbox ? '⚠️ 目前為測試環境（Sandbox），付款不會實際扣款' : '🔴 正式環境 — 付款將實際扣款';
+}
+
+async function createPayment() {
+  const plan = document.getElementById('payPlan')?.value;
+  const type = document.getElementById('payType')?.value;
+  const endpoint = type === 'subscribe' ? '/api/payment/subscribe' : '/api/payment/create';
+  const r = await api(endpoint, { method: 'POST', body: JSON.stringify({ plan }) });
+  const div = document.getElementById('payResult');
+  div.classList.remove('hidden');
+  if (r.ok) {
+    div.innerHTML = `
+    <div class="p-4 rounded-lg bg-emerald-900/30 border border-emerald-700">
+      <p class="font-bold text-emerald-400 mb-2">✅ 訂單已建立</p>
+      <div class="grid grid-cols-2 gap-2 text-sm mb-3">
+        <div><span class="text-slate-400">訂單號：</span><code class="bg-slate-800 px-2 py-0.5 rounded">${r.order_id}</code></div>
+        <div><span class="text-slate-400">金額：</span><span class="font-bold">NT$${r.amount}</span></div>
+        <div><span class="text-slate-400">方案：</span>${r.plan}</div>
+        <div><span class="text-slate-400">類型：</span>${r.type === 'subscription' ? '定期定額' : '一次付清'}</div>
+      </div>
+      ${r.sandbox ? '<p class="text-xs text-amber-400 mb-2">⚠️ Sandbox 模式 — 以下表單提交到綠界測試環境</p>' : ''}
+      <details class="mt-2">
+        <summary class="text-xs text-slate-400 cursor-pointer hover:text-white">查看綠界付款表單 HTML</summary>
+        <textarea class="w-full h-32 bg-slate-900 text-xs font-mono p-2 rounded border border-slate-600 mt-2" readonly onclick="this.select()">${(r.form_html||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+      </details>
+    </div>`;
+  } else {
+    div.innerHTML = `<div class="p-3 rounded-lg bg-red-900/30 border border-red-700 text-red-400">${r.error || '建立失敗'}</div>`;
+  }
+}
+
+// ── 系統監控 ──
+async function loadMonitor() {
+  // Dashboard data
+  const dash = await api('/api/monitor/dashboard');
+  if (dash.ok) {
+    const usage = dash.usage?.today || {};
+    document.getElementById('monCalls')?.textContent = (usage.calls || 0).toLocaleString();
+    document.getElementById('monTokens')?.textContent = (usage.tokens || 0).toLocaleString();
+    document.getElementById('monCost')?.textContent = `$${usage.cost_usd || 0}`;
+
+    // Log stats
+    const ls = dash.log_stats || {};
+    document.getElementById('monLogCount')?.textContent = (ls.total || 0).toLocaleString();
+
+    // Log level distribution
+    const counts = ls.counts || {};
+    const total = ls.total || 1;
+    const distDiv = document.getElementById('monLogDist');
+    const levelColors = { DEBUG: 'text-cyan-400', INFO: 'text-emerald-400', WARNING: 'text-amber-400', ERROR: 'text-red-400', CRITICAL: 'text-purple-400' };
+    const barColors = { DEBUG: 'bg-cyan-500', INFO: 'bg-emerald-500', WARNING: 'bg-amber-500', ERROR: 'bg-red-500', CRITICAL: 'bg-purple-500' };
+    distDiv.innerHTML = Object.entries(counts).map(([lvl, cnt]) => {
+      const pct = Math.round(cnt / total * 100);
+      return `
+      <div>
+        <div class="flex justify-between text-sm mb-1">
+          <span class="${levelColors[lvl] || 'text-slate-400'}">${lvl}</span>
+          <span class="text-slate-400">${cnt.toLocaleString()} (${pct}%)</span>
+        </div>
+        <div class="w-full bg-slate-700 rounded-full h-2">
+          <div class="h-2 rounded-full ${barColors[lvl] || 'bg-slate-500'}" style="width:${Math.max(1,pct)}%"></div>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Provider usage from system usage
+    const sys30 = dash.usage?.system_30d || {};
+    const provDiv = document.getElementById('monProviders');
+    if (sys30.by_provider && sys30.by_provider.length) {
+      provDiv.innerHTML = sys30.by_provider.map(p => `
+        <div class="flex justify-between items-center p-2 rounded bg-slate-800">
+          <span class="font-medium">${p.provider}</span>
+          <div class="text-right">
+            <span class="text-brand-500 font-bold">${(p.calls||0).toLocaleString()}</span>
+            <span class="text-xs text-slate-400 ml-2">${(p.tokens||0).toLocaleString()} tok</span>
+          </div>
+        </div>`).join('');
+    } else {
+      provDiv.innerHTML = '<p class="text-slate-500 text-sm">暫無 Provider 用量資料</p>';
+    }
+
+    // Recent errors
+    const errDiv = document.getElementById('monErrors');
+    const errors = dash.recent_errors || [];
+    if (errors.length) {
+      errDiv.innerHTML = errors.slice(-10).reverse().map(e => `
+        <div class="p-2 rounded bg-red-900/20 border border-red-900/50 text-xs">
+          <div class="flex justify-between mb-1">
+            <span class="text-red-400 font-bold">${e.error_type || 'ERROR'}</span>
+            <span class="text-slate-500">${e.ts || ''}</span>
+          </div>
+          <p class="text-slate-300">${e.message || ''}</p>
+          ${e.error ? `<p class="text-red-300 mt-1">${e.error}</p>` : ''}
+        </div>`).join('');
+    } else {
+      errDiv.innerHTML = '<p class="text-emerald-400 text-sm">✅ 無錯誤紀錄</p>';
+    }
+  } else {
+    document.getElementById('monLogDist')?.innerHTML = '<p class="text-slate-500">監控資料不可用（需 admin 權限）</p>';
+  }
+
+  // Load logs
+  await loadLogs();
+}
+
+async function loadLogs() {
+  const level = document.getElementById('monLogLevel')?.value;
+  const limit = document.getElementById('monLogLimit')?.value;
+  const r = await api(`/api/monitor/logs?level=${level}&limit=${limit}`);
+  const div = document.getElementById('monLogs');
+  if (!r.ok || !r.logs || !r.logs.length) {
+    div.innerHTML = '<p class="text-slate-500">無日誌</p>';
+    return;
+  }
+  const levelBg = { DEBUG: 'text-cyan-400', INFO: 'text-emerald-400', WARNING: 'text-amber-400', ERROR: 'text-red-400', CRITICAL: 'text-purple-400 font-bold' };
+  div.innerHTML = r.logs.map(l => {
+    const ts = (l.ts || '').replace('T', ' ').substring(0, 19);
+    const lvl = l.level || 'INFO';
+    const extra = Object.entries(l).filter(([k]) => !['ts','level','module','message'].includes(k)).map(([k,v]) => `${k}=${v}`).join(' ');
+    return `<div class="py-1 px-2 rounded hover:bg-slate-800/50 flex gap-2">
+      <span class="text-slate-500 shrink-0">${ts}</span>
+      <span class="${levelBg[lvl] || 'text-slate-400'} shrink-0 w-16">[${lvl}]</span>
+      <span class="text-slate-400 shrink-0">${l.module || ''}</span>
+      <span class="text-slate-200 flex-1">${l.message || ''}</span>
+      ${extra ? `<span class="text-slate-500 shrink-0">${extra.substring(0,80)}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── 初始化 ──
+async function refreshAll() { await loadOverview(); }
+
+(async () => {
+  // 檢查登入
+  if (!TOKEN) { location.href = '/jarvis-login'; return; }
+  const me = await api('/api/auth/me');
+  if (!me.ok) { location.href = '/jarvis-login'; return; }
+  if (!['superadmin','admin'].includes(me.user?.role)) {
+    alert('此頁面僅限管理員存取');
+    location.href = '/jarvis';
+    return;
+  }
+  document.getElementById('adminUser')?.textContent = `${me.user.username} (${me.user.role})`;
+  await loadOverview();
+})();
+</script>
+</body>
+</html>

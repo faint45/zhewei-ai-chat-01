@@ -1,0 +1,31 @@
+{
+  "id": "one_sentence_dispatch_center",
+  "name": "企業內部一句話派工任務中心",
+  "description": "將一句話需求轉成可執行任務鏈，並保留執行結果回傳。",
+  "category": "business",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "title": "Smart GUI 執行派工需求",
+      "execution": "host_script",
+      "job_type": "smart_gui_agent",
+      "provider": "desktop",
+      "args": {
+        "instruction": "依 context 中的一句話需求執行任務，完成後停在可確認結果的畫面。",
+        "execute": true,
+        "max_actions": 10,
+        "retry_count": 3
+      }
+    },
+    {
+      "title": "全螢幕 VLM 生成派工結果摘要",
+      "execution": "host_script",
+      "job_type": "screen_vlm_query",
+      "provider": "desktop",
+      "args": {
+        "question": "請總結畫面任務結果，輸出 JSON：status、done_items、pending_items、next_action。"
+      }
+    }
+  ]
+}
+

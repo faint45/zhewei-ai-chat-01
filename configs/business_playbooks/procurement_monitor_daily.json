@@ -1,0 +1,31 @@
+{
+  "id": "procurement_monitor_daily",
+  "name": "採購與公告監測（每日推播）",
+  "description": "每日巡檢採購/公告網站，擷取命中結果與截圖證據，再輸出重點摘要。",
+  "category": "business",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "title": "Smart GUI 開站並搜尋關鍵字",
+      "execution": "host_script",
+      "job_type": "smart_gui_agent",
+      "provider": "desktop",
+      "args": {
+        "instruction": "開啟採購網站，搜尋關鍵字 keyword，截圖結果列表並停在結果頁。",
+        "execute": true,
+        "max_actions": 10,
+        "retry_count": 3
+      }
+    },
+    {
+      "title": "全螢幕 VLM 摘要命中重點",
+      "execution": "host_script",
+      "job_type": "screen_vlm_query",
+      "provider": "desktop",
+      "args": {
+        "question": "請辨識畫面中的招標/公告重點，輸出 JSON：標題、日期、是否命中 keyword。"
+      }
+    }
+  ]
+}
+

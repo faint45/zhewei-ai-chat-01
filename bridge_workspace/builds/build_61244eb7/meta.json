@@ -1,0 +1,9 @@
+{
+  "id": "build_61244eb7",
+  "idea": "hello world",
+  "refine_prompt": "",
+  "provider": "groq-70b",
+  "duration_ms": 761,
+  "created_at": "2026-02-20T17:36:00.408890",
+  "size_bytes": 661
+}

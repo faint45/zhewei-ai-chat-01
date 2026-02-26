@@ -1,0 +1,122 @@
+{
+  "name": "築未科技 Zhe-Wei Tech",
+  "short_name": "築未科技",
+  "description": "AI 驅動的智慧服務平台 - 統一管理入口",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#667eea",
+  "theme_color": "#667eea",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities", "business"],
+  "screenshots": [
+    {
+      "src": "/static/screenshots/desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/static/screenshots/mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Jarvis AI",
+      "short_name": "Jarvis",
+      "description": "開啟 Jarvis AI 大腦系統",
+      "url": "https://jarvis.zhe-wei.net",
+      "icons": [{ "src": "/static/icons/jarvis.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Smart Bridge",
+      "short_name": "Bridge",
+      "description": "開啟智慧對話橋接",
+      "url": "https://bridge.zhe-wei.net",
+      "icons": [{ "src": "/static/icons/bridge.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "AI 視覺辨識",
+      "short_name": "Vision",
+      "description": "開啟 AI 視覺辨識系統",
+      "url": "https://vision.zhe-wei.net",
+      "icons": [{ "src": "/static/icons/vision.png", "sizes": "96x96" }]
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "files",
+          "accept": ["image/*", "video/*", "audio/*", ".pdf", ".doc", ".docx"]
+        }
+      ]
+    }
+  },
+  "permissions": [
+    "notifications",
+    "geolocation",
+    "camera",
+    "microphone"
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
+}

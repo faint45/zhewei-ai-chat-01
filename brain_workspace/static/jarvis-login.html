@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a0a0f">
+    <title>Jarvis — 登入</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/manifest.json?v=2026021801">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Inter','Noto Sans TC',sans-serif;-webkit-tap-highlight-color:transparent}
+        .glass{background:rgba(15,23,42,.6);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+        .field{background:rgba(15,23,42,.5);border:1px solid rgba(51,65,85,.5);transition:all .2s;color:#e2e8f0}
+        .field:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.15);outline:none}
+        .btn-primary{background:linear-gradient(135deg,#2563eb,#1d4ed8);transition:all .15s}
+        .btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
+        .btn-primary:active{filter:brightness(.95);transform:translateY(0)}
+        .btn-primary:disabled{opacity:.4;pointer-events:none}
+        .fade-in{animation:fadeIn .4s ease-out}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        .bg-glow{position:fixed;width:300px;height:300px;border-radius:50%;filter:blur(120px);opacity:.15;pointer-events:none}
+    </style>
+</head>
+<body class="bg-[#0a0a0f] text-slate-200 antialiased min-h-screen flex items-center justify-center p-4">
+
+<!-- Background glow -->
+<div class="bg-glow bg-blue-500" style="top:-80px;left:-80px"></div>
+<div class="bg-glow bg-cyan-500" style="bottom:-80px;right:-80px"></div>
+
+<div class="w-full max-w-sm fade-in">
+    <!-- Logo -->
+    <div class="text-center mb-8">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4 shadow-lg shadow-blue-500/20">J</div>
+        <h1 class="text-xl font-bold text-white">Jarvis AI 助理</h1>
+        <p class="text-sm text-slate-500 mt-1">築未科技 智慧系統</p>
+    </div>
+
+    <!-- Login Form -->
+    <div class="glass rounded-2xl border border-slate-700/50 p-6 shadow-2xl">
+        <h2 class="text-base font-semibold text-white mb-5 text-center">系統登入</h2>
+
+        <div id="errMsg" class="hidden mb-4 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm text-center"></div>
+
+        <form id="loginForm" class="space-y-4">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1.5 font-medium">帳號</label>
+                <input id="username" type="text" required autocomplete="username"
+                    class="w-full field rounded-xl px-4 py-3 text-sm" placeholder="請輸入帳號">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1.5 font-medium">密碼</label>
+                <input id="password" type="password" required autocomplete="current-password"
+                    class="w-full field rounded-xl px-4 py-3 text-sm" placeholder="請輸入密碼">
+            </div>
+            <button type="submit" id="loginBtn"
+                class="w-full btn-primary text-white py-3 rounded-xl text-sm font-semibold shadow-lg shadow-blue-500/20">
+                登入
+            </button>
+        </form>
+
+        <div class="mt-5 pt-4 border-t border-slate-700/40 text-center">
+            <p class="text-xs text-slate-500">還沒有帳號？
+                <a href="/jarvis-register" class="text-blue-400 hover:text-blue-300 font-medium">註冊 & 訂閱</a>
+            </p>
+        </div>
+    </div>
+
+    <p class="text-[10px] text-slate-600 text-center mt-6">© 2026 築未科技 Zhe-Wei Technology</p>
+</div>
+
+<script>
+const BASE = window.location.origin;
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('errMsg');
+    const btn = document.getElementById('loginBtn');
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+
+    if (!username || !password) {
+        errEl.textContent = '請輸入帳號和密碼';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '登入中…';
+    errEl.classList.add('hidden');
+
+    try {
+        const r = await fetch(`${BASE}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const d = await r.json();
+
+        if (d.ok) {
+            // 儲存 token
+            localStorage.setItem('jarvis_token', d.token);
+            localStorage.setItem('jarvis_user', JSON.stringify(d.user));
+
+            // 檢查訂閱狀態
+            if (d.user.role === 'pending' || d.user.subscription === 'pending') {
+                window.location.href = '/jarvis-register?step=subscribe&username=' + encodeURIComponent(username);
+            } else if (d.user.subscription !== 'active' && d.user.role !== 'superadmin' && d.user.role !== 'admin') {
+                window.location.href = '/jarvis-register?step=subscribe&username=' + encodeURIComponent(username);
+            } else {
+                window.location.href = '/jarvis';
+            }
+        } else {
+            errEl.textContent = d.error || '登入失敗';
+            errEl.classList.remove('hidden');
+        }
+    } catch (err) {
+        errEl.textContent = '連線失敗: ' + err.message;
+        errEl.classList.remove('hidden');
+    }
+
+    btn.disabled = false;
+    btn.textContent = '登入';
+});
+
+// 如果已登入且有效，直接跳轉
+(async () => {
+    const token = localStorage.getItem('jarvis_token');
+    if (!token) return;
+    try {
+        const r = await fetch(`${BASE}/api/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const d = await r.json();
+        if (d.ok && d.user) {
+            if (d.user.subscription === 'active' || d.user.role === 'superadmin' || d.user.role === 'admin') {
+                window.location.href = '/jarvis';
+            }
+        }
+    } catch {}
+})();
+</script>
+</body>
+</html>

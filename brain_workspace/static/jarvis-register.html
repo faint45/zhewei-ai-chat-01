@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a0a0f">
+    <title>Jarvis — 註冊 & 訂閱</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Inter','Noto Sans TC',sans-serif;-webkit-tap-highlight-color:transparent}
+        .glass{background:rgba(15,23,42,.6);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+        .field{background:rgba(15,23,42,.5);border:1px solid rgba(51,65,85,.5);transition:all .2s;color:#e2e8f0}
+        .field:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.15);outline:none}
+        .btn-primary{background:linear-gradient(135deg,#2563eb,#1d4ed8);transition:all .15s}
+        .btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
+        .btn-primary:active{filter:brightness(.95);transform:translateY(0)}
+        .btn-primary:disabled{opacity:.4;pointer-events:none}
+        .btn-outline{border:1px solid rgba(59,130,246,.4);color:#60a5fa;transition:all .15s}
+        .btn-outline:hover{background:rgba(59,130,246,.1);border-color:#3b82f6}
+        .fade-in{animation:fadeIn .4s ease-out}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        .bg-glow{position:fixed;width:300px;height:300px;border-radius:50%;filter:blur(120px);opacity:.15;pointer-events:none}
+        .plan-card{transition:all .2s;cursor:pointer}
+        .plan-card:hover{border-color:#3b82f6;transform:translateY(-2px)}
+        .plan-card.selected{border-color:#3b82f6;background:rgba(59,130,246,.08)}
+        .step-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;transition:all .2s}
+        .step-dot.active{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff}
+        .step-dot.done{background:#059669;color:#fff}
+        .step-dot.pending{background:rgba(51,65,85,.5);color:#64748b}
+        .step-line{height:2px;flex:1;transition:background .2s}
+        .check-icon{display:inline-block;width:18px;height:18px;border-radius:50%;border:2px solid rgba(51,65,85,.5);transition:all .2s;position:relative}
+        .plan-card.selected .check-icon{border-color:#3b82f6;background:#3b82f6}
+        .plan-card.selected .check-icon::after{content:'';position:absolute;top:2px;left:5px;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+    </style>
+</head>
+<body class="bg-[#0a0a0f] text-slate-200 antialiased min-h-screen flex items-center justify-center p-4">
+
+<div class="bg-glow bg-blue-500" style="top:-80px;left:-80px"></div>
+<div class="bg-glow bg-emerald-500" style="bottom:-80px;right:-80px"></div>
+
+<div id="app" class="w-full max-w-md fade-in">
+    <!-- Logo -->
+    <div class="text-center mb-6">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white text-xl font-bold mx-auto mb-3 shadow-lg shadow-blue-500/20">J</div>
+        <h1 class="text-lg font-bold text-white">Jarvis AI 助理</h1>
+        <p class="text-xs text-slate-500 mt-1">築未科技 智慧系統</p>
+    </div>
+
+    <!-- Step Indicator -->
+    <div class="flex items-center justify-center gap-2 mb-6 px-8">
+        <div class="step-dot" id="stepDot1">1</div>
+        <div class="step-line bg-slate-700/50" id="stepLine1"></div>
+        <div class="step-dot pending" id="stepDot2">2</div>
+        <div class="step-line bg-slate-700/50" id="stepLine2"></div>
+        <div class="step-dot pending" id="stepDot3">3</div>
+    </div>
+    <div class="flex justify-between text-[10px] text-slate-500 mb-6 px-4">
+        <span>註冊帳號</span><span>選擇方案</span><span>完成</span>
+    </div>
+
+    <!-- ═══ Step 1: Register ═══ -->
+    <div id="step1" class="glass rounded-2xl border border-slate-700/50 p-6 shadow-2xl">
+        <h2 class="text-base font-semibold text-white mb-5 text-center">建立帳號</h2>
+
+        <div id="regErr" class="hidden mb-4 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm text-center"></div>
+
+        <form id="regForm" class="space-y-4">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1.5 font-medium">帳號</label>
+                <input id="regUsername" type="text" required minlength="4" autocomplete="username"
+                    class="w-full field rounded-xl px-4 py-3 text-sm" placeholder="至少 4 個字元">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1.5 font-medium">Email</label>
+                <input id="regEmail" type="email" autocomplete="email"
+                    class="w-full field rounded-xl px-4 py-3 text-sm" placeholder="選填，用於通知">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1.5 font-medium">密碼</label>
+                <input id="regPassword" type="password" required minlength="6" autocomplete="new-password"
+                    class="w-full field rounded-xl px-4 py-3 text-sm" placeholder="至少 6 個字元">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1.5 font-medium">確認密碼</label>
+                <input id="regPassword2" type="password" required minlength="6" autocomplete="new-password"
+                    class="w-full field rounded-xl px-4 py-3 text-sm" placeholder="再次輸入密碼">
+            </div>
+            <button type="submit" id="regBtn"
+                class="w-full btn-primary text-white py-3 rounded-xl text-sm font-semibold shadow-lg shadow-blue-500/20">
+                註冊
+            </button>
+        </form>
+
+        <div class="mt-5 pt-4 border-t border-slate-700/40 text-center">
+            <p class="text-xs text-slate-500">已有帳號？
+                <a href="/jarvis-login" class="text-blue-400 hover:text-blue-300 font-medium">登入</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- ═══ Step 2: Subscribe ═══ -->
+    <div id="step2" class="glass rounded-2xl border border-slate-700/50 p-6 shadow-2xl hidden">
+        <h2 class="text-base font-semibold text-white mb-2 text-center">選擇訂閱方案</h2>
+        <p class="text-xs text-slate-500 text-center mb-5">確認訂閱後即可使用 Jarvis AI 系統</p>
+
+        <div id="subErr" class="hidden mb-4 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm text-center"></div>
+
+        <div class="space-y-3" id="planCards">
+            <!-- Basic Plan -->
+            <div class="plan-card rounded-xl border border-slate-700/50 p-4 selected" data-plan="basic">
+                <div class="flex items-start gap-3">
+                    <div class="check-icon mt-0.5"></div>
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-white">基礎方案</h3>
+                            <span class="text-sm font-bold text-blue-400">免費</span>
+                        </div>
+                        <ul class="mt-2 space-y-1 text-[11px] text-slate-400">
+                            <li>✓ AI 對話（每日 50 次）</li>
+                            <li>✓ 知識庫查詢</li>
+                            <li>✓ 基礎系統監控</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pro Plan -->
+            <div class="plan-card rounded-xl border border-slate-700/50 p-4" data-plan="pro">
+                <div class="flex items-start gap-3">
+                    <div class="check-icon mt-0.5"></div>
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-white">專業方案</h3>
+                            <span class="text-sm font-bold text-emerald-400">NT$ 299/月</span>
+                        </div>
+                        <ul class="mt-2 space-y-1 text-[11px] text-slate-400">
+                            <li>✓ 無限 AI 對話</li>
+                            <li>✓ 編碼模擬 & 即時預覽</li>
+                            <li>✓ 文字生圖</li>
+                            <li>✓ 學習大模型精華</li>
+                            <li>✓ 完整系統控制</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enterprise Plan -->
+            <div class="plan-card rounded-xl border border-slate-700/50 p-4" data-plan="enterprise">
+                <div class="flex items-start gap-3">
+                    <div class="check-icon mt-0.5"></div>
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-white">企業方案</h3>
+                            <span class="text-sm font-bold text-amber-400">聯繫我們</span>
+                        </div>
+                        <ul class="mt-2 space-y-1 text-[11px] text-slate-400">
+                            <li>✓ 所有專業版功能</li>
+                            <li>✓ 多用戶管理</li>
+                            <li>✓ API 存取</li>
+                            <li>✓ 優先技術支援</li>
+                            <li>✓ 自訂部署</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button id="subBtn" onclick="confirmSubscription()"
+            class="w-full btn-primary text-white py-3 rounded-xl text-sm font-semibold shadow-lg shadow-blue-500/20 mt-5">
+            確認訂閱
+        </button>
+    </div>
+
+    <!-- ═══ Step 3: Complete ═══ -->
+    <div id="step3" class="glass rounded-2xl border border-slate-700/50 p-8 shadow-2xl hidden text-center">
+        <div class="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+        </div>
+        <h2 class="text-lg font-bold text-white mb-2">訂閱完成！</h2>
+        <p class="text-sm text-slate-400 mb-1" id="completeMsg">您的帳號已啟用，現在可以使用 Jarvis AI 系統。</p>
+        <p class="text-xs text-slate-500 mb-6" id="completePlan"></p>
+        <a href="/jarvis-login" class="inline-block btn-primary text-white px-8 py-3 rounded-xl text-sm font-semibold shadow-lg shadow-blue-500/20">
+            前往登入
+        </a>
+    </div>
+
+    <p class="text-[10px] text-slate-600 text-center mt-6">© 2026 築未科技 Zhe-Wei Technology</p>
+</div>
+
+<script>
+const BASE = window.location.origin;
+let currentStep = 1;
+let registeredUsername = '';
+let selectedPlan = 'basic';
+
+// URL 參數處理（從登入頁跳轉過來的已註冊用戶）
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('step') === 'subscribe' && urlParams.get('username')) {
+    registeredUsername = urlParams.get('username');
+    goToStep(2);
+}
+
+// ── Step Navigation ──
+function goToStep(step) {
+    currentStep = step;
+    document.getElementById('step1')?.classList.toggle('hidden', step !== 1);
+    document.getElementById('step2')?.classList.toggle('hidden', step !== 2);
+    document.getElementById('step3')?.classList.toggle('hidden', step !== 3);
+
+    for (let i = 1; i <= 3; i++) {
+        const dot = document.getElementById('stepDot' + i);
+        dot.className = 'step-dot ' + (i < step ? 'done' : i === step ? 'active' : 'pending');
+        if (i < step) dot.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>';
+        else dot.textContent = i;
+    }
+    if (step > 1) document.getElementById('stepLine1')?.style.background = '#059669';
+    if (step > 2) document.getElementById('stepLine2')?.style.background = '#059669';
+}
+goToStep(currentStep);
+
+// ── Plan Selection ──
+document.getElementById('planCards')?.addEventListener('click', (e) => {
+    const card = e.target.closest('.plan-card');
+    if (!card) return;
+    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedPlan = card.dataset.plan;
+});
+
+// ── Register ──
+document.getElementById('regForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('regErr');
+    const btn = document.getElementById('regBtn');
+    const username = document.getElementById('regUsername')?.value.trim();
+    const email = document.getElementById('regEmail')?.value.trim();
+    const password = document.getElementById('regPassword')?.value.trim();
+    const password2 = document.getElementById('regPassword2')?.value.trim();
+
+    if (password !== password2) {
+        errEl.textContent = '兩次密碼不一致';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '註冊中…';
+    errEl.classList.add('hidden');
+
+    try {
+        const r = await fetch(`${BASE}/api/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, email })
+        });
+        const d = await r.json();
+
+        if (d.ok) {
+            registeredUsername = username;
+            goToStep(2);
+        } else {
+            errEl.textContent = d.error || '註冊失敗';
+            errEl.classList.remove('hidden');
+        }
+    } catch (err) {
+        errEl.textContent = '連線失敗: ' + err.message;
+        errEl.classList.remove('hidden');
+    }
+
+    btn.disabled = false;
+    btn.textContent = '註冊';
+});
+
+// ── Confirm Subscription ──
+async function confirmSubscription() {
+    const errEl = document.getElementById('subErr');
+    const btn = document.getElementById('subBtn');
+
+    if (!registeredUsername) {
+        errEl.textContent = '請先完成註冊';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '處理中…';
+    errEl.classList.add('hidden');
+
+    try {
+        const r = await fetch(`${BASE}/api/auth/subscribe`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: registeredUsername, plan: selectedPlan })
+        });
+        const d = await r.json();
+
+        if (d.ok) {
+            const planNames = { basic: '基礎方案（免費）', pro: '專業方案', enterprise: '企業方案' };
+            document.getElementById('completePlan')?.textContent = '方案：' + (planNames[selectedPlan] || selectedPlan);
+            goToStep(3);
+        } else {
+            errEl.textContent = d.error || '訂閱失敗';
+            errEl.classList.remove('hidden');
+        }
+    } catch (err) {
+        errEl.textContent = '連線失敗: ' + err.message;
+        errEl.classList.remove('hidden');
+    }
+
+    btn.disabled = false;
+    btn.textContent = '確認訂閱';
+}
+</script>
+</body>
+</html>

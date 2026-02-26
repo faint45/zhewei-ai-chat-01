@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>對話遙控 - 築未科技</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Noto Sans TC', sans-serif; }
+        .msg-user { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .msg-bot { background: #f3f4f6; color: #1f2937; }
+        .typing { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .quick-chip { transition: all 0.2s; }
+        .quick-chip:active { transform: scale(0.95); }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-gray-800 px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <span class="text-2xl">🤖</span>
+            <div>
+                <h1 class="font-bold">對話遙控</h1>
+                <p class="text-xs text-gray-400">無需看螢幕，像聊天一樣控制電腦</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <span id="status" class="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400">就緒</span>
+            <button onclick="toggleHistory()" class="p-2 rounded hover:bg-gray-700">📋</button>
+            <button onclick="toggleSettings()" class="p-2 rounded hover:bg-gray-700">⚙️</button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Quick Commands Sidebar -->
+        <aside class="w-48 bg-gray-800/50 border-r border-gray-700 p-3 hidden md:block overflow-y-auto">
+            <p class="text-xs text-gray-400 mb-2">快速指令</p>
+            <div class="space-y-2">
+                <button onclick="sendQuick('開啟記事本')" class="quick-chip w-full text-left text-xs px-3 py-2 rounded bg-blue-600/20 border border-blue-500/30 hover:bg-blue-600/40">📝 開記事本</button>
+                <button onclick="sendQuick('開啟終端機')" class="quick-chip w-full text-left text-xs px-3 py-2 rounded bg-green-600/20 border border-green-500/30 hover:bg-green-600/40">💻 開終端機</button>
+                <button onclick="sendQuick('開啟 Chrome')" class="quick-chip w-full text-left text-xs px-3 py-2 rounded bg-red-600/20 border border-red-500/30 hover:bg-red-600/40">🌐 開 Chrome</button>
+                <button onclick="sendQuick('搜尋 D:\\ 的 *.py 檔案')" class="quick-chip w-full text-left text-xs px-3 py-2 rounded bg-yellow-600/20 border border-yellow-500/30 hover:bg-yellow-600/40">🔍 搜尋檔案</button>
+                <button onclick="sendQuick('檢查系統狀態')" class="quick-chip w-full text-left text-xs px-3 py-2 rounded bg-purple-600/20 border border-purple-500/30 hover:bg-purple-600/40">📊 系統狀態</button>
+                <button onclick="sendQuick('開 VS Code')" class="quick-chip w-full text-left text-xs px-3 py-2 rounded bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/40">📦 VS Code</button>
+                <button onclick="sendQuick('開啟檔案總管')" class="quick-chip w-full text-left text-xs px-3 py-2 rounded bg-orange-600/20 border border-orange-500/30 hover:bg-orange-600/40">📁 檔案總管</button>
+                <button onclick="sendQuick('開啟瀏覽器並前往 youtube.com')" class="quick-chip w-full text-left text-xs px-3 py-2 rounded bg-pink-600/20 border border-pink-500/30 hover:bg-pink-600/40">🎬 YouTube</button>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-700">
+                <p class="text-xs text-gray-400 mb-2">常用操作</p>
+                <button onclick="sendQuick('開啟 Chrome 並前往 google.com')" class="quick-chip w-full text-left text-xs px-3 py-2 rounded bg-gray-700 hover:bg-gray-600">🔎 Google</button>
+                <button onclick="sendQuick('開啟終端機並執行 python --version')" class="quick-chip w-full text-left text-xs px-3 py-2 rounded bg-gray-700 hover:bg-gray-600">🐍 Python 版本</button>
+                <button onclick="sendQuick('開啟記事本並輸入今天的日期')" class="quick-chip w-full text-left text-xs px-3 py-2 rounded bg-gray-700 hover:bg-gray-600">📅 記錄日期</button>
+            </div>
+        </aside>
+
+        <!-- Chat Area -->
+        <div class="flex-1 flex flex-col">
+            <!-- Messages -->
+            <div id="chat" class="flex-1 overflow-y-auto p-4 space-y-3">
+                <div class="msg-bot p-4 rounded-lg text-sm max-w-[80%]">
+                    <p class="font-bold mb-2">👋 你好！我是對話遙控助手</p>
+                    <p class="text-gray-600">你可以用自然語言告訴我想要做什麼，我會幫你執行。</p>
+                    <p class="mt-2 text-gray-500 text-xs">例如：「開啟 Chrome」、「搜尋 D:\ 的檔案」、「開終端機」</p>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="p-4 bg-gray-800 border-t border-gray-700">
+                <div class="flex gap-2">
+                    <input id="message" type="text" placeholder="輸入指令... 例如：開啟記事本" 
+                        class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                        onkeypress="if(event.key==='Enter') sendMessage()">
+                    <button onclick="sendMessage()" class="btn bg-blue-600 hover:bg-blue-700 px-6 rounded-lg font-bold">
+                        ➤
+                    </button>
+                </div>
+                <div class="flex justify-between mt-2 text-xs text-gray-500">
+                    <span id="provider-info">Provider: gemini</span>
+                    <span id="mode-info">模式: 執行並回覆</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Sidebar -->
+        <aside id="history-panel" class="w-64 bg-gray-800 border-l border-gray-700 p-3 hidden overflow-y-auto">
+            <p class="text-xs text-gray-400 mb-2">執行歷史</p>
+            <div id="history-list" class="space-y-2"></div>
+        </aside>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 p-4">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-sm">
+            <h2 class="text-lg font-bold mb-4">⚙️ 設定</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs text-gray-400">AI Provider</label>
+                    <select id="provider-select" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 mt-1">
+                        <option value="gemini">Gemini (預設)</option>
+                        <option value="claude">Claude</option>
+                        <option value="ollama">Ollama (本地)</option>
+                        <option value="deepseek">DeepSeek</option>
+                        <option value="groq">Groq</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400">執行模式</label>
+                    <select id="mode-select" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 mt-1">
+                        <option value="execute">執行並回覆</option>
+                        <option value="plan">僅規劃，不執行</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400">Token (可選)</label>
+                    <input type="password" id="token-input" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 mt-1">
+                </div>
+            </div>
+            <div class="flex gap-2 mt-6">
+                <button onclick="saveSettings()" class="flex-1 bg-blue-600 py-2 rounded">儲存</button>
+                <button onclick="toggleSettings()" class="flex-1 bg-gray-700 py-2 rounded">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let token = localStorage.getItem('jarvis_token') || '';
+        let executeMode = true;
+        let provider = 'gemini';
+
+        function getHeaders() {
+            const h = { 'Content-Type': 'application/json' };
+            if (token) h['Authorization'] = `Bearer ${token}`;
+            return h;
+        }
+
+        function addMessage(role, content, extra = '') {
+            const div = document.createElement('div');
+            div.className = role === 'user' 
+                ? 'msg-user p-4 rounded-lg text-sm max-w-[80%] ml-auto' 
+                : 'msg-bot p-4 rounded-lg text-sm max-w-[80%]';
+            div.innerHTML = content + (extra ? `<div class="mt-2 text-xs text-gray-400 border-t border-gray-200 pt-2">${extra}</div>` : '');
+            document.getElementById('chat').appendChild(div);
+            div.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function addTyping() {
+            const div = document.createElement('div');
+            div.id = 'typing';
+            div.className = 'msg-bot p-4 rounded-lg text-sm max-w-[80%]';
+            div.innerHTML = '<span class="typing">思考中...</span>';
+            document.getElementById('chat').appendChild(div);
+            div.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function removeTyping() {
+            document.getElementById('typing')?.remove();
+        }
+
+        function showStatus(msg) {
+            document.getElementById('status').textContent = msg;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('message');
+            const message = input.value.trim();
+            if (!message) return;
+
+            addMessage('user', message);
+            input.value = '';
+            showStatus('執行中...');
+            addTyping();
+
+            try {
+                const res = await fetch(`${API_BASE}/api/chat/remote`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ message, execute: executeMode, provider })
+                });
+                const data = await res.json();
+                removeTyping();
+
+                if (data.ok) {
+                    const r = data.result;
+                    let content = r.response || r.summary || '執行完成';
+                    let extra = `耗時: ${r.duration_seconds || 0}秒`;
+                    if (r.executed) extra += ' | 已執行';
+                    addMessage('bot', content, extra);
+                    updateHistory(r);
+                } else {
+                    addMessage('bot', `<p class="text-red-400">❌ ${data.error}</p>`);
+                }
+            } catch (e) {
+                removeTyping();
+                addMessage('bot', `<p class="text-red-400">❌ 錯誤：${e.message}</p>`);
+            }
+
+            showStatus('就緒');
+        }
+
+        async function sendQuick(cmd) {
+            document.getElementById('message').value = cmd;
+            sendMessage();
+        }
+
+        function toggleSettings() {
+            const modal = document.getElementById('settings-modal');
+            modal.classList.toggle('hidden');
+            modal.classList.toggle('flex');
+        }
+
+        function saveSettings() {
+            provider = document.getElementById('provider-select').value;
+            executeMode = document.getElementById('mode-select').value === 'execute';
+            token = document.getElementById('token-input').value;
+            if (token) localStorage.setItem('jarvis_token', token);
+            document.getElementById('provider-info').textContent = `Provider: ${provider}`;
+            document.getElementById('mode-info').textContent = `模式: ${executeMode ? '執行並回覆' : '僅規劃'}`;
+            toggleSettings();
+        }
+
+        function toggleHistory() {
+            const panel = document.getElementById('history-panel');
+            panel.classList.toggle('hidden');
+        }
+
+        async function updateHistory(result) {
+            const list = document.getElementById('history-list');
+            const item = document.createElement('div');
+            item.className = 'p-2 bg-gray-700 rounded text-xs';
+            item.innerHTML = `
+                <p class="text-gray-300 truncate">${result.user_message || '系統檢查'}</p>
+                <p class="text-green-400 mt-1">${result.executed ? '✅ 已執行' : '📋 已規劃'}</p>
+            `;
+            list.insertBefore(item, list.firstChild);
+        }
+
+        async function checkStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/api/chat/remote/status`);
+                const data = await res.json();
+                if (data.ok) {
+                    showStatus('就緒');
+                } else {
+                    showStatus('離線');
+                }
+            } catch (e) {
+                showStatus('離線');
+            }
+        }
+
+        checkStatus();
+        setInterval(checkStatus, 30000);
+    </script>
+</body>
+</html>
