@@ -112,6 +112,14 @@ def extract_section(pcd, params: SectionParams) -> SectionResult:
     points_2d = _denoise_2d(points_2d, params.denoise_radius, params.denoise_neighbors)
     logger.info(f"降噪後: {len(points_2d):,}")
 
+    if len(points_2d) == 0:
+        return SectionResult(
+            section_type=params.section_type,
+            position=params.position,
+            points_2d=np.empty((0, 2)),
+            n_points=0
+        )
+
     # 提取輪廓線
     contours = _extract_contours(points_2d, params.simplify_tolerance)
     logger.info(f"輪廓線數: {len(contours)}")
@@ -147,14 +155,11 @@ def auto_sections(pcd, n_plans: int = 3, n_elevations: int = 4, thickness: float
         SectionResult 列表
     """
     points = pcd.points
-    z_min, z_max = points[:, 2].min(), points[:, 2].max()
-    x_min, x_max = points[:, 0].min(), points[:, 0].max()
-    y_min, y_max = points[:, 1].min(), points[:, 1].max()
-
     results = []
 
-    # 平面圖：均勻高度
-    z_positions = np.linspace(z_min + (z_max - z_min) * 0.1, z_max - (z_max - z_min) * 0.1, n_plans)
+    # 使用直方圖找點密度最高的位置
+    z_positions = _find_dense_positions(points[:, 2], n_plans)
+    logger.info(f"平面圖高度 (Z): {[f'{z:.1f}' for z in z_positions]}")
     for z in z_positions:
         params = SectionParams(section_type=SectionType.PLAN, position=float(z), thickness=thickness)
         results.append(extract_section(pcd, params))
@@ -163,18 +168,41 @@ def auto_sections(pcd, n_plans: int = 3, n_elevations: int = 4, thickness: float
     n_x = n_elevations // 2
     n_y = n_elevations - n_x
 
-    x_positions = np.linspace(x_min + (x_max - x_min) * 0.3, x_max - (x_max - x_min) * 0.3, n_x)
+    x_positions = _find_dense_positions(points[:, 0], n_x)
+    logger.info(f"X立面位置: {[f'{x:.1f}' for x in x_positions]}")
     for x in x_positions:
         params = SectionParams(section_type=SectionType.ELEVATION_X, position=float(x), thickness=thickness)
         results.append(extract_section(pcd, params))
 
-    y_positions = np.linspace(y_min + (y_max - y_min) * 0.3, y_max - (y_max - y_min) * 0.3, n_y)
+    y_positions = _find_dense_positions(points[:, 1], n_y)
+    logger.info(f"Y立面位置: {[f'{y:.1f}' for y in y_positions]}")
     for y in y_positions:
         params = SectionParams(section_type=SectionType.ELEVATION_Y, position=float(y), thickness=thickness)
         results.append(extract_section(pcd, params))
 
     logger.info(f"自動生成 {len(results)} 個切面 ({n_plans} 平面 + {n_x} X立面 + {n_y} Y立面)")
     return results
+
+
+def _find_dense_positions(values: np.ndarray, n: int, n_bins: int = 100) -> list[float]:
+    """用直方圖找點密度最高的 n 個位置"""
+    counts, edges = np.histogram(values, bins=n_bins)
+    centers = (edges[:-1] + edges[1:]) / 2
+
+    # 找前 n 個密度最高的 bin，但要保持間距
+    min_gap = len(counts) // (n * 2 + 1)  # 最小間隔
+    selected = []
+    sorted_idx = np.argsort(counts)[::-1]
+
+    for idx in sorted_idx:
+        if len(selected) >= n:
+            break
+        # 檢查與已選位置的距離
+        if all(abs(idx - s) >= max(min_gap, 1) for s in selected):
+            selected.append(idx)
+
+    selected.sort()
+    return [float(centers[i]) for i in selected]
 
 
 def _denoise_2d(points: np.ndarray, radius: float, min_neighbors: int) -> np.ndarray:
