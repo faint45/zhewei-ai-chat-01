@@ -8,6 +8,7 @@ on:
       - 'frontend/**'
       - 'templates/index.html'
       - 'static/**'
+      - 'brain_workspace/static/pwa/**'
       - '.github/workflows/deploy-frontend.yml'
 
 jobs:

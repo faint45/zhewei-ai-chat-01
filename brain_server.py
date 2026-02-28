@@ -55,7 +55,10 @@ app = FastAPI(title="Zhewei Brain Command Center", description="預設端口 800
 # 網域白名單（CORS）
 origins = [
     "https://zhe-wei.net",
+    "https://www.zhe-wei.net",
     "https://brain.zhe-wei.net",
+    "https://jarvis.zhe-wei.net",
+    "https://zhewei-ai-chat-01.pages.dev",
     "http://localhost:3000",
     "http://localhost:8000",
     "http://localhost:8002",
@@ -1264,6 +1267,32 @@ async def api_remote_enhance(request: Request, body: dict):
                 provider="error", model="", duration_ms=int((_time.time() - start) * 1000),
                 success=False, error_msg=str(e)[:200], user_id=uid, task_type=task_type,
             )
+        return {"ok": False, "error": str(e)[:300]}
+
+
+@app.get("/api/ai/task-planner-test")
+async def api_ai_task_planner_test(request: Request, q: str = "你好"):
+    """測試 TaskPlanner 分類結果（不實際呼叫模型）。"""
+    try:
+        from ai_modules.task_planner import planner
+        plan = planner.plan([{"role": "user", "content": q}])
+        return {
+            "query": q, "level": plan.level, "label": plan.label,
+            "domain": plan.domain, "model_chain": plan.model_chain,
+            "quality_gate": plan.quality_gate, "escalation": plan.escalation,
+            "thinking": plan.thinking, "system_prompt": plan.system_prompt[:100] if plan.system_prompt else "",
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:300]}
+
+
+@app.get("/api/ai/training-analysis")
+async def api_ai_training_analysis(request: Request):
+    """分析任務日誌，找出適合微調的高頻領域。"""
+    try:
+        from ai_modules.task_planner import training_analyzer
+        return training_analyzer.analyze()
+    except Exception as e:
         return {"ok": False, "error": str(e)[:300]}
 
 
@@ -4004,7 +4033,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 # ── Ntfy 推播 API ──────────────────────────────────────────────
-NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://notify.zhewei.tech").rstrip("/")
+NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://notify.zhe-wei.net").rstrip("/")
 NTFY_ADMIN_USER = os.environ.get("NTFY_ADMIN_USER", "").strip()
 NTFY_ADMIN_PASS = os.environ.get("NTFY_ADMIN_PASS", "").strip()
 NTFY_DEFAULT_TOPIC = os.environ.get("NTFY_DEFAULT_TOPIC", "zhewei_general").strip()
@@ -4272,7 +4301,7 @@ async def api_transfer_upload(request: Request):
     # Ntfy 推播通知
     try:
         ntfy_topic = f"transfer_{transfer_id}"
-        ntfy_url = os.environ.get("NTFY_SERVER", "https://notify.zhewei.tech")
+        ntfy_url = os.environ.get("NTFY_SERVER", "https://notify.zhe-wei.net")
         ntfy_user = os.environ.get("NTFY_ADMIN_USER")
         ntfy_pass = os.environ.get("NTFY_ADMIN_PASS")
         import httpx
@@ -4317,7 +4346,7 @@ async def api_transfer_text(request: Request):
     # Ntfy 推播通知
     try:
         ntfy_topic = f"transfer_{transfer_id}"
-        ntfy_url = os.environ.get("NTFY_SERVER", "https://notify.zhewei.tech")
+        ntfy_url = os.environ.get("NTFY_SERVER", "https://notify.zhe-wei.net")
         ntfy_user = os.environ.get("NTFY_ADMIN_USER")
         ntfy_pass = os.environ.get("NTFY_ADMIN_PASS")
         import httpx
@@ -4358,6 +4387,33 @@ async def api_transfer_download(file_id: str):
 async def api_transfer_history(request: Request):
     """取得傳送歷史。"""
     return {"items": []}
+
+
+@app.get("/pwa")
+async def get_pwa(request: Request):
+    """PWA 可攜式 AI 助手入口。"""
+    for d in (STATIC_DIR, FALLBACK_STATIC):
+        p = d / "pwa" / "index.html"
+        if p.exists():
+            return FileResponse(str(p), media_type="text/html")
+    return PlainTextResponse("pwa/index.html not found", status_code=404)
+
+
+@app.get("/pwa/{path:path}")
+async def get_pwa_static(path: str):
+    """PWA 靜態資源。"""
+    for d in (STATIC_DIR, FALLBACK_STATIC):
+        p = d / "pwa" / path
+        if p.exists() and p.is_file():
+            media = None
+            if path.endswith(".js"):
+                media = "application/javascript"
+            elif path.endswith(".json"):
+                media = "application/json"
+            elif path.endswith(".png"):
+                media = "image/png"
+            return FileResponse(str(p), media_type=media)
+    return PlainTextResponse("not found", status_code=404)
 
 
 @app.get("/app")
