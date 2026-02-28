@@ -3,9 +3,24 @@ services:
     image: ghcr.io/open-webui/open-webui:main
     container_name: open-webui
     ports:
-      - "3000:8080"
+      - "3001:8080"
     environment:
+      # Ollama (築未本地模型)
       - OLLAMA_BASE_URL=http://host.docker.internal:11460
+      # Forge 生圖 (SD WebUI Forge)
+      - AUTOMATIC1111_BASE_URL=http://host.docker.internal:7860
+      - ENABLE_IMAGE_GENERATION=true
+      - IMAGE_GENERATION_ENGINE=automatic1111
+      - IMAGE_SIZE=1024x1024
+      # 預設模型
+      - DEFAULT_MODELS=zhewei-qwen3-32b-deep
+      # 代碼執行沙盒
+      - ENABLE_CODE_EXECUTION=true
+      - CODE_EXECUTION_ENGINE=pyodide
+      # 管理設定
+      - WEBUI_NAME=築未科技 AI 中心
+      - WEBUI_AUTH=false
+      - ENABLE_SIGNUP=false
     volumes:
       - open-webui-data:/app/backend/data
     extra_hosts:
@@ -21,6 +36,7 @@ services:
       - ./mcpo:/opt/mcpo
       - D:/brain_workspace:/workspace
     restart: unless-stopped
+
 volumes:
   open-webui-data:
 

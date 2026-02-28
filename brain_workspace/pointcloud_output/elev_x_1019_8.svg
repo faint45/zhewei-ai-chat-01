@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+  <rect width="800" height="600" fill="#ffffff"/>
+  <text x="400.0" y="25" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#333">X方向立面圖 (X=1019.84m)</text>
+  <line x1="40.0" y1="371.25937961727146" x2="760.0" y2="371.25937961727146" stroke="#999" stroke-width="0.5"/>
+  <text x="400.0" y="386.25937961727146" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#666">67.21m</text>
+  <line x1="25.0" y1="351.3" x2="25.0" y2="248.7" stroke="#999" stroke-width="0.5"/>
+  <text x="20.0" y="300.0" text-anchor="end" font-family="sans-serif" font-size="11" fill="#666" transform="rotate(-90,20.0,300.0)">9.57m</text>
+</svg>

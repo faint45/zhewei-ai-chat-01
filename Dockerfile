@@ -1,4 +1,4 @@
-# 築未科技大腦 — WebSocket 服務 (端口 8000)
+# 築未科技大腦 — Brain Server v2.0 模組化架構 (端口 8000)
 # 建置：docker build -t zhewei-brain .
 # 執行：docker run -p 8000:8000 --env-file .env zhewei-brain
 

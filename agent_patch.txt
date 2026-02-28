@@ -1,0 +1,11 @@
+@app.get("/agent")
+async def get_agent_panel(request: Request):
+    """代理執行介面頁面 - 加入帳號密碼認證"""
+    auth = _require_auth(request)
+    if isinstance(auth, RedirectResponse):
+        return auth
+    for d in (STATIC_DIR, FALLBACK_STATIC):
+        p = d / "agent-panel.html"
+        if p.exists():
+            return FileResponse(str(p))
+    return PlainTextResponse("agent-panel.html not found", status_code=404)

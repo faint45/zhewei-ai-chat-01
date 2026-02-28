@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>築未科技 — AI 生圖</title>
+<style>
+:root {
+  --bg:#0d1117; --bg2:#161b22; --bg3:#21262d; --border:#30363d;
+  --fg:#e6edf3; --fg2:#8b949e; --blue:#58a6ff; --green:#3fb950;
+  --red:#f85149; --yellow:#d29922; --purple:#bc8cff;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--fg);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
+
+/* ── 頂欄 ── */
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;height:50px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;}
+.topbar a{color:var(--fg2);text-decoration:none;font-size:13px;}
+.topbar a:hover{color:var(--fg);}
+.logo{font-weight:700;font-size:15px;color:var(--fg);}
+.logo span{color:var(--blue);}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--fg2);display:inline-block;}
+.status-dot.on{background:var(--green);box-shadow:0 0 6px var(--green);}
+.status-dot.off{background:var(--red);}
+
+/* ── 主體兩欄 ── */
+.wrap{display:grid;grid-template-columns:420px 1fr;gap:20px;padding:20px;max-width:1200px;margin:0 auto;}
+@media(max-width:900px){.wrap{grid-template-columns:1fr;}}
+
+/* ── 左欄：操作區 ── */
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px;}
+.panel-title{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;}
+
+.field{display:flex;flex-direction:column;gap:6px;}
+.field label{font-size:13px;font-weight:600;color:var(--fg);}
+.field .hint{font-size:11px;color:var(--fg2);line-height:1.4;}
+textarea,input[type=text]{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--fg);padding:10px 12px;font-size:13px;font-family:inherit;resize:vertical;transition:border .2s;}
+textarea:focus,input[type=text]:focus{outline:none;border-color:var(--blue);}
+
+/* ── 尺寸選擇 ── */
+.size-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.size-btn{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 6px;cursor:pointer;text-align:center;transition:all .2s;color:var(--fg2);}
+.size-btn:hover{border-color:var(--blue);color:var(--fg);}
+.size-btn.active{border-color:var(--blue);background:rgba(88,166,255,.12);color:var(--blue);}
+.size-btn .size-label{font-size:13px;font-weight:600;}
+.size-btn .size-sub{font-size:10px;color:inherit;margin-top:2px;}
+
+/* ── 品質滑桿 ── */
+.quality-row{display:flex;gap:8px;}
+.q-btn{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;color:var(--fg2);transition:all .2s;}
+.q-btn:hover{border-color:var(--blue);color:var(--fg);}
+.q-btn.active{border-color:var(--blue);background:rgba(88,166,255,.12);color:var(--blue);}
+
+/* ── 風格標籤 ── */
+.style-wrap{display:flex;gap:6px;flex-wrap:wrap;}
+.style-tag{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);font-size:12px;cursor:pointer;color:var(--fg2);transition:all .2s;}
+.style-tag:hover{border-color:var(--blue);color:var(--fg);}
+.style-tag.active{border-color:var(--purple);background:rgba(188,140,255,.12);color:var(--purple);}
+
+/* ── 生成按鈕 ── */
+.gen-btn{width:100%;padding:14px;border-radius:10px;border:none;background:var(--blue);color:#000;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.gen-btn:hover{filter:brightness(1.15);transform:translateY(-1px);}
+.gen-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;filter:none;}
+.gen-btn .spinner{width:18px;height:18px;border:2.5px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── 右欄：結果區 ── */
+.result-panel{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px;}
+.result-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--fg2);padding:60px 20px;}
+.result-empty .icon{font-size:48px;opacity:.4;}
+.result-img{width:100%;border-radius:10px;display:none;}
+.result-img.show{display:block;}
+.result-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.act-btn{flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--fg);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;text-align:center;}
+.act-btn:hover{border-color:var(--blue);color:var(--blue);}
+
+/* ── 提示詞歷史 ── */
+.history{margin-top:8px;}
+.history-title{font-size:12px;color:var(--fg2);margin-bottom:8px;}
+.history-list{display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto;}
+.history-item{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--fg2);cursor:pointer;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.history-item:hover{border-color:var(--blue);color:var(--fg);}
+
+/* ── 提示 banner ── */
+.notice{background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--yellow);display:none;}
+.notice.show{display:block;}
+.progress-msg{font-size:13px;color:var(--fg2);text-align:center;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/hub">← 返回主頁</a>
+  <div style="flex:1"></div>
+  <div class="logo">🎨 <span>AI 生圖</span></div>
+  <div style="flex:1"></div>
+  <span class="status-dot" id="forgeDot"></span>
+  <span id="forgeStatus" style="font-size:12px;color:var(--fg2)">連線中...</span>
+</div>
+
+<div class="wrap">
+
+  <!-- ── 左欄：控制 ── -->
+  <div class="panel">
+    <div class="panel-title">✏️ 描述你想要的圖片</div>
+
+    <div class="notice" id="forgeOffline">
+      ⚠️ Forge 生圖服務未啟動。請先在本機啟動 Forge（webui-user.bat），或等待服務就緒。
+    </div>
+
+    <div class="field">
+      <label>📝 圖片描述（想要什麼）</label>
+      <textarea id="prompt" rows="4" placeholder="例如：一隻白色的貓咪坐在窗邊，陽光照射，柔和的光線，高解析度"></textarea>
+      <div class="hint">用中文或英文描述都可以，描述越詳細效果越好</div>
+    </div>
+
+    <div class="field">
+      <label>🚫 不想出現的東西（選填）</label>
+      <textarea id="neg" rows="2" placeholder="例如：模糊、變形的手、醜陋、低品質"></textarea>
+    </div>
+
+    <div class="field">
+      <label>📐 圖片大小</label>
+      <div class="size-grid">
+        <div class="size-btn active" onclick="setSize(this,768,768)">
+          <div class="size-label">⬛ 正方形</div>
+          <div class="size-sub">768 × 768</div>
+        </div>
+        <div class="size-btn" onclick="setSize(this,1152,768)">
+          <div class="size-label">🖼 橫幅</div>
+          <div class="size-sub">1152 × 768</div>
+        </div>
+        <div class="size-btn" onclick="setSize(this,768,1152)">
+          <div class="size-label">📱 直幅</div>
+          <div class="size-sub">768 × 1152</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>⚡ 生成品質</label>
+      <div class="quality-row">
+        <div class="q-btn active" onclick="setQuality(this,15)">
+          <div>🚀 快速</div>
+          <div style="font-size:10px;font-weight:400;margin-top:2px;">約 20 秒</div>
+        </div>
+        <div class="q-btn" onclick="setQuality(this,25)">
+          <div>✨ 標準</div>
+          <div style="font-size:10px;font-weight:400;margin-top:2px;">約 35 秒</div>
+        </div>
+        <div class="q-btn" onclick="setQuality(this,40)">
+          <div>💎 精細</div>
+          <div style="font-size:10px;font-weight:400;margin-top:2px;">約 60 秒</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>🎨 風格（選填，可多選）</label>
+      <div class="style-wrap" id="styleWrap">
+        <div class="style-tag" onclick="toggleStyle(this,'anime style, illustration')">動漫插畫</div>
+        <div class="style-tag" onclick="toggleStyle(this,'photorealistic, photography')">寫實照片</div>
+        <div class="style-tag" onclick="toggleStyle(this,'oil painting, artistic')">油畫藝術</div>
+        <div class="style-tag" onclick="toggleStyle(this,'cinematic, dramatic lighting')">電影感</div>
+        <div class="style-tag" onclick="toggleStyle(this,'cute, chibi, kawaii')">可愛萌系</div>
+        <div class="style-tag" onclick="toggleStyle(this,'dark, moody, gothic')">黑暗風格</div>
+        <div class="style-tag" onclick="toggleStyle(this,'watercolor, soft colors')">水彩淡彩</div>
+        <div class="style-tag" onclick="toggleStyle(this,'sci-fi, futuristic, neon')">科幻未來</div>
+      </div>
+    </div>
+
+    <button class="gen-btn" id="genBtn" onclick="generate()">
+      ✨ 開始生成
+    </button>
+
+    <div class="history" id="historySection" style="display:none">
+      <div class="history-title">📋 最近使用的描述（點擊重用）</div>
+      <div class="history-list" id="historyList"></div>
+    </div>
+  </div>
+
+  <!-- ── 右欄：結果 ── -->
+  <div class="result-panel">
+    <div class="panel-title">🖼 生成結果</div>
+
+    <div class="result-empty" id="emptyState">
+      <div class="icon">🎨</div>
+      <div style="font-size:14px;font-weight:600;">尚未生成圖片</div>
+      <div style="font-size:12px;text-align:center;line-height:1.6;">在左側填寫描述，<br>按下「開始生成」即可</div>
+    </div>
+
+    <div id="loadingState" style="display:none;flex:1;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:40px;">
+      <div style="width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .9s linear infinite;"></div>
+      <div class="progress-msg" id="progressMsg">正在生成中，請稍候...</div>
+      <div id="progressTimer" style="font-size:24px;font-weight:700;color:var(--blue);">0s</div>
+    </div>
+
+    <img id="resultImg" class="result-img" alt="生成結果">
+
+    <div class="result-actions" id="resultActions" style="display:none">
+      <div class="act-btn" id="dlBtn" onclick="downloadImg()">⬇ 下載圖片</div>
+      <div class="act-btn" onclick="generate()">🔄 重新生成</div>
+      <div class="act-btn" onclick="copyPrompt()">📋 複製描述</div>
+    </div>
+
+    <div id="resultMeta" style="display:none;font-size:11px;color:var(--fg2);line-height:1.8;background:var(--bg3);border-radius:8px;padding:10px 12px;"></div>
+  </div>
+
+</div>
+
+<script>
+let selW = 768, selH = 768, selSteps = 15;
+let activeStyles = [];
+let genTimer = null;
+let lastPrompt = '';
+let lastImgData = '';
+
+const FORGE_API = '/forge/sdapi/v1/txt2img';
+const NEG_BASE = 'low quality, blurry, bad anatomy, deformed, ugly, watermark, text, signature, worst quality, normal quality';
+
+// ── 初始化 ──
+window.addEventListener('load', () => {
+  checkForge();
+  loadHistory();
+  setInterval(checkForge, 20000);
+});
+
+async function checkForge() {
+  try {
+    const r = await fetch('/forge/sdapi/v1/samplers', { signal: AbortSignal.timeout(3000) });
+    const ok = r.ok;
+    document.getElementById('forgeDot').className = 'status-dot ' + (ok ? 'on' : 'off');
+    document.getElementById('forgeStatus').textContent = ok ? 'Forge 在線' : 'Forge 離線';
+    document.getElementById('forgeOffline').classList.toggle('show', !ok);
+    document.getElementById('genBtn').disabled = !ok;
+  } catch {
+    document.getElementById('forgeDot').className = 'status-dot off';
+    document.getElementById('forgeStatus').textContent = 'Forge 離線';
+    document.getElementById('forgeOffline').classList.add('show');
+    document.getElementById('genBtn').disabled = true;
+  }
+}
+
+function setSize(el, w, h) {
+  selW = w; selH = h;
+  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setQuality(el, steps) {
+  selSteps = steps;
+  document.querySelectorAll('.q-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function toggleStyle(el, style) {
+  const idx = activeStyles.indexOf(style);
+  if (idx >= 0) { activeStyles.splice(idx, 1); el.classList.remove('active'); }
+  else { activeStyles.push(style); el.classList.add('active'); }
+}
+
+async function generate() {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt) { document.getElementById('prompt').focus(); return; }
+
+  const negUser = document.getElementById('neg').value.trim();
+  const styleStr = activeStyles.join(', ');
+  const fullPrompt = [prompt, styleStr, 'masterpiece, best quality, highres'].filter(Boolean).join(', ');
+  const fullNeg = [negUser, NEG_BASE].filter(Boolean).join(', ');
+
+  lastPrompt = prompt;
+
+  // 切換到載入狀態
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('loadingState').style.display = 'flex';
+  document.getElementById('resultImg').classList.remove('show');
+  document.getElementById('resultActions').style.display = 'none';
+  document.getElementById('resultMeta').style.display = 'none';
+
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> 生成中...';
+
+  // 計時器
+  let secs = 0;
+  document.getElementById('progressTimer').textContent = '0s';
+  document.getElementById('progressMsg').textContent = '正在生成中，請稍候...';
+  if (genTimer) clearInterval(genTimer);
+  genTimer = setInterval(() => {
+    secs++;
+    document.getElementById('progressTimer').textContent = secs + 's';
+    if (secs === 5) document.getElementById('progressMsg').textContent = '模型運算中...';
+    if (secs === 20) document.getElementById('progressMsg').textContent = '快完成了...';
+    if (secs === 40) document.getElementById('progressMsg').textContent = '精細處理中，請再等一下...';
+  }, 1000);
+
+  const t0 = Date.now();
+
+  try {
+    const resp = await fetch(FORGE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: fullPrompt,
+        negative_prompt: fullNeg,
+        width: selW,
+        height: selH,
+        steps: selSteps,
+        cfg_scale: 7,
+        sampler_name: 'Euler a',
+        seed: -1,
+        batch_size: 1,
+      })
+    });
+
+    if (!resp.ok) throw new Error(`伺服器錯誤 ${resp.status}`);
+    const data = await resp.json();
+    const imgData = data.images?.[0];
+    if (!imgData) throw new Error('沒有收到圖片資料');
+
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    lastImgData = imgData;
+
+    // 顯示圖片
+    const img = document.getElementById('resultImg');
+    img.src = 'data:image/png;base64,' + imgData;
+    img.onload = () => img.classList.add('show');
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('resultActions').style.display = 'flex';
+
+    const meta = document.getElementById('resultMeta');
+    meta.style.display = 'block';
+    meta.innerHTML = `描述：${escHtml(prompt)}<br>尺寸：${selW} × ${selH}｜步數：${selSteps}｜耗時：${elapsed}s`;
+
+    saveHistory(prompt);
+
+  } catch (err) {
+    clearInterval(genTimer);
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('emptyState').innerHTML = `<div class="icon">❌</div><div style="font-size:14px;font-weight:600;">生成失敗</div><div style="font-size:12px;color:var(--red)">${err.message}</div>`;
+  } finally {
+    clearInterval(genTimer);
+    btn.disabled = false;
+    btn.innerHTML = '✨ 開始生成';
+    await checkForge();
+  }
+}
+
+function downloadImg() {
+  if (!lastImgData) return;
+  const a = document.createElement('a');
+  a.href = 'data:image/png;base64,' + lastImgData;
+  a.download = `生圖_${new Date().toISOString().slice(0,19).replace(/[T:]/g,'_')}.png`;
+  a.click();
+}
+
+function copyPrompt() {
+  navigator.clipboard.writeText(lastPrompt);
+}
+
+function saveHistory(p) {
+  let h = JSON.parse(localStorage.getItem('forge_history') || '[]');
+  h = [p, ...h.filter(x => x !== p)].slice(0, 10);
+  localStorage.setItem('forge_history', JSON.stringify(h));
+  loadHistory();
+}
+
+function loadHistory() {
+  const h = JSON.parse(localStorage.getItem('forge_history') || '[]');
+  if (!h.length) return;
+  document.getElementById('historySection').style.display = 'block';
+  document.getElementById('historyList').innerHTML = h.map(p =>
+    `<div class="history-item" onclick="document.getElementById('prompt').value=${JSON.stringify(p)}">${escHtml(p)}</div>`
+  ).join('');
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

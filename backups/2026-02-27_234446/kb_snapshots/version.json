@@ -1,0 +1,21 @@
+{
+  "current_version": 2,
+  "history": [
+    {
+      "version": 1,
+      "file": "kb_v1_jarvis_training_20260214_100419.json.gz",
+      "collection": "jarvis_training",
+      "items": 100,
+      "size_mb": 0.77,
+      "exported_at": "2026-02-14T10:04:19"
+    },
+    {
+      "version": 2,
+      "file": "kb_v2_jarvis_training_20260214_100835.json.gz",
+      "collection": "jarvis_training",
+      "items": 50,
+      "size_mb": 0.4,
+      "exported_at": "2026-02-14T10:08:35"
+    }
+  ]
+}

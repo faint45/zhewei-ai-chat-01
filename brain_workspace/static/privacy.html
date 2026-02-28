@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>隱私權政策 — 築未科技</title>
+<style>
+  :root{--bg:#0f172a;--fg:#e2e8f0;--accent:#0ea5e9;--card:#1e293b;--border:#334155}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--fg);line-height:1.8}
+  .container{max-width:800px;margin:0 auto;padding:2rem 1.5rem}
+  h1{font-size:1.75rem;color:var(--accent);margin-bottom:.5rem}
+  .subtitle{color:#94a3b8;margin-bottom:2rem;font-size:.9rem}
+  h2{font-size:1.15rem;color:var(--accent);margin:1.5rem 0 .5rem;padding-bottom:.3rem;border-bottom:1px solid var(--border)}
+  p,li{font-size:.95rem;color:#cbd5e1;margin-bottom:.5rem}
+  ul{padding-left:1.5rem;margin-bottom:1rem}
+  .back{display:inline-block;margin-bottom:1.5rem;color:var(--accent);text-decoration:none;font-size:.9rem}
+  .back:hover{text-decoration:underline}
+  .footer{margin-top:3rem;padding-top:1rem;border-top:1px solid var(--border);color:#64748b;font-size:.8rem;text-align:center}
+  table{width:100%;border-collapse:collapse;margin:1rem 0}
+  th,td{text-align:left;padding:.5rem .75rem;border:1px solid var(--border);font-size:.9rem}
+  th{background:var(--card);color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="/jarvis">← 返回系統</a>
+  <h1>隱私權政策</h1>
+  <p class="subtitle">最後更新：2026 年 2 月 27 日 ｜ 生效日：2026 年 3 月 1 日</p>
+
+  <h2>一、資料蒐集者</h2>
+  <p>築未科技（以下簡稱「本公司」）為本平台之資料蒐集與處理者。</p>
+  <p>聯絡信箱：<a href="mailto:privacy@zhe-wei.net" style="color:var(--accent)">privacy@zhe-wei.net</a></p>
+
+  <h2>二、蒐集之個人資料類別</h2>
+  <table>
+    <tr><th>類別</th><th>資料項目</th><th>蒐集目的</th></tr>
+    <tr><td>帳號資料</td><td>使用者名稱、電子郵件、密碼（雜湊後儲存）</td><td>身分驗證、帳號管理</td></tr>
+    <tr><td>付款資料</td><td>訂單編號、方案、金額（信用卡號由綠界代收，本公司不儲存）</td><td>訂閱管理、交易紀錄</td></tr>
+    <tr><td>使用紀錄</td><td>API 呼叫次數、功能使用量、登入時間</td><td>用量計量、服務改善</td></tr>
+    <tr><td>裝置資訊</td><td>IP 位址、瀏覽器類型（限速防護用）</td><td>資安防護、限流</td></tr>
+  </table>
+
+  <h2>三、資料之利用</h2>
+  <ul>
+    <li>提供、維護及改善本平台服務</li>
+    <li>處理付款與訂閱管理</li>
+    <li>寄送系統通知與服務異動通知</li>
+    <li>遵守法令規定之義務</li>
+  </ul>
+  <p>本公司<strong>不會</strong>將您的個人資料出售予第三方。</p>
+
+  <h2>四、資料之保護</h2>
+  <ul>
+    <li>密碼以 PBKDF2-SHA256 加鹽雜湊儲存</li>
+    <li>傳輸全程使用 HTTPS/TLS 加密</li>
+    <li>JWT Token 設定有效期限，逾期自動失效</li>
+    <li>API 存取採限流機制，防止暴力攻擊</li>
+  </ul>
+
+  <h2>五、第三方服務</h2>
+  <ul>
+    <li><strong>綠界 ECPay</strong>：付款處理（適用綠界隱私政策）</li>
+    <li><strong>Cloudflare</strong>：CDN 與 DDoS 防護（適用 Cloudflare 隱私政策）</li>
+    <li><strong>Ollama / Google Gemini / Groq</strong>：AI 模型推論（對話內容可能傳送至模型提供者）</li>
+  </ul>
+
+  <h2>六、您的權利</h2>
+  <p>依據個人資料保護法，您享有以下權利：</p>
+  <ul>
+    <li>查詢或請求閱覽您的個人資料</li>
+    <li>請求補充或更正您的個人資料</li>
+    <li>請求停止蒐集、處理或利用您的個人資料</li>
+    <li>請求刪除您的個人資料</li>
+  </ul>
+  <p>請寄信至 <a href="mailto:privacy@zhe-wei.net" style="color:var(--accent)">privacy@zhe-wei.net</a>，本公司將於收到申請後 30 日內回覆。</p>
+
+  <h2>七、Cookie 使用</h2>
+  <p>本平台使用 Session Cookie（zhewei_session）及 JWT Token 維持登入狀態。不使用第三方追蹤 Cookie。</p>
+
+  <h2>八、政策修訂</h2>
+  <p>本公司得隨時修訂本政策。修訂後將於本頁面公告，重大變更將另行通知。</p>
+
+  <div class="footer">
+    &copy; 2026 築未科技 Zhe-Wei Technology. All rights reserved.<br>
+    <a href="/terms" style="color:#64748b">服務條款</a> ｜ <a href="/privacy" style="color:#64748b">隱私權政策</a>
+  </div>
+</div>
+</body>
+</html>

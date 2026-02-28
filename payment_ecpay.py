@@ -107,7 +107,7 @@ def create_payment_order(
         "TotalAmount": str(amount),
         "TradeDesc": urllib.parse.quote_plus("築未科技AI平台訂閱"),
         "ItemName": name[:200],
-        "ReturnURL": return_url or ECPAY_RETURN_URL or "https://example.com/api/payment/callback",
+        "ReturnURL": return_url or ECPAY_RETURN_URL or "https://jarvis.zhe-wei.net/api/payment/callback",
         "OrderResultURL": order_result_url or ECPAY_ORDER_RESULT_URL or "",
         "ChoosePayment": "Credit",
         "EncryptType": "1",
@@ -187,7 +187,7 @@ def create_subscription_order(
         "TotalAmount": str(amount),
         "TradeDesc": urllib.parse.quote_plus("築未科技AI平台月繳訂閱"),
         "ItemName": name[:200],
-        "ReturnURL": return_url or ECPAY_RETURN_URL or "https://example.com/api/payment/callback",
+        "ReturnURL": return_url or ECPAY_RETURN_URL or "https://jarvis.zhe-wei.net/api/payment/callback",
         "OrderResultURL": order_result_url or ECPAY_ORDER_RESULT_URL or "",
         "ChoosePayment": "Credit",
         "EncryptType": "1",
@@ -199,7 +199,7 @@ def create_subscription_order(
         "PeriodType": "M",       # M=月
         "Frequency": "1",        # 每 1 個月
         "ExecTimes": "12",       # 執行 12 次（1 年）
-        "PeriodReturnURL": return_url or ECPAY_RETURN_URL or "",
+        "PeriodReturnURL": return_url or ECPAY_RETURN_URL or "https://jarvis.zhe-wei.net/api/payment/callback",
     }
 
     params = {k: v for k, v in params.items() if v}

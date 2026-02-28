@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>築未科技 — 統一控制中心</title>
+<style>
+:root {
+  --bg:#0d1117; --bg2:#161b22; --bg3:#21262d; --border:#30363d;
+  --fg:#e6edf3; --fg2:#8b949e; --green:#3fb950; --blue:#58a6ff;
+  --yellow:#d29922; --red:#f85149; --purple:#bc8cff; --cyan:#39d353;
+  --orange:#f0883e; --pink:#ff7b72;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--fg);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
+
+/* ── 頂欄 ── */
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;}
+.logo{font-weight:700;font-size:16px;letter-spacing:-.3px;}
+.logo span{color:var(--blue);}
+.net-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;}
+.net-badge.local{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.3);}
+.net-badge.remote{background:rgba(88,166,255,.15);color:var(--blue);border:1px solid rgba(88,166,255,.3);}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px;}
+.svc-dot{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--fg2);}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--fg2);}
+.dot.on{background:var(--green);box-shadow:0 0 5px var(--green);}
+.dot.off{background:var(--red);}
+
+/* ── 主體 ── */
+.container{max-width:1100px;margin:0 auto;padding:24px 20px;}
+.section-title{font-size:12px;color:var(--fg2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;font-weight:600;}
+
+/* ── 卡片網格 ── */
+.grid{display:grid;gap:14px;}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+@media(max-width:800px){.grid-4,.grid-3{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}}
+@media(max-width:480px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px;cursor:pointer;transition:all .2s;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:10px;}
+.card:hover{border-color:var(--blue);background:var(--bg3);transform:translateY(-1px);}
+.card.disabled{opacity:.45;cursor:not-allowed;pointer-events:none;}
+.card-icon{font-size:22px;}
+.card-title{font-weight:600;font-size:14px;}
+.card-desc{font-size:12px;color:var(--fg2);line-height:1.5;}
+.card-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;}
+.tag{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}
+.tag-local{background:rgba(63,185,80,.12);color:var(--green);border:1px solid rgba(63,185,80,.25);}
+.tag-remote{background:rgba(88,166,255,.12);color:var(--blue);border:1px solid rgba(88,166,255,.25);}
+.tag-both{background:rgba(188,140,255,.12);color:var(--purple);border:1px solid rgba(188,140,255,.25);}
+.tag-new{background:rgba(240,136,62,.15);color:var(--orange);border:1px solid rgba(240,136,62,.3);}
+
+/* ── 快捷工具條 ── */
+.quick-bar{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.quick-bar label{font-size:12px;color:var(--fg2);}
+.quick-bar input{flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:7px 12px;font-size:13px;}
+.quick-bar input:focus{outline:none;border-color:var(--blue);}
+.qbtn{padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:var(--blue);color:#000;white-space:nowrap;}
+.qbtn:hover{filter:brightness(1.15);}
+.qbtn.outline{background:transparent;color:var(--fg2);border:1px solid var(--border);}
+.qbtn.outline:hover{border-color:var(--fg);color:var(--fg);}
+
+/* ── 狀態面板 ── */
+.status-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:24px;}
+.svc-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;}
+.svc-card .dot{flex-shrink:0;}
+.svc-info{flex:1;min-width:0;}
+.svc-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.svc-url{font-size:11px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* ── 分隔線 ── */
+.divider{height:1px;background:var(--border);margin:24px 0;}
+
+/* ── 說明標語 ── */
+.hero{text-align:center;padding:32px 0 24px;}
+.hero h2{font-size:24px;font-weight:700;margin-bottom:8px;}
+.hero p{font-size:14px;color:var(--fg2);}
+.hero .pills{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px;}
+.pill{padding:4px 14px;border-radius:20px;font-size:12px;background:var(--bg3);border:1px solid var(--border);color:var(--fg2);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">築未科技 <span>AI Hub</span></div>
+  <span class="net-badge" id="netBadge">偵測中...</span>
+  <div class="topbar-right">
+    <div class="svc-dot"><div class="dot" id="dotBrain"></div><span>Brain</span></div>
+    <div class="svc-dot"><div class="dot" id="dotOllama"></div><span>Ollama</span></div>
+    <div class="svc-dot"><div class="dot" id="dotForge"></div><span>Forge</span></div>
+    <div class="svc-dot"><div class="dot" id="dotWebUI"></div><span>WebUI</span></div>
+    <span id="timeStr" style="font-size:12px;color:var(--fg2);min-width:55px;text-align:right"></span>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="hero">
+    <h2>🏗️ 築未科技統一控制中心</h2>
+    <p id="heroSub">連線中...</p>
+    <div class="pills">
+      <span class="pill">🤖 AI 代理</span>
+      <span class="pill">🧠 深度討論</span>
+      <span class="pill">🎨 生圖</span>
+      <span class="pill">💻 代碼執行</span>
+      <span class="pill">📡 MCP 工具</span>
+    </div>
+  </div>
+
+  <!-- 快捷代理執行 -->
+  <div class="quick-bar">
+    <label>⚡ 快捷代理</label>
+    <input type="text" id="quickTask" placeholder="輸入任務直接執行... (Ctrl+Enter)" title="快捷任務輸入">
+    <select id="quickModel" style="background:var(--bg3);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:7px 10px;font-size:12px;" title="選擇模型">
+      <option value="zhewei-qwen3-32b-agent">32b-agent</option>
+      <option value="zhewei-brain-v5-structured">brain-v5</option>
+      <option value="zhewei-brain-v5">v5-fast</option>
+    </select>
+    <button class="qbtn" onclick="quickRun()">▶ 執行</button>
+    <button class="qbtn outline" onclick="window.location='/agent'">完整介面</button>
+  </div>
+
+  <!-- 服務狀態 -->
+  <div class="section-title">服務狀態</div>
+  <div class="status-grid" id="statusGrid">
+    <div class="svc-card"><div class="dot" id="s-brain"></div><div class="svc-info"><div class="svc-name">Brain Server</div><div class="svc-url" id="su-brain">port 8002</div></div></div>
+    <div class="svc-card"><div class="dot" id="s-ollama"></div><div class="svc-info"><div class="svc-name">Ollama</div><div class="svc-url" id="su-ollama">port 11460</div></div></div>
+    <div class="svc-card"><div class="dot" id="s-forge"></div><div class="svc-info"><div class="svc-name">Forge 生圖</div><div class="svc-url" id="su-forge">port 7860</div></div></div>
+    <div class="svc-card"><div class="dot" id="s-webui"></div><div class="svc-info"><div class="svc-name">Open WebUI</div><div class="svc-url" id="su-webui">port 3001 (內網)</div></div></div>
+    <div class="svc-card"><div class="dot" id="s-mcp"></div><div class="svc-info"><div class="svc-name">MCP Tools</div><div class="svc-url" id="su-mcp">port 18020</div></div></div>
+    <div class="svc-card"><div class="dot" id="s-vision"></div><div class="svc-info"><div class="svc-name">Vision AI</div><div class="svc-url" id="su-vision">port 8030</div></div></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 核心功能 -->
+  <div class="section-title">核心功能</div>
+  <div class="grid grid-3" style="margin-bottom:24px">
+    <a class="card" href="/agent">
+      <div class="card-icon">🤖</div>
+      <div class="card-title">代理執行中心</div>
+      <div class="card-desc">ReAct 自主代理，自動執行命令、讀寫檔案、修復 bug，即時串流步驟</div>
+      <div class="card-tags"><span class="tag tag-both">內外網</span><span class="tag tag-new">新功能</span></div>
+    </a>
+    <a class="card" id="deepCard" href="#" onclick="openDeepDiscussion()">
+      <div class="card-icon">🧠</div>
+      <div class="card-title">深度討論 / 兵推</div>
+      <div class="card-desc">qwen3:32b 深度分析，兵推模擬、腳本推演、架構討論、風險評估</div>
+      <div class="card-tags"><span class="tag tag-both">內外網</span></div>
+    </a>
+    <a class="card" id="forgeCard" href="/forge-easy">
+      <div class="card-icon">🎨</div>
+      <div class="card-title">AI 文字生圖</div>
+      <div class="card-desc">輸入描述，一鍵生成圖片。支援風格選擇、尺寸調整，完全本地運算</div>
+      <div class="card-tags"><span class="tag tag-both" id="forgeTag">內網直連</span><span class="tag tag-new">簡化介面</span></div>
+    </a>
+  </div>
+
+  <!-- AI 工具 -->
+  <div class="section-title">AI 工具</div>
+  <div class="grid grid-4" style="margin-bottom:24px">
+    <a class="card" id="webuiCard" href="http://localhost:3001" target="_blank" rel="noopener noreferrer">
+      <div class="card-icon">🌐</div>
+      <div class="card-title">Open WebUI</div>
+      <div class="card-desc">完整 AI 介面，生圖+代碼+MCP 工具整合</div>
+      <div class="card-tags"><span class="tag tag-both" id="webuiTag">內網直連</span></div>
+    </a>
+    <a class="card" href="/jarvis">
+      <div class="card-icon">⚡</div>
+      <div class="card-title">Jarvis AI</div>
+      <div class="card-desc">快速 AI 對話，多模型路由</div>
+      <div class="card-tags"><span class="tag tag-both">內外網</span></div>
+    </a>
+    <a class="card" href="https://vision.zhe-wei.net" target="_blank" rel="noopener noreferrer">
+      <div class="card-icon">👁️</div>
+      <div class="card-title">視覺辨識</div>
+      <div class="card-desc">YOLOv8 + OCR，工地安全偵測</div>
+      <div class="card-tags"><span class="tag tag-both">內外網</span></div>
+    </a>
+    <a class="card" href="/pwa">
+      <div class="card-icon">📱</div>
+      <div class="card-title">PWA 行動版</div>
+      <div class="card-desc">手機瀏覽器安裝，離線可用</div>
+      <div class="card-tags"><span class="tag tag-both">內外網</span></div>
+    </a>
+  </div>
+
+  <!-- 系統工具 -->
+  <div class="section-title">系統管理</div>
+  <div class="grid grid-4">
+    <a class="card" href="/admin">
+      <div class="card-icon">⚙️</div>
+      <div class="card-title">系統管理</div>
+      <div class="card-desc">brain_server 管理介面</div>
+      <div class="card-tags"><span class="tag tag-both">內外網</span></div>
+    </a>
+    <div class="card" onclick="checkAllServices()">
+      <div class="card-icon">🩺</div>
+      <div class="card-title">服務健康檢查</div>
+      <div class="card-desc">重新掃描所有服務狀態</div>
+      <div class="card-tags"><span class="tag tag-both">內外網</span></div>
+    </div>
+    <div class="card" onclick="openMcpInfo()">
+      <div class="card-icon">📡</div>
+      <div class="card-title">MCP 工具伺服器</div>
+      <div class="card-desc">port 18020，供 Open WebUI 接入</div>
+      <div class="card-tags"><span class="tag tag-local">僅內網</span></div>
+    </div>
+    <div class="card" onclick="runAgentTask('列出 D:/zhe-wei-tech 根目錄 Python 檔案')">
+      <div class="card-icon">🔍</div>
+      <div class="card-title">系統快速掃描</div>
+      <div class="card-desc">列出主系統 Python 模組</div>
+      <div class="card-tags"><span class="tag tag-both">內外網</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 深度討論浮層 -->
+<div id="deepModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;width:100%;max-width:680px;max-height:80vh;display:flex;flex-direction:column;">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-weight:700">🧠 深度討論 — zhewei-qwen3-32b-deep</span>
+      <button onclick="closeDeep()" style="background:none;border:none;color:var(--fg2);font-size:20px;cursor:pointer;">×</button>
+    </div>
+    <div id="deepMsgs" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;min-height:200px;">
+      <div style="text-align:center;color:var(--fg2);font-size:13px;padding:20px;">輸入問題開始深度討論</div>
+    </div>
+    <div style="padding:14px 16px;border-top:1px solid var(--border);display:flex;gap:10px;">
+      <textarea id="deepInput" placeholder="兵推：... / 分析：... / 架構：..." rows="2"
+        style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:8px;font-size:13px;resize:none;font-family:inherit"
+        onkeydown="if(event.ctrlKey&&event.key==='Enter')sendDeep()"></textarea>
+      <button onclick="sendDeep()" style="padding:8px 20px;background:var(--blue);color:#000;border:none;border-radius:6px;font-weight:700;cursor:pointer;align-self:flex-end;">發送</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 網路偵測 ──
+const isLocal = ['localhost','127.0.0.1'].includes(location.hostname)
+  || /^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(location.hostname);
+const API_BASE = location.origin;
+const WS_PROTO = location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+// 更新網路標示
+const badge = document.getElementById('netBadge');
+const heroSub = document.getElementById('heroSub');
+if (isLocal) {
+  badge.textContent = '內網模式'; badge.className = 'net-badge local';
+  heroSub.textContent = '內網連線 — 所有功能可用（生圖、Open WebUI、MCP）';
+} else {
+  badge.textContent = '外網模式'; badge.className = 'net-badge remote';
+  heroSub.textContent = '外網連線 — 所有功能透過 brain_server 代理可用';
+  // 外網改用代理路徑
+  document.getElementById('webuiCard').href = '/webui/';
+  document.getElementById('forgeCard').removeAttribute('onclick');
+  document.getElementById('forgeCard').href = '/forge/';
+}
+
+// ── 時鐘 ──
+setInterval(() => {
+  const n = new Date();
+  document.getElementById('timeStr').textContent =
+    `${n.getHours().toString().padStart(2,'0')}:${n.getMinutes().toString().padStart(2,'0')}`;
+}, 1000);
+
+// ── 服務狀態偵測 ──
+async function checkSvc(id, url, topId) {
+  const dot = document.getElementById(id);
+  try {
+    const r = await fetch(url, {signal: AbortSignal.timeout(2500)});
+    dot.className = r.ok ? 'dot on' : 'dot off';
+    if (topId) document.getElementById(topId).className = r.ok ? 'dot on' : 'dot off';
+  } catch {
+    dot.className = 'dot off';
+    if (topId) document.getElementById(topId).className = 'dot off';
+  }
+}
+
+async function checkAllServices() {
+  await Promise.all([
+    checkSvc('s-brain', `${API_BASE}/health`, 'dotBrain'),
+    checkSvc('s-ollama', 'http://localhost:11460/api/tags', 'dotOllama'),
+    checkSvc('s-forge', 'http://localhost:7860', 'dotForge'),
+    checkSvc('s-webui', 'http://localhost:3001', 'dotWebUI'),
+    checkSvc('s-mcp', 'http://localhost:18020/health', null),
+    checkSvc('s-vision', 'http://localhost:8030/healthz', null),
+  ]);
+}
+checkAllServices();
+setInterval(checkAllServices, 30000);
+
+// ── 快捷代理執行 ──
+function quickRun() {
+  const task = document.getElementById('quickTask').value.trim();
+  if (!task) return;
+  const model = document.getElementById('quickModel').value;
+  const url = `/agent?task=${encodeURIComponent(task)}&model=${encodeURIComponent(model)}`;
+  window.location.href = url;
+}
+document.getElementById('quickTask').addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') quickRun();
+});
+
+function runAgentTask(task) {
+  document.getElementById('quickTask').value = task;
+  quickRun();
+}
+
+// ── Forge ──
+function openForge() {
+  if (!isLocal) { alert('Forge 生圖僅限內網使用'); return; }
+  window.open('http://localhost:7860', '_blank');
+}
+
+// ── MCP 資訊 ──
+function openMcpInfo() {
+  window.open('http://localhost:18020/.well-known/mcp', '_blank');
+}
+
+// ── 深度討論 ──
+let deepHistory = [];
+
+function openDeepDiscussion(e) {
+  if (e) e.preventDefault();
+  document.getElementById('deepModal').style.display = 'flex';
+  document.getElementById('deepInput').focus();
+}
+
+function closeDeep() {
+  document.getElementById('deepModal').style.display = 'none';
+}
+
+async function sendDeep() {
+  const input = document.getElementById('deepInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const msgs = document.getElementById('deepMsgs');
+
+  // 清除提示
+  if (msgs.children.length === 1 && msgs.children[0].style.textAlign === 'center') {
+    msgs.innerHTML = '';
+  }
+
+  // 用戶訊息
+  const userDiv = document.createElement('div');
+  userDiv.style.cssText = 'padding:10px 14px;background:rgba(88,166,255,.1);border-radius:8px;font-size:13px;align-self:flex-end;max-width:85%;';
+  userDiv.textContent = text;
+  msgs.appendChild(userDiv);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  // 思考中
+  const thinkDiv = document.createElement('div');
+  thinkDiv.style.cssText = 'padding:8px 14px;color:var(--fg2);font-size:12px;font-style:italic;';
+  thinkDiv.textContent = '⏳ 深度推理中...';
+  msgs.appendChild(thinkDiv);
+
+  deepHistory.push({role:'user', content:text});
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/jarvis/stream`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        messages: [{role:'system', content:'你是築未科技的深度戰略分析師，使用兵推框架、三種情境推演、風險評估進行深度分析。'}, ...deepHistory.slice(-8)],
+        model: 'zhewei-qwen3-32b-deep',
+        stream: true,
+      })
+    });
+
+    thinkDiv.textContent = '';
+    thinkDiv.style.cssText = 'padding:10px 14px;background:var(--bg3);border-radius:8px;font-size:13px;max-width:90%;white-space:pre-wrap;line-height:1.6;';
+
+    if (resp.headers.get('content-type')?.includes('text/event-stream')) {
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder();
+      let full = '';
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        const chunk = dec.decode(value);
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') break;
+            try { const j = JSON.parse(data); full += j.content || j.delta || ''; } catch{}
+          }
+        }
+        thinkDiv.textContent = full;
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+      deepHistory.push({role:'assistant', content:full});
+    } else {
+      const data = await resp.json();
+      const reply = data.content || data.response || data.result || JSON.stringify(data);
+      thinkDiv.textContent = reply;
+      deepHistory.push({role:'assistant', content:reply});
+    }
+  } catch(e) {
+    thinkDiv.style.color = 'var(--red)';
+    thinkDiv.textContent = `❌ 連線失敗: ${e.message}`;
+  }
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ESC 關閉浮層
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDeep();
+});
+</script>
+</body>
+</html>

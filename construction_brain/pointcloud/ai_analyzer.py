@@ -17,9 +17,9 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_URL = "http://localhost:11434"
-DEFAULT_MODEL = "zhewei-brain-v4"
-FALLBACK_MODEL = "qwen3:4b"
+OLLAMA_URL = "http://localhost:11460"
+DEFAULT_MODEL = "zhewei-brain-v5-structured"
+FALLBACK_MODEL = "zhewei-brain-v5"
 
 
 @dataclass

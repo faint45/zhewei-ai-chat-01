@@ -1,0 +1,22 @@
+{
+  "license_id": "ZW-CCAF-EA96-1546-DE08",
+  "customer_name": "gw-test-user",
+  "tier": "enterprise",
+  "tier_name": "企業版",
+  "roles": "__all__",
+  "max_kb_items": -1,
+  "remote_calls_per_month": -1,
+  "vision_enabled": true,
+  "workflow_enabled": true,
+  "offline_grace_days": 90,
+  "max_devices": 1,
+  "device_fingerprint": "",
+  "issued_at": "2026-02-27T15:40:32",
+  "expires_at": "2026-03-29T15:40:32",
+  "notes": "auto-generated from payment plan=enterprise",
+  "version": 1,
+  "signature": "cd10254a9dcffc3b8f1d0c7c8dfc6f6236a7a60606d14fb909fc0cd11f08919d",
+  "status": "active",
+  "created_at": "2026-02-27T15:40:32",
+  "activations": []
+}

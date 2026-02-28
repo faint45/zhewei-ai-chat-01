@@ -1,0 +1,94 @@
+---
+description: 築未科技模組化開發規範 v1.0 — Brain Server Router 架構強制標準
+alwaysApply: true
+---
+
+# 築未科技 — 模組化開發規範 (v1.0) [cite: 2026-02-27]
+
+> **核心原則：新功能一律寫進對應 Router，禁止直接修改主檔加端點。**
+
+## 1. 架構總覽
+
+```
+brain_server_v2.py          ← 精簡主檔（僅 app 初始化 + WebSocket + 啟動）
+routers/
+  deps.py                   ← 共用依賴（認證、AI 服務、狀態、工具函式、Pydantic 模型）
+  auth.py                   ← 認證 + API Key 管理
+  pages.py                  ← HTML 頁面路由
+  system.py                 ← 系統健康 + 模式切換
+  commercial.py             ← 授權 + 租戶 + 支付 + 營收
+  usage.py                  ← 用量 + 監控 + 營運通知
+  proxy.py                  ← AI API 代理（OpenAI 相容）
+  asset.py                  ← 資產管理
+  host_phone.py             ← 主機代理 + Phone Agent
+  smart_chat.py             ← 智慧遙控 + 對話遙控 + Vision Edge
+  agent.py                  ← Agent 任務 + Playbook + Butler + Graph-RAG
+  jarvis.py                 ← Jarvis AI（生圖/學習/角色/工作流/代碼生成）
+  extras.py                 ← memU 記憶 + Ntfy 推播
+```
+
+## 2. 新增端點規則
+
+| 規則 | 說明 |
+|------|------|
+| **選擇 Router** | 依功能領域放入對應 router；無法歸類則新建 router |
+| **Pydantic 驗證** | 所有 POST/PUT 端點的 request body 必須用 Pydantic `BaseModel` |
+| **認證守衛** | 敏感端點必須加 `_require_jwt` / `_require_admin` / `_require_superadmin` |
+| **結構化回應** | 統一 `{"ok": bool, ...}` 格式 |
+| **錯誤處理** | 用 `HTTPException` 或 try/except + `{"ok": False, "error": "..."}` |
+| **可選依賴** | 非核心模組用 `try: import xxx` + `except ImportError` 保護 |
+| **日誌** | 用 `logger` 不用 `print`；錯誤用 `logger.error` 或 `logger.exception` |
+
+## 3. deps.py 管理規則
+
+- 新增共用函式/狀態 → 加到 `deps.py`
+- 新增 Pydantic 模型 → 加到 `deps.py` 底部
+- **禁止** 在 router 內定義應該共用的狀態（如 dict、Queue）
+- **禁止** 在 router 內重複 import 已在 deps 中封裝的模組
+
+## 4. 禁止事項
+
+| 🔴 禁止 | 說明 |
+|---------|------|
+| 直接修改 `brain_server_v2.py` 加端點 | 新端點一律放 router |
+| 單個 .py 超過 800 行 | 超過則拆分新 router |
+| 在 router 內 `import auth_manager` | 統一從 `deps` 取用 |
+| 硬編碼 API Key / 密碼 | 用 `os.environ.get()` |
+| `print()` 輸出 | 用 `logger.info/warning/error` |
+| 跳過兵推直接 build | 必須先過六關（見 部署前兵推SOP.mdc） |
+
+## 5. 新 Router 範本
+
+```python
+# -*- coding: utf-8 -*-
+"""築未科技 — [功能名稱] Router"""
+from fastapi import APIRouter, Request, HTTPException
+from routers.deps import _extract_token, _require_admin, logger
+
+router = APIRouter(tags=["功能標籤"])
+
+@router.get("/api/xxx/health")
+async def api_xxx_health():
+    return {"ok": True, "service": "xxx"}
+
+@router.post("/api/xxx/action")
+async def api_xxx_action(request: Request):
+    _require_admin(request)
+    payload = await request.json()
+    # ... 業務邏輯 ...
+    return {"ok": True}
+```
+
+新 router 建完後，到 `brain_server_v2.py` 加兩行：
+```python
+from routers.new_module import router as new_module_router
+app.include_router(new_module_router)
+```
+
+## 6. 修改既有端點流程
+
+1. 找到端點所在 router
+2. 修改邏輯
+3. 若需新共用函式 → 加到 `deps.py`
+4. 執行兵推 SOP 第一～四關
+5. 本地測試通過 → Docker rebuild

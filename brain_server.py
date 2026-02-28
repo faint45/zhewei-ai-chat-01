@@ -35,7 +35,8 @@ if str(ROOT) not in sys.path:
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Depends, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse
+from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse, StreamingResponse as _StreamingResponse
+import httpx as _httpx
 from functools import wraps
 from ai_service import GeminiService, OllamaService, ClaudeService, SmartAIService
 from agent_logic import AgentManager
@@ -101,13 +102,40 @@ async def rate_limit_middleware(request: Request, call_next):
 
 
 @app.middleware("http")
-async def auth_static_protected(request: Request, call_next):
-    """保護 /static/index.html、/static/chat.html：需登入（若已設 ADMIN）。"""
-    if _auth_configured() and request.url.path in ("/static/index.html", "/static/chat.html"):
-        sid = request.cookies.get(SESSION_COOKIE)
-        if not (sid and sid in _sessions):
-            return RedirectResponse(url="/login", status_code=302)
-    return await call_next(request)
+async def global_auth_middleware(request: Request, call_next):
+    """全域認證中間件：保護所有頁面與 WebSocket（除白名單外）"""
+    if not _auth_configured():
+        return await call_next(request)
+
+    path = request.url.path
+
+    # 白名單：無需認證
+    _OPEN_PATHS = {
+        "/", "/login", "/logout", "/healthz", "/readyz", "/health",
+        "/nginx-health", "/jarvis-login", "/jarvis-register",
+    }
+    _OPEN_PREFIXES = ("/static/", "/api/auth/",)
+
+    if path in _OPEN_PATHS or any(path.startswith(p) for p in _OPEN_PREFIXES):
+        return await call_next(request)
+
+    # 已登入 session
+    sid = request.cookies.get(SESSION_COOKIE)
+    if sid and sid in _sessions:
+        return await call_next(request)
+
+    # WebSocket：拒絕未認證連線
+    if request.headers.get("upgrade", "").lower() == "websocket":
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "未登入"}, status_code=401)
+
+    # API 呼叫：回傳 401 JSON
+    if path.startswith("/api/") or path.startswith("/ws"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "未登入，請先登入"}, status_code=401)
+
+    # 頁面路由：導向登入頁
+    return RedirectResponse(url="/login", status_code=302)
 
 # 三引擎 + 智慧路由
 gemini_ai = GeminiService()
@@ -2770,7 +2798,7 @@ def health_check():
     ollama_ok = False
     try:
         import urllib.request
-        url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434") + "/api/tags"
+        url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11460") + "/api/tags"
         with urllib.request.urlopen(urllib.request.Request(url, method="GET"), timeout=2) as r:
             ollama_ok = r.status == 200
     except Exception:
@@ -3803,7 +3831,7 @@ def api_agents():
     ollama_ok = False
     try:
         import urllib.request
-        req = urllib.request.Request(os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434") + "/api/tags", method="GET")
+        req = urllib.request.Request(os.environ.get("OLLAMA_BASE_URL", "http://localhost:11460") + "/api/tags", method="GET")
         with urllib.request.urlopen(req, timeout=2) as r:
             ollama_ok = r.status == 200
     except Exception:
@@ -4209,13 +4237,6 @@ async def api_mv_get_status(project_name: str):
         return {"ok": False, "error": str(e)}
 
 
-@app.on_event("startup")
-async def startup():
-    _load_agent_tasks()
-    asyncio.create_task(broadcast_progress())
-    asyncio.create_task(_agent_worker_loop())
-
-
 # ── 檔案傳輸 API ────────────────────────────────────────────
 TRANSFER_DIR = BRAIN_WORKSPACE / "transfer_files"
 TRANSFER_DIR.mkdir(exist_ok=True)
@@ -4448,6 +4469,560 @@ async def get_transfer_receive_page():
         if p.exists():
             return FileResponse(str(p))
     return PlainTextResponse("transfer-receive.html not found", status_code=404)
+
+
+# ── ReAct 代理 WebSocket ──────────────────────────────────────────────────────
+
+OLLAMA_AGENT_URL    = os.environ.get("OLLAMA_BASE_URL",    "http://localhost:11460")
+AGENT_DEFAULT_MODEL = os.environ.get("OLLAMA_BRAIN_MODEL", "zhewei-qwen3-32b-agent")
+GROQ_API_KEY        = os.environ.get("GROQ_API_KEY",        "")
+GEMINI_API_KEY      = os.environ.get("GEMINI_API_KEY",      "")
+ANTHROPIC_API_KEY   = os.environ.get("ANTHROPIC_API_KEY",  "")
+DEEPSEEK_API_KEY    = os.environ.get("DEEPSEEK_API_KEY",   "")
+MISTRAL_API_KEY     = os.environ.get("MISTRAL_API_KEY",    "")
+OPENROUTER_API_KEY  = os.environ.get("OPENROUTER_API_KEY", "")
+XAI_API_KEY         = os.environ.get("XAI_API_KEY",        "")
+DASHSCOPE_API_KEY   = os.environ.get("DASHSCOPE_API_KEY",  "")
+MINIMAX_API_KEY     = os.environ.get("MINIMAX_API_KEY",    "")
+
+_AGENT_TOOLS_DESC = """可用工具（每次只輸出一個 JSON，不加說明文字）：
+{"thought":"思考","tool":"run_command","args":{"command":"...","cwd":"D:/zhe-wei-tech","timeout":60}}
+{"thought":"思考","tool":"read_file","args":{"path":"D:/zhe-wei-tech/xxx.py"}}
+{"thought":"思考","tool":"write_file","args":{"path":"D:/xxx.py","content":"..."}}
+{"thought":"思考","tool":"list_dir","args":{"path":"D:/zhe-wei-tech"}}
+{"thought":"思考","tool":"search_in_file","args":{"path":"D:/xxx.py","pattern":"keyword"}}
+{"thought":"思考","tool":"call_local_llm","args":{"prompt":"請生成...","model":"zhewei-brain-v5","task":"coding"}}
+  # call_local_llm：呼叫本地 Ollama 模型執行子任務（coding/analysis/review）
+  # task 類型：coding（生成程式碼）/ analysis（分析文件）/ review（審查程式碼）
+  # 回傳本地模型輸出，可直接用 write_file 儲存結果
+完成時：{"done":true,"result":"摘要"}"""
+
+
+def _agent_exec_tool_sync(tool: str, args: dict) -> tuple[str, bool]:
+    """同步版工具執行（在 executor 中呼叫）"""
+    try:
+        if tool == "run_command":
+            result = subprocess.run(
+                args.get("command", ""), shell=True, capture_output=True, text=True,
+                cwd=str(args.get("cwd", "D:/zhe-wei-tech")),
+                timeout=int(args.get("timeout", 300)),
+                encoding="utf-8", errors="replace",
+            )
+            out = result.stdout.strip()
+            err = result.stderr.strip()
+            if err:
+                out += f"\n[STDERR] {err}" if out else err
+            if result.returncode != 0:
+                out = f"[EXIT {result.returncode}]\n{out}" if out else f"[EXIT {result.returncode}]"
+            return (out or "(無輸出)", result.returncode == 0)
+        elif tool == "read_file":
+            p = Path(args["path"])
+            if not p.exists():
+                return (f"[ERROR] 不存在: {args['path']}", False)
+            content = p.read_text(encoding="utf-8", errors="replace")
+            if len(content) > 60000:
+                lines = content.splitlines()
+                content = "\n".join(lines[:100]) + f"\n...(共{len(lines)}行)"
+            return (content, True)
+        elif tool == "write_file":
+            p = Path(args["path"])
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(args["content"], encoding="utf-8")
+            return (f"✅ 已寫入: {args['path']} ({len(args['content'])} chars)", True)
+        elif tool == "list_dir":
+            p = Path(args.get("path", "D:/zhe-wei-tech"))
+            if not p.exists():
+                return ("[ERROR] 目錄不存在", False)
+            items = [("📁 " if i.is_dir() else "📄 ") + i.name for i in sorted(p.iterdir())[:50]]
+            return ("\n".join(items), True)
+        elif tool == "search_in_file":
+            import re as _re
+            p = Path(args["path"])
+            if not p.exists():
+                return ("[ERROR] 檔案不存在", False)
+            lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+            matches = [f"L{i+1}: {l.rstrip()}" for i, l in enumerate(lines)
+                       if _re.search(args.get("pattern", ""), l, _re.IGNORECASE)]
+            return ("\n".join(matches[:50]) if matches else "(未找到)", bool(matches))
+        elif tool == "call_local_llm":
+            prompt   = args.get("prompt", "")
+            model    = args.get("model", "zhewei-brain-v5")
+            task     = args.get("task", "coding")
+            if not prompt:
+                return ("[ERROR] prompt 不可為空", False)
+            task_prefix = {
+                "coding":   "你是一位專業軟體工程師，請根據需求生成高品質 Python 程式碼，只輸出程式碼，不加說明：\n\n",
+                "analysis": "你是一位程式碼分析師，請詳細分析以下內容並輸出結論：\n\n",
+                "review":   "你是一位資深工程師，請審查以下程式碼並指出問題與改進建議：\n\n",
+            }.get(task, "")
+            messages = [{"role": "user", "content": task_prefix + prompt}]
+            import urllib.request as _ur
+            payload = json.dumps({
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "options": {"temperature": 0.05, "num_predict": 4096, "num_ctx": 8192},
+            }).encode("utf-8")
+            req = _ur.Request(
+                f"{OLLAMA_AGENT_URL}/api/chat",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            with _ur.urlopen(req, timeout=600) as r:
+                d = json.loads(r.read())
+                content = d.get("message", {}).get("content", "")
+                thinking = d.get("message", {}).get("thinking", "")
+                if thinking:
+                    content = f"[本地模型思考]\n{thinking}\n\n[輸出]\n{content}"
+                return (content or "(無輸出)", True)
+        else:
+            return (f"[ERROR] 未知工具: {tool}", False)
+    except subprocess.TimeoutExpired:
+        return ("[TIMEOUT] 命令超時", False)
+    except Exception as e:
+        return (f"[ERROR] {e}", False)
+
+
+async def _agent_exec_tool(websocket: WebSocket, tool: str, args: dict, turn: int) -> tuple[str, bool]:
+    """非同步工具執行：在 executor 跑，期間每 5 秒送心跳"""
+    loop = asyncio.get_event_loop()
+    future = loop.run_in_executor(None, _agent_exec_tool_sync, tool, args)
+
+    import time as _time
+    t0 = _time.time()
+    heartbeat_interval = 5
+
+    while not future.done():
+        try:
+            await asyncio.wait_for(asyncio.shield(future), timeout=heartbeat_interval)
+            break
+        except asyncio.TimeoutError:
+            elapsed = int(_time.time() - t0)
+            try:
+                await websocket.send_json({
+                    "type": "heartbeat", "turn": turn,
+                    "tool": tool, "elapsed": elapsed,
+                    "message": f"⏳ 執行中... {elapsed}s"
+                })
+            except Exception:
+                future.cancel()
+                return ("[ABORT] WebSocket 已斷線", False)
+
+    try:
+        return future.result()
+    except Exception as e:
+        return (f"[ERROR] {e}", False)
+
+
+def _sync_call_ollama(messages: list, model: str) -> str:
+    import urllib.request as _ur
+    payload = json.dumps({
+        "model": model, "messages": messages, "stream": False,
+        "options": {"temperature": 0.05, "num_predict": 2048, "num_ctx": 4096, "repeat_penalty": 1.1}
+    }).encode("utf-8")
+    req = _ur.Request(f"{OLLAMA_AGENT_URL}/api/chat", data=payload,
+                      headers={"Content-Type": "application/json"})
+    with _ur.urlopen(req, timeout=600) as r:
+        d = json.loads(r.read())
+        content = d.get("message", {}).get("content", "")
+        thinking = d.get("message", {}).get("thinking", "")
+        if thinking and "<think>" not in content:
+            content = f"<think>\n{thinking}\n</think>\n\n{content}"
+        return content
+
+
+def _sync_call_openai_compat(messages: list, model: str, base_url: str, api_key: str, provider: str) -> str:
+    import urllib.request as _ur
+    if not api_key:
+        raise RuntimeError(f"{provider.upper()}_API_KEY 未設定，請在 .env 加入")
+    payload = json.dumps({
+        "model": model, "messages": messages,
+        "temperature": 0.05, "max_tokens": 2048,
+    }).encode("utf-8")
+    req = _ur.Request(
+        f"{base_url}/chat/completions",
+        data=payload,
+        headers={"Content-Type": "application/json",
+                 "Authorization": f"Bearer {api_key}"},
+    )
+    with _ur.urlopen(req, timeout=120) as r:
+        d = json.loads(r.read())
+        return d["choices"][0]["message"]["content"]
+
+
+def _sync_call_anthropic(messages: list, model: str) -> str:
+    import urllib.request as _ur
+    if not ANTHROPIC_API_KEY:
+        raise RuntimeError("ANTHROPIC_API_KEY 未設定，請在 .env 加入")
+    system_txt = ""
+    conv_msgs = []
+    for m in messages:
+        if m["role"] == "system":
+            system_txt = m["content"]
+        else:
+            conv_msgs.append({"role": m["role"], "content": m["content"]})
+    body: dict = {"model": model, "messages": conv_msgs,
+                  "max_tokens": 2048, "temperature": 0.05}
+    if system_txt:
+        body["system"] = system_txt
+    req = _ur.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Content-Type": "application/json",
+                 "x-api-key": ANTHROPIC_API_KEY,
+                 "anthropic-version": "2023-06-01"},
+    )
+    with _ur.urlopen(req, timeout=120) as r:
+        d = json.loads(r.read())
+        return d["content"][0]["text"]
+
+
+def _sync_call_groq(messages: list, model: str) -> str:
+    import urllib.request as _ur
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY 未設定，請在 .env 加入")
+    payload = json.dumps({
+        "model": model, "messages": messages,
+        "temperature": 0.05, "max_tokens": 2048,
+    }).encode("utf-8")
+    req = _ur.Request(
+        "https://api.groq.com/openai/v1/chat/completions",
+        data=payload,
+        headers={"Content-Type": "application/json",
+                 "Authorization": f"Bearer {GROQ_API_KEY}"},
+    )
+    with _ur.urlopen(req, timeout=120) as r:
+        d = json.loads(r.read())
+        return d["choices"][0]["message"]["content"]
+
+
+def _sync_call_gemini(messages: list, model: str) -> str:
+    import urllib.request as _ur
+    if not GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY 未設定，請在 .env 加入")
+    # 轉換成 Gemini contents 格式（system → 第一個 user 訊息前綴）
+    contents = []
+    system_txt = ""
+    for m in messages:
+        role = m["role"]
+        text = m["content"]
+        if role == "system":
+            system_txt = text
+            continue
+        g_role = "user" if role == "user" else "model"
+        if system_txt and g_role == "user" and not contents:
+            text = system_txt + "\n\n" + text
+            system_txt = ""
+        contents.append({"role": g_role, "parts": [{"text": text}]})
+    url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+           f"{model}:generateContent?key={GEMINI_API_KEY}")
+    payload = json.dumps({
+        "contents": contents,
+        "generationConfig": {"temperature": 0.05, "maxOutputTokens": 2048},
+    }).encode("utf-8")
+    req = _ur.Request(url, data=payload,
+                      headers={"Content-Type": "application/json"})
+    with _ur.urlopen(req, timeout=120) as r:
+        d = json.loads(r.read())
+        return d["candidates"][0]["content"]["parts"][0]["text"]
+
+
+_OPENAI_COMPAT_PROVIDERS = {
+    "deepseek":   ("https://api.deepseek.com/v1",                       lambda: DEEPSEEK_API_KEY),
+    "mistral":    ("https://api.mistral.ai/v1",                         lambda: MISTRAL_API_KEY),
+    "openrouter": ("https://openrouter.ai/api/v1",                      lambda: OPENROUTER_API_KEY),
+    "xai":        ("https://api.x.ai/v1",                               lambda: XAI_API_KEY),
+    "dashscope":  ("https://dashscope.aliyuncs.com/compatible-mode/v1", lambda: DASHSCOPE_API_KEY),
+    "groq":       ("https://api.groq.com/openai/v1",                    lambda: GROQ_API_KEY),
+}
+
+
+async def _call_llm_agent(messages: list, model: str) -> str:
+    """統一 LLM 路由：provider:model 格式路由到各雲端 API，無前綴走 Ollama"""
+    if ":" in model:
+        provider, real_model = model.split(":", 1)
+        provider = provider.lower()
+        if provider == "gemini":
+            return await asyncio.get_event_loop().run_in_executor(
+                None, _sync_call_gemini, messages, real_model)
+        elif provider == "anthropic":
+            return await asyncio.get_event_loop().run_in_executor(
+                None, _sync_call_anthropic, messages, real_model)
+        elif provider in _OPENAI_COMPAT_PROVIDERS:
+            base_url, key_fn = _OPENAI_COMPAT_PROVIDERS[provider]
+            return await asyncio.get_event_loop().run_in_executor(
+                None, _sync_call_openai_compat, messages, real_model, base_url, key_fn(), provider)
+    return await asyncio.get_event_loop().run_in_executor(
+        None, _sync_call_ollama, messages, model)
+
+
+async def _call_ollama_agent(messages: list, model: str) -> str:
+    """向下相容舊介面"""
+    return await _call_llm_agent(messages, model)
+
+
+def _parse_agent_action(response: str) -> dict | None:
+    import re as _re
+    if "</think>" in response:
+        response = response.split("</think>")[-1].strip()
+    for pat in (r"```json\s*([\s\S]*?)\s*```", r"```\s*([\s\S]*?)\s*```", r"(\{[\s\S]*\})"):
+        m = _re.search(pat, response, _re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group(1).strip())
+            except Exception:
+                continue
+    try:
+        return json.loads(response.strip())
+    except Exception:
+        return None
+
+
+@app.websocket("/ws/agent")
+async def ws_agent(websocket: WebSocket):
+    """ReAct 代理 WebSocket — 即時串流執行步驟至前端"""
+    await websocket.accept()
+    try:
+        init = await websocket.receive_json()
+        task = init.get("task", "")
+        model = init.get("model", AGENT_DEFAULT_MODEL)
+        max_turns = int(init.get("max_turns", 100))
+
+        if not task:
+            await websocket.send_json({"type": "error", "message": "缺少 task 參數"})
+            return
+
+        await websocket.send_json({"type": "start", "task": task, "model": model})
+
+        # ── 載入長期記憶 ──
+        _mem_ctx = ""
+        try:
+            if AGENT_MEMORY_AVAILABLE:
+                _mem = get_agent_memory("jarvis")
+                _recent = _mem.get_recent_context(5)
+                if _recent:
+                    _mem_ctx = "\n\n[近期任務記憶]\n" + "\n".join(
+                        f"- {r['user_input'][:80]}" for r in _recent
+                    )
+        except Exception:
+            pass
+
+        messages = [
+            {"role": "system", "content": f"你是築未科技的自主工程師代理。\n任務: {task}\n工作目錄: D:/zhe-wei-tech\n{_mem_ctx}\n\n{_AGENT_TOOLS_DESC}\n\n規則：每次只輸出一個 JSON 動作，不加其他文字。遇錯自動修正。"},
+            {"role": "user", "content": f"開始執行任務：{task}"},
+        ]
+
+        import time as _time
+        t0 = _time.time()
+
+        for turn in range(1, max_turns + 1):
+            await websocket.send_json({"type": "thinking", "turn": turn})
+            try:
+                response = await _call_ollama_agent(messages, model)
+            except Exception as e:
+                await websocket.send_json({"type": "error", "message": str(e)})
+                break
+
+            action = _parse_agent_action(response)
+            if action is None:
+                await websocket.send_json({"type": "parse_error", "turn": turn, "raw": response[:300]})
+                messages.append({"role": "assistant", "content": response})
+                messages.append({"role": "user", "content": "請只輸出 JSON 格式。"})
+                continue
+
+            if action.get("done"):
+                result_text = action.get("result", "任務完成")
+                await websocket.send_json({
+                    "type": "done", "result": result_text,
+                    "turns": turn, "elapsed": round(_time.time() - t0, 1),
+                })
+                # ── 儲存到記憶 ──
+                try:
+                    if AGENT_MEMORY_AVAILABLE:
+                        _mem = get_agent_memory("jarvis")
+                        _mem.store_interaction(task, result_text, session_id=f"ws_{int(t0)}")
+                except Exception:
+                    pass
+                return
+
+            tool = action.get("tool", "")
+            args = action.get("args", {})
+            await websocket.send_json({
+                "type": "step", "turn": turn,
+                "thought": action.get("thought", ""),
+                "tool": tool,
+                "args": {k: str(v)[:200] for k, v in args.items()},
+            })
+
+            obs, success = await _agent_exec_tool(websocket, tool, args, turn)
+            await websocket.send_json({
+                "type": "observation", "turn": turn, "tool": tool,
+                "result": obs[:600] + ("..." if len(obs) > 600 else ""),
+                "success": success,
+            })
+
+            messages.append({"role": "assistant", "content": response})
+            messages.append({"role": "user", "content": f"觀察結果:\n{obs}\n\n請決定下一步（輸出 JSON）。"})
+
+        await websocket.send_json({"type": "max_turns", "message": f"已執行 {max_turns} 步驟，如需繼續請增加最大步驟數"})
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logging.error(f"ws_agent error: {e}")
+        try:
+            await websocket.send_json({"type": "error", "message": str(e)})
+        except Exception:
+            pass
+
+
+@app.post("/api/agent/run")
+async def api_agent_run(request: Request):
+    """REST 端點：執行代理任務（等待完成後回傳）"""
+    body = await request.json()
+    task = body.get("task", "")
+    model = body.get("model", AGENT_DEFAULT_MODEL)
+    max_turns = int(body.get("max_turns", 100))
+    if not task:
+        raise HTTPException(status_code=400, detail="缺少 task 參數")
+
+    messages = [
+        {"role": "system", "content": f"你是築未科技的自主工程師代理。\n任務: {task}\n{_AGENT_TOOLS_DESC}"},
+        {"role": "user", "content": f"開始：{task}"},
+    ]
+    steps = []
+    for turn in range(1, max_turns + 1):
+        try:
+            response = await _call_ollama_agent(messages, model)
+        except Exception as e:
+            return {"success": False, "error": str(e), "steps": steps}
+        action = _parse_agent_action(response)
+        if action is None:
+            messages.append({"role": "assistant", "content": response})
+            messages.append({"role": "user", "content": "請只輸出 JSON。"})
+            continue
+        if action.get("done"):
+            return {"success": True, "result": action.get("result", ""), "steps": steps, "turns": turn}
+        tool = action.get("tool", "")
+        args = action.get("args", {})
+        obs, success = _agent_exec_tool_sync(tool, args)
+        steps.append({"turn": turn, "tool": tool, "thought": action.get("thought", ""), "result": obs[:300], "success": success})
+        messages.append({"role": "assistant", "content": response})
+        messages.append({"role": "user", "content": f"觀察:\n{obs}\n\n下一步（JSON）："})
+    return {"success": False, "message": "達到最大步驟數", "steps": steps}
+
+
+@app.get("/agent")
+async def get_agent_panel(request: Request):
+    """代理執行介面頁面 - 加入帳號密碼認證"""
+    auth = _require_auth(request)
+    if isinstance(auth, RedirectResponse):
+        return auth
+    for d in (STATIC_DIR, FALLBACK_STATIC):
+        p = d / "agent-panel.html"
+        if p.exists():
+            return FileResponse(str(p))
+    return PlainTextResponse("agent-panel.html not found", status_code=404)
+
+
+@app.get("/forge-easy")
+async def get_forge_easy():
+    """簡化生圖介面"""
+    for d in (STATIC_DIR, FALLBACK_STATIC):
+        p = d / "forge-easy.html"
+        if p.exists():
+            return FileResponse(str(p))
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse("forge-easy.html not found", status_code=404)
+
+
+@app.get("/hub")
+async def get_hub():
+    """築未科技統一控制中心（內外網通用）"""
+    for d in (STATIC_DIR, FALLBACK_STATIC):
+        p = d / "zhewei-hub.html"
+        if p.exists():
+            return FileResponse(str(p))
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse("zhewei-hub.html not found", status_code=404)
+
+
+# ── 反向代理：Forge (7860) & Open WebUI (3001) ────────────────────────────────
+
+_PROXY_CLIENT = _httpx.AsyncClient(timeout=120, follow_redirects=True)
+_FORGE_ORIGIN = "http://localhost:7860"
+_WEBUI_ORIGIN = "http://localhost:3001"
+
+_PROXY_SKIP_HEADERS = {"host", "content-length", "transfer-encoding", "connection",
+                        "keep-alive", "upgrade", "proxy-authenticate", "proxy-authorization"}
+
+
+async def _proxy_request(request: Request, target_origin: str, path: str):
+    """通用反向代理：轉發請求到目標伺服器並回傳回應（含串流）"""
+    url = f"{target_origin}/{path}"
+    if request.url.query:
+        url += f"?{request.url.query}"
+
+    fwd_headers = {
+        k: v for k, v in request.headers.items()
+        if k.lower() not in _PROXY_SKIP_HEADERS
+    }
+    fwd_headers["host"] = target_origin.split("//")[-1]
+
+    body = await request.body()
+
+    try:
+        resp = await _PROXY_CLIENT.request(
+            method=request.method,
+            url=url,
+            headers=fwd_headers,
+            content=body if body else None,
+        )
+    except _httpx.ConnectError:
+        from fastapi.responses import JSONResponse
+        svc = "Forge" if "7860" in target_origin else "Open WebUI"
+        return JSONResponse({"error": f"{svc} 未啟動，請先在本機啟動服務"}, status_code=503)
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+    resp_headers = {
+        k: v for k, v in resp.headers.items()
+        if k.lower() not in {"content-encoding", "transfer-encoding", "connection", "content-length"}
+    }
+
+    return _StreamingResponse(
+        content=resp.aiter_bytes(chunk_size=65536),
+        status_code=resp.status_code,
+        headers=resp_headers,
+        media_type=resp.headers.get("content-type"),
+    )
+
+
+@app.api_route("/forge/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
+async def proxy_forge(request: Request, path: str = ""):
+    """反向代理：Forge SD WebUI (port 7860)
+    外網訪問：https://jarvis.zhe-wei.net/forge/
+    """
+    if _auth_configured():
+        sid = request.cookies.get(SESSION_COOKIE)
+        if not (sid and sid in _sessions):
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"error": "需要登入才能使用 Forge"}, status_code=401)
+    return await _proxy_request(request, _FORGE_ORIGIN, path)
+
+
+@app.api_route("/webui/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
+async def proxy_webui(request: Request, path: str = ""):
+    """反向代理：Open WebUI (port 3001)
+    外網訪問：https://jarvis.zhe-wei.net/webui/
+    """
+    if _auth_configured():
+        sid = request.cookies.get(SESSION_COOKIE)
+        if not (sid and sid in _sessions):
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"error": "需要登入才能使用 Open WebUI"}, status_code=401)
+    return await _proxy_request(request, _WEBUI_ORIGIN, path)
 
 
 @app.on_event("startup")

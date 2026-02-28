@@ -29,7 +29,7 @@ try:
 except Exception:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-MAX_TURNS = 10
+MAX_TURNS = int(os.environ.get("AGENT_MAX_TURNS", "1000").strip() or "1000")
 LANGGRAPH_REPAIR_MAX = int((os.environ.get("LANGGRAPH_REPAIR_MAX", "3").strip() or "3"))
 Z_DRIVE_PATH = Path(os.environ.get("ZHEWEI_MEMORY_ROOT", "Z:/Zhewei_Brain"))
 RULES_FILE = Z_DRIVE_PATH / "Rules" / "master_rules.md"

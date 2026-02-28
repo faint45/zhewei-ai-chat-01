@@ -19,7 +19,11 @@ from pathlib import Path
 # ── 設定 ──
 ROOT = Path(__file__).resolve().parent
 USERS_FILE = ROOT / "brain_workspace" / "auth" / "users.json"
-JWT_SECRET = os.environ.get("JWT_SECRET", "zhewei-jarvis-secret-2026-" + secrets.token_hex(8))
+_JWT_FALLBACK = "zhewei-jarvis-secret-2026-CHANGE-ME-IN-ENV"
+JWT_SECRET = os.environ.get("JWT_SECRET", "").strip() or _JWT_FALLBACK
+if JWT_SECRET == _JWT_FALLBACK:
+    import logging as _logging
+    _logging.getLogger("zhewei.auth").warning("JWT_SECRET not set in .env — using insecure fallback. Set JWT_SECRET for production!")
 JWT_EXPIRY = int(os.environ.get("JWT_EXPIRY", 86400 * 7))  # 預設 7 天
 
 # ── PostgreSQL 支援（商用模式）──

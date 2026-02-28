@@ -23,6 +23,47 @@ except ImportError:
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _text_to_image_forge(prompt: str, filename: str, width: int = 1024, height: int = 1024, steps: int = 20) -> str | None:
+    """Forge WebUI API 生圖（/sdapi/v1/txt2img）。"""
+    forge_port = os.environ.get("FORGE_PORT", "7860").strip()
+    forge_url = os.environ.get("FORGE_URL", "").strip()
+    base = None
+    candidates = []
+    if forge_url:
+        candidates.append(forge_url.rstrip("/"))
+    for host in ["localhost", "127.0.0.1", "host.docker.internal"]:
+        candidates.append(f"http://{host}:{forge_port}")
+    seen = list(dict.fromkeys(candidates))
+    for url in seen:
+        try:
+            r = requests.get(f"{url}/sdapi/v1/sd-models", timeout=3)
+            if r.status_code == 200:
+                base = url
+                break
+        except Exception:
+            continue
+    if not base:
+        return None
+    payload = {
+        "prompt": prompt[:500],
+        "negative_prompt": "blurry, low quality, distorted, watermark, text, ugly, deformed",
+        "width": width, "height": height, "steps": steps,
+        "cfg_scale": 7, "sampler_name": "Euler",
+    }
+    try:
+        r = requests.post(f"{base}/sdapi/v1/txt2img", json=payload, timeout=120)
+        if r.status_code == 200:
+            images = r.json().get("images", [])
+            if images:
+                img_bytes = base64.b64decode(images[0])
+                out_path = OUTPUT_DIR / (filename or "image.png")
+                out_path.write_bytes(img_bytes)
+                return f"已儲存: {out_path}"
+    except Exception:
+        pass
+    return None
+
+
 def _text_to_image_comfyui(prompt: str, filename: str) -> str | None:
     """本地 ComfyUI API 生圖（需 ComfyUI 運行，預設 port 9188）。"""
     import json as _json, time as _time, uuid as _uuid
@@ -117,7 +158,10 @@ def _text_to_image_comfyui(prompt: str, filename: str) -> str | None:
 
 
 def text_to_image(prompt: str, filename: str = "image.png") -> str:
-    """文字生圖。優先 ComfyUI 本地，無則需 REPLICATE_API_TOKEN。"""
+    """文字生圖。優先 Forge，其次 ComfyUI，無則需 REPLICATE_API_TOKEN。"""
+    result = _text_to_image_forge(prompt, filename or "image.png")
+    if result:
+        return result
     result = _text_to_image_comfyui(prompt, filename or "image.png")
     if result:
         return result

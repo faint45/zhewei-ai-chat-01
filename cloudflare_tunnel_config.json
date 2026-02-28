@@ -41,6 +41,16 @@
       "originRequest": {}
     },
     {
+      "hostname": "webui.zhe-wei.net",
+      "service": "http://gateway:80",
+      "originRequest": {}
+    },
+    {
+      "hostname": "forge.zhe-wei.net",
+      "service": "http://gateway:80",
+      "originRequest": {}
+    },
+    {
       "service": "http://gateway:80"
     }
   ],

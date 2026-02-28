@@ -44,6 +44,7 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_CODER_MODEL") or os.environ.get("OLLAMA_MO
 OLLAMA_TIMEOUT = float(os.environ.get("OLLAMA_TIMEOUT", "120"))
 OLLAMA_STRONG_MODEL = os.environ.get("OLLAMA_STRONG_MODEL", "qwen3:32b")
 OLLAMA_FAST_MODEL = os.environ.get("OLLAMA_FAST_MODEL", "qwen3:4b")
+OLLAMA_BRAIN_MODEL = os.environ.get("OLLAMA_BRAIN_MODEL", "zhewei-brain-v5-structured")
 
 LLAMA_SWAP_URL = (os.environ.get("LLAMA_SWAP_URL") or "http://localhost:10005").rstrip("/")
 LLAMA_SWAP_MODEL = os.environ.get("LLAMA_SWAP_MODEL", "qwen3-32b")
@@ -576,10 +577,19 @@ class SmartAIService(BaseAIService):
         self.ollama = ollama_service if ollama_service is not None else OllamaService(model_name=OLLAMA_STRONG_MODEL)
         self.ollama_fast = OllamaService(model_name=OLLAMA_FAST_MODEL)
         self.ollama_reason = OllamaService(model_name=OLLAMA_REASON_MODEL)
+        self.brain = OllamaService(model_name=OLLAMA_BRAIN_MODEL)  # 蒸餾專才
         self.claude = claude_service if claude_service is not None else ClaudeService()
         self.minimax = minimax_service if minimax_service is not None else MiniMaxService()
         self.llama_swap = LlamaSwapService()
         self.mode = AI_COST_MODE
+        # TaskPlanner 精準指派引擎
+        try:
+            from ai_modules.task_planner import planner as _tp, PrePlanner as _pp
+            self._task_planner = _tp
+            self._pre_planner = _pp()
+        except ImportError:
+            self._task_planner = None
+            self._pre_planner = None
         # 健康狀態快取：(is_healthy: bool, timestamp: float)
         self._ollama_health: tuple[bool, float] = (True, 0.0)
         self._llama_swap_health: tuple[bool, float] = (False, 0.0)
@@ -684,9 +694,9 @@ class SmartAIService(BaseAIService):
 
     async def _call_with_fallback(self, messages: list, chain: list[str], task_label: str = "") -> str:
         """依序嘗試 chain 中的服務，本地異常時自動跳過切雲端。每次呼叫自動記錄用量。"""
-        services = {"ollama": self.ollama, "ollama_fast": self.ollama_fast, "ollama_reason": self.ollama_reason, "gemini": self.gemini, "claude": self.claude, "minimax": self.minimax, "llama_swap": self.llama_swap}
-        labels = {"ollama": "🏠 軍師 Ollama 32b", "ollama_fast": "⚡ 士兵 Ollama fast", "ollama_reason": "🧠 推理 DeepSeek-R1 14b", "gemini": "☁️ 軍師 Gemini", "claude": "🟣 備援 Claude", "minimax": "🔵 尖兵 MiniMax", "llama_swap": "🔄 備援 LlamaSwap"}
-        model_names = {"ollama": OLLAMA_STRONG_MODEL, "ollama_fast": OLLAMA_FAST_MODEL, "ollama_reason": OLLAMA_REASON_MODEL, "gemini": GEMINI_MODEL, "claude": ANTHROPIC_MODEL, "minimax": MINIMAX_MODEL, "llama_swap": LLAMA_SWAP_MODEL}
+        services = {"ollama": self.ollama, "ollama_fast": self.ollama_fast, "ollama_reason": self.ollama_reason, "brain": self.brain, "gemini": self.gemini, "claude": self.claude, "minimax": self.minimax, "llama_swap": self.llama_swap}
+        labels = {"ollama": "🏠 軍師 Ollama 32b", "ollama_fast": "⚡ 士兵 Ollama fast", "ollama_reason": "🧠 推理 DeepSeek-R1 14b", "brain": "🧬 專才 Brain-v3", "gemini": "☁️ 軍師 Gemini", "claude": "🟣 備援 Claude", "minimax": "🔵 尖兵 MiniMax", "llama_swap": "🔄 備援 LlamaSwap"}
+        model_names = {"ollama": OLLAMA_STRONG_MODEL, "ollama_fast": OLLAMA_FAST_MODEL, "ollama_reason": OLLAMA_REASON_MODEL, "brain": OLLAMA_BRAIN_MODEL, "gemini": GEMINI_MODEL, "claude": ANTHROPIC_MODEL, "minimax": MINIMAX_MODEL, "llama_swap": LLAMA_SWAP_MODEL}
         ollama_healthy = await self._check_ollama_health()
         # 估算輸入 token
         input_text = " ".join(m.get("content", "") for m in messages)
@@ -701,9 +711,9 @@ class SmartAIService(BaseAIService):
             if svc is None:
                 continue
             # 本地異常時跳過 Ollama（包含 fast），直接用雲端
-            if name in ("ollama", "ollama_fast") and not ollama_healthy:
-                print(f"🧠 智慧路由 [{self.mode}|{task_label}] ⏭️ 跳過 Ollama（本地異常）")
-                last_error = "ollama: 本地服務不可用"
+            if name in ("ollama", "ollama_fast", "brain") and not ollama_healthy:
+                print(f"🧠 智慧路由 [{self.mode}|{task_label}] ⏭️ 跳過 {name}（本地異常）")
+                last_error = f"{name}: 本地服務不可用"
                 continue
             # llama-swap 未運行時跳過
             if name == "llama_swap":
@@ -746,7 +756,7 @@ class SmartAIService(BaseAIService):
                 except Exception:
                     pass
                 # Ollama 回應異常 → 記錄失敗
-                if name in ("ollama", "ollama_fast"):
+                if name in ("ollama", "ollama_fast", "brain"):
                     self._consecutive_ollama_failures += 1
             except Exception as e:
                 duration_ms = int((time.time() - t0) * 1000)
@@ -761,7 +771,7 @@ class SmartAIService(BaseAIService):
                     )
                 except Exception:
                     pass
-                if name in ("ollama", "ollama_fast"):
+                if name in ("ollama", "ollama_fast", "brain"):
                     self._consecutive_ollama_failures += 1
                     # 即時標記不健康，下次不再嘗試（直到快取過期重新探測）
                     self._ollama_health = (False, time.time())
@@ -776,20 +786,23 @@ class SmartAIService(BaseAIService):
 
     async def chat(self, messages: list) -> str:
         """
-        主調度方法 — 軍師/士兵分工 + Thinking Protocol 自動注入。
+        主調度方法 — TaskPlanner 精準指派 + Pre-Planning + QualityGate。
 
-        smart_route 模式：
-          think（思考/分析/規劃）→ DeepSeek 軍師 → MiniMax 備援 → Claude → Ollama 最後手段
-          execute（執行/生成/翻譯）→ Ollama 士兵 → DeepSeek 救援
+        升級架構（2026-02-28）：
+          L0 greeting  → 4b 秒回（0 成本）
+          L1 quick     → 4b/8b 快速回應
+          L2 domain    → brain-v3 專才 或 32b + RAG
+          L3 complex   → 32b + 品質檢查 + 重試
+          L4 expert    → 32b + RAG + 品檢 + 雲端覆核
 
-        Thinking Protocol（基於 Thinking-Claude v5.1）：
-          think 任務自動注入思考指令 → 本地用 lite 版，雲端用 full 版
-          execute 任務不注入（速度優先）
-          環境變數 THINKING_PROTOCOL=off 可全局關閉
+        向後相容：無 TaskPlanner 時退回舊邏輯（think/execute 二分法）。
         """
-        task = self._classify_task(messages)
+        # ── TaskPlanner 精準指派 ──
+        if self._task_planner is not None:
+            return await self._chat_with_planner(messages)
 
-        # Thinking Protocol 注入（僅 think 任務）
+        # ── 向後相容：舊邏輯 ──
+        task = self._classify_task(messages)
         thinking_mode = os.environ.get("THINKING_PROTOCOL", "auto")
         if thinking_mode != "off" and task == "think":
             try:
@@ -799,7 +812,6 @@ class SmartAIService(BaseAIService):
                 pass
 
         if self.mode == "cloud_first":
-            # 雲端優先：用 full 版 thinking
             if thinking_mode != "off" and task == "think":
                 try:
                     from ai_modules.thinking_protocol import inject_thinking
@@ -809,27 +821,102 @@ class SmartAIService(BaseAIService):
             return await self._call_with_fallback(messages, ["deepseek", "minimax", "claude", "ollama"], task)
 
         if self.mode == "local_only":
-            # 🔒 純本地模式：絕不呼叫任何雲端 API
             if task == "think":
                 return await self._call_with_fallback(messages, ["ollama", "ollama_reason", "llama_swap", "ollama_fast"], "think")
             else:
                 return await self._call_with_fallback(messages, ["ollama_fast", "ollama", "llama_swap"], "execute")
 
         if self.mode == "local_first":
-            # 本地優先：全部本地先跑，實在不行才雲端
             if task == "think":
                 return await self._call_with_fallback(messages, ["ollama", "ollama_reason", "llama_swap", "deepseek", "claude"], "think")
             else:
                 return await self._call_with_fallback(messages, ["ollama_fast", "ollama", "llama_swap", "deepseek"], "execute")
 
-        # smart_route（推薦）：本地 32b 軍師 / fast 士兵 / 雲端備援
-        # llama_swap 作為 Ollama 的本地 fallback（同 GPU，零成本）
         if task == "think":
-            # 🧠 思考型：Ollama 32b → llama-swap → DeepSeek → MiniMax → Claude
             return await self._call_with_fallback(messages, ["ollama", "llama_swap", "deepseek", "minimax", "claude"], "think")
         else:
-            # ⚡ 執行型：Ollama fast → Ollama 32b fallback → llama-swap → MiniMax → DeepSeek
             return await self._call_with_fallback(messages, ["ollama_fast", "ollama", "llama_swap", "minimax", "deepseek"], "execute")
+
+    async def _chat_with_planner(self, messages: list) -> str:
+        """
+        TaskPlanner 驅動的精準調度。
+
+        流程：
+        1. TaskPlanner.plan() — 分類 + 產出 TaskPlan
+        2. PrePlanner.prepare_messages() — SOP/RAG/格式注入
+        3. _call_with_fallback() — 按 model_chain 執行
+        4. QualityGate — 品質檢查 + 自動升級
+        5. log_task() — 記錄到訓練日誌
+        """
+        t0 = time.time()
+        plan = self._task_planner.plan(messages)
+
+        # 取出最後一條 user 訊息（用於品檢和日誌）
+        last_user = ""
+        for m in messages:
+            if m.get("role") == "user":
+                last_user = (m.get("content") or "").strip()
+
+        print(f"📋 TaskPlanner: {plan.level} {plan.label} | domain={plan.domain} | chain={plan.model_chain}")
+
+        # ── local_only 模式：過濾掉雲端模型 ──
+        chain = list(plan.model_chain)
+        cloud_models = {"deepseek", "gemini", "claude", "minimax"}
+        if self.mode == "local_only":
+            chain = [m for m in chain if m not in cloud_models]
+            if not chain:
+                chain = ["ollama_fast", "ollama", "brain", "llama_swap"]
+        elif self.mode == "cloud_first":
+            # 雲端優先：把雲端模型排前面
+            local = [m for m in chain if m not in cloud_models]
+            cloud = [m for m in chain if m in cloud_models]
+            if not cloud:
+                cloud = ["deepseek", "minimax", "claude"]
+            chain = cloud + local
+
+        # ── Pre-Planning：準備 messages ──
+        prepared = self._pre_planner.prepare_messages(plan, messages) if self._pre_planner else messages
+
+        # ── 執行 ──
+        response = await self._call_with_fallback(prepared, chain, f"{plan.level}_{plan.label}")
+        duration_ms = int((time.time() - t0) * 1000)
+
+        # ── QualityGate 品質檢查 ──
+        if plan.quality_gate and not self._is_error_response(response):
+            try:
+                from ai_modules.ai_sop import QualityGate
+                qg = QualityGate(min_score=plan.quality_min_score)
+                result = qg.check(last_user, response)
+                if not result.get("pass", True):
+                    issues = result.get("issues", [])
+                    print(f"⚠️ QualityGate 不通過: {issues} (score={result.get('score', 0)})")
+                    # 自動升級：用更強的模型重試
+                    if plan.escalation:
+                        escalation_chain = ["deepseek", "minimax", "claude"]
+                        # local_only 模式不升級到雲端
+                        if self.mode != "local_only":
+                            print(f"🔄 品質升級: 交給 {escalation_chain}")
+                            response2 = await self._call_with_fallback(prepared, escalation_chain, f"{plan.level}_escalated")
+                            if not self._is_error_response(response2):
+                                response = response2
+                    elif plan.max_retries > 0:
+                        # 同模型重試一次
+                        print(f"🔄 重試中...")
+                        response2 = await self._call_with_fallback(prepared, chain[:2], f"{plan.level}_retry")
+                        if not self._is_error_response(response2):
+                            result2 = qg.check(last_user, response2)
+                            if result2.get("score", 0) > result.get("score", 0):
+                                response = response2
+            except ImportError:
+                pass
+
+        # ── 記錄到訓練日誌 ──
+        try:
+            self._task_planner.log_task(plan, last_user, response, chain[0], duration_ms)
+        except Exception:
+            pass
+
+        return response
 
 
 class LlamaSwapService(BaseAIService):

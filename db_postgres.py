@@ -37,7 +37,7 @@ if not DATABASE_URL:
     DATABASE_URL = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DATABASE}"
 
 # JWT 設定（與 auth_manager.py 一致）
-JWT_SECRET = os.environ.get("JWT_SECRET", "zhewei-jarvis-secret-2025").strip()
+JWT_SECRET = os.environ.get("JWT_SECRET", "").strip() or "zhewei-jarvis-secret-2026-CHANGE-ME-IN-ENV"
 JWT_EXPIRY = int(os.environ.get("JWT_EXPIRY", "86400"))
 
 

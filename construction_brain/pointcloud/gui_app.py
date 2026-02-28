@@ -318,9 +318,9 @@ class PointCloudApp:
         ttk.Button(top, text="📊 比較所有斷面", command=self._ai_compare).pack(side="left", padx=2)
 
         ttk.Label(top, text="模型:").pack(side="left", padx=(10, 0))
-        self.model_var = tk.StringVar(value="zhewei-brain-v4")
+        self.model_var = tk.StringVar(value="zhewei-brain-v5-structured")
         model_combo = ttk.Combobox(top, textvariable=self.model_var, width=18,
-                                   values=["zhewei-brain-v4", "zhewei-brain-v3", "qwen3:4b"])
+                                   values=["zhewei-brain-v5-structured", "zhewei-brain-v5", "zhewei-brain-v4", "zhewei-brain-v3", "qwen3:4b"])
         model_combo.pack(side="left", padx=3)
 
         self.ai_text = scrolledtext.ScrolledText(parent, bg=BG2, fg=FG, font=("Consolas", 10),

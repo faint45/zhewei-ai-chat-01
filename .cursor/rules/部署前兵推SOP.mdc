@@ -1,0 +1,81 @@
+---
+description: 築未科技部署前兵推 SOP v1.0 — Docker rebuild / 模組重構前的六關強制驗證
+alwaysApply: true
+---
+
+# 築未科技 — 部署前兵推 SOP (v1.0) [cite: 2026-02-27]
+
+> **核心原則：先兵推後部署。** 絕不直接 docker-compose build。
+
+## 觸發條件（任一成立即啟動兵推）
+
+- 新增或修改 ≥3 個 .py 檔案
+- 修改 Dockerfile / requirements / docker-compose.yml
+- 拆分或合併模組（如 brain_server.py → routers/）
+- 變更跨模組 import 路徑
+
+## 六關檢查流程
+
+### 第一關：語法檢查
+
+對所有新增/修改的 .py 執行：
+```
+python -m py_compile <file.py>
+```
+全部通過才進下一關。
+
+### 第二關：Import 鏈驗證
+
+1. 列出共用模組（如 `routers/deps.py`）所有匯出符號
+2. 逐一比對每個消費端的 `from xxx import` 行
+3. 製表記錄，缺一個標 🔴，全對標 ✅
+
+### 第三關：硬依賴存在性
+
+1. 找出所有 **非 try/except** 的 import
+2. 確認對應 .py 存在、class/function 名稱正確
+3. **特別注意別名**：`GeminiService = AIService`、`AgentManager` 在 `agent_logic` 不在 `ai_service`
+
+### 第四關：函式簽名匹配
+
+1. 跨模組 class 實例化 → 檢查 `__init__` 必填參數
+2. 跨模組函式呼叫 → 檢查參數名與順序
+
+### 第五關：Docker Context 優化
+
+1. `.dockerignore` 排除大型目錄，目標 context < 150MB
+2. 必排：`stable-diffusion-webui-forge/`, `LivePortrait/`, `ai_engines/`, `memU/`, `workspace/`, `.git/`, `ComfyUI/`, `Wav2Lip/`, `archive/`
+
+### 第六關：Build & 啟動驗證
+
+1. `docker-compose build <service>`（一次只跑一個，禁止並行）
+2. `docker-compose up -d <service>`
+3. 驗證：`/healthz`, `/health`, `/api/auth/me`
+4. 日誌：`docker-compose logs --tail=50 <service>`
+
+## 兵推報告格式（寫入 brain_workspace/reports/）
+
+```json
+{
+  "aiName": "Cascade",
+  "taskName": "deploy_dryrun",
+  "status": "completed",
+  "checks": {
+    "syntax": { "pass": true, "count": 15 },
+    "import_chain": { "pass": true, "mismatches": 0 },
+    "hard_deps": { "pass": false, "bugs": ["file:line description"] },
+    "signatures": { "pass": true },
+    "docker_context": { "pass": true, "size_mb": 95 }
+  },
+  "conclusion": "N bugs found, fix before build",
+  "timestamp": "ISO-8601"
+}
+```
+
+## 歷史教訓
+
+| 日期 | 教訓 |
+|------|------|
+| 2026-02-27 | `AgentManager` 在 `agent_logic.py` 不在 `ai_service.py`，兵推第三關攔截 |
+| 2026-02-27 | Docker context 734MB → 優化 `.dockerignore` 降至 ~95MB |
+| 2026-02-27 | 多個 `docker-compose build` 並行互相阻塞，只能串行 |

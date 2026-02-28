@@ -33,3 +33,18 @@ raw_data_archive/
 deploy.zip
 *.zip
 *.tar.xz
+# 大型子專案
+stable-diffusion-webui-forge/
+LivePortrait/
+Wav2Lip/
+ai_engines/
+memU/
+workspace/
+D/
+archive/
+mv_projects/
+大智庫範本/
+.agents/
+.git/
+ComfyUI/
+Jarvis_Training/.venv312/

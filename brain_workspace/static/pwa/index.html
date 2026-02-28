@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0a0f1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="築未科技 AI 助手 — 隨身智慧大腦">
+<link rel="manifest" href="/pwa/manifest.json">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect rx='20' width='100' height='100' fill='%230ea5e9'/><text x='50' y='68' text-anchor='middle' font-size='52' font-weight='bold' fill='white'>Z</text></svg>">
+<title>築未 AI 助手</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{font-family:'Segoe UI','Noto Sans TC',system-ui,-apple-system,sans-serif}
+
+/* === Login === */
+.login-bg{background:linear-gradient(135deg,#0a0f1e 0%,#0c1929 40%,#0a1628 100%)}
+.login-card{backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.glow-ring{box-shadow:0 0 60px rgba(14,165,233,.15),0 0 120px rgba(14,165,233,.05)}
+.input-field{background:rgba(15,23,42,.6);border:1px solid rgba(51,65,85,.6);transition:all .2s}
+.input-field:focus{border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.15)}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.float-anim{animation:float 6s ease-in-out infinite}
+
+/* === App Shell === */
+.app-shell{display:grid;grid-template-rows:auto 1fr auto;height:100dvh}
+.topbar{height:56px;background:rgba(10,15,30,.85);backdrop-filter:blur(12px);border-bottom:1px solid rgba(51,65,85,.4);z-index:40}
+.bottomnav{background:rgba(10,15,30,.92);backdrop-filter:blur(12px);border-top:1px solid rgba(51,65,85,.4);padding-bottom:env(safe-area-inset-bottom)}
+.nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;color:#64748b;font-size:10px;transition:all .15s;position:relative}
+.nav-btn.active{color:#0ea5e9}
+.nav-btn.active::before{content:'';position:absolute;top:-1px;width:24px;height:2px;background:#0ea5e9;border-radius:1px}
+.nav-btn i{font-size:18px}
+.page{display:none;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.page.active{display:flex;flex-direction:column}
+
+/* === Chat === */
+.chat-area{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:85%;padding:12px 16px;border-radius:18px;font-size:14px;line-height:1.6;word-break:break-word}
+.msg.user{align-self:flex-end;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white;border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:#1e293b;color:#e2e8f0;border-bottom-left-radius:4px;border:1px solid #334155}
+.msg.ai pre{background:#0f172a;border-radius:8px;padding:10px;overflow-x:auto;margin:8px 0;font-size:12px}
+.msg.ai code{font-family:'Cascadia Code','Fira Code',monospace}
+.msg.system{align-self:center;background:transparent;color:#64748b;font-size:12px;padding:4px}
+.chat-input-bar{display:flex;gap:8px;padding:12px 16px;background:rgba(10,15,30,.9);backdrop-filter:blur(8px);border-top:1px solid rgba(51,65,85,.4)}
+.chat-input{flex:1;background:#1e293b;border:1px solid #334155;border-radius:24px;padding:10px 18px;color:#e2e8f0;font-size:14px;outline:none;resize:none;max-height:120px;transition:border .2s}
+.chat-input:focus{border-color:#0ea5e9}
+.send-btn{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.send-btn:active{transform:scale(.92)}
+.send-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* === Cards === */
+.card{background:#111827;border:1px solid rgba(51,65,85,.5);border-radius:16px;padding:16px;transition:all .2s}
+.card:active{transform:scale(.98)}
+.stat-num{font-size:28px;font-weight:700;background:linear-gradient(135deg,#0ea5e9,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+/* === Status dots === */
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot.green{background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.5)}
+.dot.red{background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.5)}
+.dot.yellow{background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,.5)}
+
+/* === Scrollbar === */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:#334155;border-radius:2px}
+
+/* === Skeleton loading === */
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.skeleton{background:linear-gradient(90deg,#1e293b 25%,#334155 50%,#1e293b 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px}
+
+/* === Typing indicator === */
+@keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
+.typing span{animation:blink 1.4s infinite;display:inline-block;width:6px;height:6px;background:#64748b;border-radius:50%;margin:0 2px}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+
+/* === Mode selector === */
+.mode-chip{padding:4px 12px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid #334155;color:#94a3b8;transition:all .15s;white-space:nowrap}
+.mode-chip.active{background:rgba(14,165,233,.15);border-color:#0ea5e9;color:#0ea5e9}
+</style>
+</head>
+<body class="bg-[#0a0f1e] text-slate-200">
+
+<!-- ============== LOGIN SCREEN ============== -->
+<div id="loginScreen" class="login-bg fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="w-full max-w-sm">
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <div class="w-20 h-20 rounded-3xl bg-gradient-to-br from-sky-500 to-cyan-400 flex items-center justify-center text-white text-3xl font-bold mx-auto mb-5 shadow-xl glow-ring float-anim">Z</div>
+      <h1 class="text-2xl font-bold text-white tracking-tight">築未科技</h1>
+      <p class="text-sm text-slate-400 mt-1">AI 智慧助手</p>
+    </div>
+    <!-- Card -->
+    <div class="login-card bg-slate-800/40 rounded-3xl border border-slate-700/40 p-7">
+      <div id="loginErr" class="hidden mb-4 px-4 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm text-center"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5 ml-1" for="loginUser">帳號</label>
+          <input id="loginUser" type="text" autocomplete="username" class="input-field w-full rounded-xl px-4 py-3 text-sm text-slate-200 outline-none" placeholder="請輸入帳號">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5 ml-1" for="loginPass">密碼</label>
+          <input id="loginPass" type="password" autocomplete="current-password" class="input-field w-full rounded-xl px-4 py-3 text-sm text-slate-200 outline-none" placeholder="請輸入密碼">
+        </div>
+        <button id="loginBtn" onclick="doLogin()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-white font-semibold text-sm hover:brightness-110 active:scale-[.98] transition-all shadow-lg shadow-sky-500/20">
+          <span id="loginBtnText">登入</span>
+          <i id="loginSpinner" class="fas fa-circle-notch fa-spin hidden ml-2"></i>
+        </button>
+      </div>
+      <div class="flex items-center justify-between mt-5 text-xs text-slate-500">
+        <span>v3.0 PWA</span>
+        <div class="flex items-center gap-1.5">
+          <div class="dot green" id="serverDot"></div>
+          <span id="serverLabel">連線中...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== MAIN APP ============== -->
+<div id="mainApp" class="app-shell" style="display:none">
+
+  <!-- Top Bar -->
+  <header class="topbar flex items-center px-4 gap-3">
+    <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">Z</div>
+    <div class="flex-1 min-w-0">
+      <div class="text-sm font-semibold text-white truncate" id="topTitle">主控台</div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="text-xs text-slate-500 hidden sm:block" id="topUser"></div>
+      <button onclick="showPage('settings')" class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white transition text-xs" id="avatarBtn">A</button>
+    </div>
+  </header>
+
+  <!-- Pages Container -->
+  <main class="relative overflow-hidden bg-[#0a0f1e]">
+
+    <!-- === Dashboard === -->
+    <section id="pg-home" class="page active">
+      <div class="p-4 space-y-4 pb-6">
+        <!-- Greeting -->
+        <div class="pt-2 pb-1">
+          <h2 class="text-xl font-bold text-white" id="greeting">你好</h2>
+          <p class="text-sm text-slate-400 mt-1" id="greetSub">系統運行中</p>
+        </div>
+        <!-- Stats -->
+        <div class="grid grid-cols-2 gap-3" id="statsGrid">
+          <div class="card"><div class="text-xs text-slate-400 mb-1">AI 模型</div><div class="stat-num" id="statModels">—</div></div>
+          <div class="card"><div class="text-xs text-slate-400 mb-1">知識庫</div><div class="stat-num" id="statKB">—</div></div>
+          <div class="card"><div class="text-xs text-slate-400 mb-1">服務</div><div class="stat-num" id="statServices">—</div></div>
+          <div class="card"><div class="text-xs text-slate-400 mb-1">GPU</div><div class="stat-num text-lg" id="statGPU">—</div></div>
+        </div>
+        <!-- Quick Actions -->
+        <div>
+          <h3 class="text-xs text-slate-400 uppercase tracking-wider mb-3">快速操作</h3>
+          <div class="grid grid-cols-4 gap-2">
+            <button onclick="showPage('chat');startChat('general')" class="card flex flex-col items-center gap-2 py-3 text-center">
+              <i class="fas fa-comment-dots text-sky-400 text-lg"></i>
+              <span class="text-[10px] text-slate-300">聊天</span>
+            </button>
+            <button onclick="showPage('chat');startChat('code')" class="card flex flex-col items-center gap-2 py-3 text-center">
+              <i class="fas fa-code text-emerald-400 text-lg"></i>
+              <span class="text-[10px] text-slate-300">寫程式</span>
+            </button>
+            <button onclick="showPage('chat');startChat('image')" class="card flex flex-col items-center gap-2 py-3 text-center">
+              <i class="fas fa-image text-purple-400 text-lg"></i>
+              <span class="text-[10px] text-slate-300">生圖</span>
+            </button>
+            <button onclick="showPage('chat');startChat('construction')" class="card flex flex-col items-center gap-2 py-3 text-center">
+              <i class="fas fa-hard-hat text-amber-400 text-lg"></i>
+              <span class="text-[10px] text-slate-300">營建</span>
+            </button>
+          </div>
+        </div>
+        <!-- Services -->
+        <div>
+          <h3 class="text-xs text-slate-400 uppercase tracking-wider mb-3">外部服務</h3>
+          <div class="space-y-2" id="serviceList"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- === Chat === -->
+    <section id="pg-chat" class="page">
+      <!-- Mode Bar -->
+      <div class="flex items-center gap-2 px-4 py-2 overflow-x-auto border-b border-slate-800/50" id="modeBar">
+        <div class="mode-chip active" data-mode="general" onclick="switchMode('general')">一般對話</div>
+        <div class="mode-chip" data-mode="code" onclick="switchMode('code')">程式碼</div>
+        <div class="mode-chip" data-mode="construction" onclick="switchMode('construction')">營建顧問</div>
+        <div class="mode-chip" data-mode="image" onclick="switchMode('image')">生圖</div>
+        <div class="mode-chip" data-mode="translate" onclick="switchMode('translate')">翻譯</div>
+      </div>
+      <!-- Messages -->
+      <div class="chat-area" id="chatArea">
+        <div class="msg system">AI 助手已就緒，請開始對話</div>
+      </div>
+      <!-- Input -->
+      <div class="chat-input-bar">
+        <textarea id="chatInput" class="chat-input" rows="1" placeholder="輸入訊息..." oninput="autoResize(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMsg()"><i class="fas fa-paper-plane text-sm"></i></button>
+      </div>
+    </section>
+
+    <!-- === Tools === -->
+    <section id="pg-tools" class="page">
+      <div class="p-4 space-y-3 pb-6">
+        <h2 class="text-lg font-bold text-white pt-2">工具箱</h2>
+        <div class="grid grid-cols-2 gap-3">
+          <a href="/transfer" target="_blank" class="card flex items-center gap-3"><i class="fas fa-exchange-alt text-sky-400"></i><span class="text-sm">檔案傳輸</span></a>
+          <a href="/mv-creator" target="_blank" class="card flex items-center gap-3"><i class="fas fa-film text-purple-400"></i><span class="text-sm">MV 創作</span></a>
+          <a href="https://vision.zhe-wei.net" target="_blank" class="card flex items-center gap-3"><i class="fas fa-eye text-emerald-400"></i><span class="text-sm">視覺辨識</span></a>
+          <a href="https://codesim.zhe-wei.net" target="_blank" class="card flex items-center gap-3"><i class="fas fa-terminal text-amber-400"></i><span class="text-sm">代碼模擬</span></a>
+          <a href="https://cms.zhe-wei.net" target="_blank" class="card flex items-center gap-3"><i class="fas fa-hard-hat text-orange-400"></i><span class="text-sm">營建管理</span></a>
+          <a href="https://bridge.zhe-wei.net" target="_blank" class="card flex items-center gap-3"><i class="fas fa-cubes text-indigo-400"></i><span class="text-sm">App 工坊</span></a>
+          <a href="https://dify.zhe-wei.net" target="_blank" class="card flex items-center gap-3"><i class="fas fa-brain text-pink-400"></i><span class="text-sm">Dify AI</span></a>
+          <button onclick="showPage('chat');startChat('image')" class="card flex items-center gap-3"><i class="fas fa-paint-brush text-rose-400"></i><span class="text-sm">AI 生圖</span></button>
+        </div>
+        <h3 class="text-xs text-slate-400 uppercase tracking-wider mt-4 mb-2">系統</h3>
+        <div class="grid grid-cols-2 gap-3" id="adminTools" style="display:none">
+          <button onclick="apiCall('/api/self-check','GET').then(r=>alert(JSON.stringify(r,null,2)))" class="card flex items-center gap-3"><i class="fas fa-stethoscope text-cyan-400"></i><span class="text-sm">自我檢查</span></button>
+          <button onclick="apiCall('/api/jarvis/learning-stats','GET').then(r=>alert(JSON.stringify(r,null,2)))" class="card flex items-center gap-3"><i class="fas fa-graduation-cap text-green-400"></i><span class="text-sm">學習統計</span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- === Status === -->
+    <section id="pg-status" class="page">
+      <div class="p-4 space-y-4 pb-6">
+        <h2 class="text-lg font-bold text-white pt-2">系統狀態</h2>
+        <div id="statusContent">
+          <div class="space-y-3">
+            <div class="skeleton h-20 w-full"></div>
+            <div class="skeleton h-20 w-full"></div>
+            <div class="skeleton h-20 w-full"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- === Settings === -->
+    <section id="pg-settings" class="page">
+      <div class="p-4 space-y-4 pb-6">
+        <h2 class="text-lg font-bold text-white pt-2">設定</h2>
+        <div class="card">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-12 h-12 rounded-full bg-sky-600 flex items-center justify-center text-lg font-bold" id="settAvatar">A</div>
+            <div>
+              <div class="font-semibold text-white" id="settUser">—</div>
+              <div class="text-xs text-slate-400" id="settRole">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="text-sm font-semibold text-slate-300 mb-3">連線</h3>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span class="text-slate-400">API 伺服器</span><span class="text-slate-200" id="settServer">—</span></div>
+            <div class="flex justify-between"><span class="text-slate-400">模式</span><span class="text-slate-200" id="settMode">雲端</span></div>
+            <div class="flex justify-between"><span class="text-slate-400">PWA 版本</span><span class="text-slate-200">v3.0</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="text-sm font-semibold text-slate-300 mb-3">USB 可攜模式</h3>
+          <p class="text-xs text-slate-400 mb-3">當偵測到本地 Ollama (localhost:11434) 時，自動切換為離線模式，所有 AI 請求走本地。</p>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-slate-300">自動切換</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="autoLocal" checked class="sr-only peer" onchange="saveSettings()">
+              <div class="w-9 h-5 bg-slate-700 peer-checked:bg-sky-500 rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+            </label>
+          </div>
+        </div>
+        <button onclick="doLogout()" class="w-full py-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 font-semibold text-sm hover:bg-rose-500/20 transition">登出</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Nav -->
+  <nav class="bottomnav grid grid-cols-5 px-2 pt-1 pb-1">
+    <button class="nav-btn active" onclick="showPage('home')"><i class="fas fa-home"></i><span>首頁</span></button>
+    <button class="nav-btn" onclick="showPage('chat')"><i class="fas fa-comment-dots"></i><span>聊天</span></button>
+    <button class="nav-btn" onclick="showPage('tools')"><i class="fas fa-th"></i><span>工具</span></button>
+    <button class="nav-btn" onclick="showPage('status')"><i class="fas fa-chart-bar"></i><span>狀態</span></button>
+    <button class="nav-btn" onclick="showPage('settings')"><i class="fas fa-user"></i><span>我的</span></button>
+  </nav>
+
+</div>
+
+<script>
+// ==================== CONFIG ====================
+const API_BASE = location.origin;
+const LOCAL_OLLAMA = 'http://localhost:11434';
+let TOKEN = localStorage.getItem('zw_pwa_token') || '';
+let USER = JSON.parse(localStorage.getItem('zw_pwa_user') || 'null');
+let chatMode = 'general';
+let chatHistory = [];
+let isStreaming = false;
+let useLocal = false;
+
+// ==================== AUTH ====================
+async function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value.trim();
+  if (!u || !p) return showLoginErr('請輸入帳號和密碼');
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  document.getElementById('loginBtnText').textContent = '登入中...';
+  document.getElementById('loginSpinner').classList.remove('hidden');
+  try {
+    const r = await fetch(`${API_BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username:u, password:p})
+    });
+    const d = await r.json();
+    if (d.ok && d.token) {
+      TOKEN = d.token;
+      localStorage.setItem('zw_pwa_token', TOKEN);
+      // Fetch user info
+      const me = await apiCall('/api/auth/me','GET');
+      if (me.ok) {
+        USER = me.user;
+        localStorage.setItem('zw_pwa_user', JSON.stringify(USER));
+      }
+      enterApp();
+    } else {
+      showLoginErr(d.error || '登入失敗');
+    }
+  } catch(e) {
+    showLoginErr('無法連線伺服器');
+  }
+  btn.disabled = false;
+  document.getElementById('loginBtnText').textContent = '登入';
+  document.getElementById('loginSpinner').classList.add('hidden');
+}
+
+function showLoginErr(msg) {
+  const el = document.getElementById('loginErr');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 4000);
+}
+
+function doLogout() {
+  TOKEN = '';
+  USER = null;
+  localStorage.removeItem('zw_pwa_token');
+  localStorage.removeItem('zw_pwa_user');
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+}
+
+// ==================== APP INIT ====================
+async function enterApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'grid';
+  updateUserUI();
+  loadDashboard();
+  checkLocalOllama();
+
+  // Handle hash routing
+  const hash = location.hash.replace('#','');
+  if (hash && document.getElementById('pg-' + hash)) {
+    showPage(hash);
+    if (hash === 'chat') startChat(chatMode);
+  }
+}
+
+function updateUserUI() {
+  if (!USER) return;
+  const initial = (USER.username || 'U')[0].toUpperCase();
+  document.getElementById('avatarBtn').textContent = initial;
+  document.getElementById('topUser').textContent = USER.username;
+  document.getElementById('settUser').textContent = USER.username;
+  document.getElementById('settRole').textContent = USER.role || 'user';
+  document.getElementById('settAvatar').textContent = initial;
+  document.getElementById('settServer').textContent = API_BASE;
+
+  // Greeting
+  const h = new Date().getHours();
+  const greet = h < 6 ? '夜深了' : h < 12 ? '早安' : h < 18 ? '午安' : '晚安';
+  document.getElementById('greeting').textContent = `${greet}，${USER.username}`;
+
+  // Admin tools
+  if (['superadmin','admin'].includes(USER.role)) {
+    document.getElementById('adminTools').style.display = 'grid';
+  }
+}
+
+// ==================== NAVIGATION ====================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const pg = document.getElementById('pg-' + name);
+  if (pg) pg.classList.add('active');
+
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-btn')[{home:0,chat:1,tools:2,status:3,settings:4}[name] ?? 0].classList.add('active');
+
+  const titles = {home:'主控台',chat:'AI 對話',tools:'工具箱',status:'系統狀態',settings:'設定'};
+  document.getElementById('topTitle').textContent = titles[name] || name;
+
+  if (name === 'status') loadStatus();
+  location.hash = name === 'home' ? '' : name;
+}
+
+// ==================== API ====================
+async function apiCall(path, method='GET', body=null) {
+  const opts = {method, headers:{'Authorization':`Bearer ${TOKEN}`}};
+  if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  try {
+    const r = await fetch(API_BASE + path, opts);
+    if (r.status === 401 || r.status === 403) { doLogout(); return {ok:false}; }
+    return await r.json();
+  } catch(e) {
+    return {ok:false, error:e.message};
+  }
+}
+
+// ==================== DASHBOARD ====================
+async function loadDashboard() {
+  // Self check
+  try {
+    const sc = await apiCall('/api/self-check','GET');
+    if (sc.ok && sc.checks) {
+      const ollama = sc.checks.find(c => c.name === 'ollama');
+      const kb = sc.checks.find(c => c.name === 'chromadb');
+      if (ollama && ollama.result && ollama.result.models) {
+        document.getElementById('statModels').textContent = ollama.result.models.length;
+      }
+      if (kb && kb.result && kb.result.count !== undefined) {
+        document.getElementById('statKB').textContent = (kb.result.count / 1000).toFixed(1) + 'k';
+      }
+    }
+  } catch(e) {}
+
+  // Services
+  const services = [
+    {name:'Jarvis AI', url:'jarvis.zhe-wei.net', icon:'fa-brain', color:'text-sky-400'},
+    {name:'視覺辨識', url:'vision.zhe-wei.net', icon:'fa-eye', color:'text-emerald-400'},
+    {name:'代碼模擬', url:'codesim.zhe-wei.net', icon:'fa-code', color:'text-amber-400'},
+    {name:'營建管理', url:'cms.zhe-wei.net', icon:'fa-hard-hat', color:'text-orange-400'},
+    {name:'App 工坊', url:'bridge.zhe-wei.net', icon:'fa-cubes', color:'text-indigo-400'},
+  ];
+  const sl = document.getElementById('serviceList');
+  sl.innerHTML = services.map(s => `
+    <a href="https://${s.url}" target="_blank" class="card flex items-center gap-3 !p-3">
+      <i class="fas ${s.icon} ${s.color} text-base w-6 text-center"></i>
+      <span class="text-sm flex-1">${s.name}</span>
+      <i class="fas fa-external-link-alt text-slate-600 text-xs"></i>
+    </a>
+  `).join('');
+
+  document.getElementById('statServices').textContent = services.length + '+';
+  document.getElementById('statGPU').textContent = '5070Ti';
+  document.getElementById('greetSub').textContent = `${new Date().toLocaleDateString('zh-TW',{month:'long',day:'numeric',weekday:'long'})}`;
+}
+
+// ==================== CHAT ====================
+function startChat(mode) {
+  switchMode(mode || 'general');
+}
+
+function switchMode(mode) {
+  chatMode = mode;
+  document.querySelectorAll('.mode-chip').forEach(c => c.classList.toggle('active', c.dataset.mode === mode));
+}
+
+function addMsg(role, text) {
+  const area = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  if (role === 'ai') {
+    div.innerHTML = formatAI(text);
+  } else {
+    div.textContent = text;
+  }
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+  return div;
+}
+
+function formatAI(text) {
+  // Simple markdown: code blocks, bold, inline code
+  return text
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code style="background:#334155;padding:1px 5px;border-radius:4px;font-size:12px">$1</code>')
+    .replace(/\n/g, '<br>');
+}
+
+async function sendMsg() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || isStreaming) return;
+
+  input.value = '';
+  autoResize(input);
+  addMsg('user', text);
+  chatHistory.push({role:'user', content:text});
+
+  isStreaming = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  // Typing indicator
+  const typing = addMsg('ai', '');
+  typing.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+
+  try {
+    let systemPrompt = '';
+    switch(chatMode) {
+      case 'code': systemPrompt = '你是專業的程式開發助手，擅長 Python, JavaScript, TypeScript。回覆要包含程式碼範例。'; break;
+      case 'construction': systemPrompt = '你是營建工程顧問，熟悉台灣營建法規、施工標準、工地安全管理。'; break;
+      case 'image': systemPrompt = '你是 AI 生圖助手。當用戶描述想要的圖片時，幫他優化 prompt 並用繁體中文解釋。如需生成，告知用戶使用 Forge 或 ComfyUI。'; break;
+      case 'translate': systemPrompt = '你是專業翻譯。將用戶輸入翻譯為另一種語言（中→英、英→中、日→中）。直接翻譯，不需解釋。'; break;
+      default: systemPrompt = '你是築未科技的 AI 助手 Jarvis，友善、專業、簡潔地回答問題。使用繁體中文。';
+    }
+
+    const messages = [{role:'system', content:systemPrompt}, ...chatHistory.slice(-10)];
+
+    // Try streaming endpoint
+    const resp = await fetch(`${API_BASE}/api/jarvis/stream`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'Authorization':`Bearer ${TOKEN}`},
+      body: JSON.stringify({messages, model: useLocal ? 'qwen3:8b' : undefined})
+    });
+
+    if (resp.ok && resp.headers.get('content-type')?.includes('text/event-stream')) {
+      // SSE streaming
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      typing.innerHTML = '';
+
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, {stream:true});
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') break;
+            try {
+              const j = JSON.parse(data);
+              if (j.content) {
+                fullText += j.content;
+                typing.innerHTML = formatAI(fullText);
+              }
+            } catch(e) {
+              fullText += data;
+              typing.innerHTML = formatAI(fullText);
+            }
+          }
+        }
+        document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
+      }
+      chatHistory.push({role:'assistant', content:fullText});
+    } else {
+      // Fallback: non-streaming
+      const d = await resp.json();
+      const reply = d.reply || d.response || d.content || d.error || '無回應';
+      typing.innerHTML = formatAI(reply);
+      chatHistory.push({role:'assistant', content:reply});
+    }
+  } catch(e) {
+    // Fallback to simple chat endpoint
+    try {
+      const d = await apiCall('/api/chat/remote', 'POST', {message: text, mode: chatMode});
+      const reply = d.reply || d.response || d.message || '連線失敗';
+      typing.innerHTML = formatAI(reply);
+      chatHistory.push({role:'assistant', content:reply});
+    } catch(e2) {
+      typing.innerHTML = '<span class="text-rose-400">連線失敗，請稍後再試</span>';
+    }
+  }
+
+  isStreaming = false;
+  document.getElementById('sendBtn').disabled = false;
+  document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// ==================== STATUS ====================
+async function loadStatus() {
+  const cont = document.getElementById('statusContent');
+  cont.innerHTML = '<div class="space-y-3"><div class="skeleton h-20 w-full"></div><div class="skeleton h-20 w-full"></div></div>';
+
+  try {
+    const sc = await apiCall('/api/self-check','GET');
+    if (!sc.ok) { cont.innerHTML = '<p class="text-rose-400">無法取得狀態</p>'; return; }
+
+    let html = '<div class="space-y-3">';
+    for (const c of (sc.checks || [])) {
+      const ok = c.result && c.result.ok;
+      const dot = ok ? 'green' : 'red';
+      const detail = ok
+        ? (c.name === 'ollama' ? `${c.result.models?.length || 0} 模型` :
+           c.name === 'chromadb' ? `${c.result.count} 筆知識` :
+           c.name === 'api_keys' ? `${c.result.available_count}/${c.result.total} 可用` :
+           c.name === 'embed_model' ? c.result.model :
+           c.name === 'generate_model' ? c.result.model :
+           c.name === 'learning_pipeline' ? '驗證通過' : '正常')
+        : (c.result?.error || '異常');
+
+      html += `<div class="card flex items-center gap-3 !p-3">
+        <div class="dot ${dot}"></div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium text-white">${c.name}</div>
+          <div class="text-xs text-slate-400 truncate">${detail}</div>
+        </div>
+      </div>`;
+    }
+    html += '</div>';
+    cont.innerHTML = html;
+  } catch(e) {
+    cont.innerHTML = `<p class="text-rose-400">載入失敗：${e.message}</p>`;
+  }
+}
+
+// ==================== LOCAL OLLAMA ====================
+async function checkLocalOllama() {
+  const auto = document.getElementById('autoLocal')?.checked;
+  if (!auto) return;
+  try {
+    const r = await fetch(LOCAL_OLLAMA + '/api/tags', {signal: AbortSignal.timeout(2000)});
+    if (r.ok) {
+      useLocal = true;
+      document.getElementById('settMode').textContent = '本地 (USB)';
+      document.getElementById('settMode').classList.add('text-emerald-400');
+    }
+  } catch(e) {
+    useLocal = false;
+    document.getElementById('settMode').textContent = '雲端';
+  }
+}
+
+function saveSettings() {
+  checkLocalOllama();
+}
+
+// ==================== INIT ====================
+document.getElementById('loginPass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// Check server connectivity
+(async () => {
+  try {
+    const r = await fetch(API_BASE + '/health', {signal: AbortSignal.timeout(3000)});
+    if (r.ok) {
+      document.getElementById('serverDot').className = 'dot green';
+      document.getElementById('serverLabel').textContent = '已連線';
+    }
+  } catch(e) {
+    document.getElementById('serverDot').className = 'dot red';
+    document.getElementById('serverLabel').textContent = '離線';
+  }
+})();
+
+// Auto-login if token exists
+(async () => {
+  if (TOKEN) {
+    try {
+      const me = await apiCall('/api/auth/me','GET');
+      if (me.ok && me.user) {
+        USER = me.user;
+        localStorage.setItem('zw_pwa_user', JSON.stringify(USER));
+        enterApp();
+        return;
+      }
+    } catch(e) {}
+    // Token invalid
+    TOKEN = '';
+    localStorage.removeItem('zw_pwa_token');
+  }
+  document.getElementById('loginScreen').style.display = 'flex';
+})();
+
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/pwa/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
