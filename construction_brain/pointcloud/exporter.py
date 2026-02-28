@@ -9,22 +9,32 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
+
 from .section_extractor import SectionResult, SectionType
 
 logger = logging.getLogger(__name__)
 
 
-def export_dxf(result: SectionResult, output_path: str, scale: float = 1.0, layer_name: Optional[str] = None):
+def export_dxf(result: SectionResult, output_path: str, scale: float = 1.0,
+               layer_name: Optional[str] = None,
+               show_points: bool = True, show_grid: bool = True,
+               show_dimensions: bool = True, grid_spacing: float = 0.0):
     """
-    匯出切面為 DXF 檔案。
+    匯出切面為 DXF 檔案（含尺寸標註、座標網格、散點圖）。
 
     Args:
         result: SectionResult 切面結果
         output_path: 輸出路徑 (.dxf)
         scale: 縮放比例（預設 1:1，公尺）
         layer_name: 圖層名稱
+        show_points: 是否顯示散點
+        show_grid: 是否顯示座標網格
+        show_dimensions: 是否顯示尺寸標註
+        grid_spacing: 網格間距 (0=自動)
     """
     import ezdxf
+    from .dimension import auto_dimensions, add_dimensions_to_dxf, add_grid_to_dxf
 
     doc = ezdxf.new(dxfversion="R2010")
     msp = doc.modelspace()
@@ -32,48 +42,59 @@ def export_dxf(result: SectionResult, output_path: str, scale: float = 1.0, laye
     if layer_name is None:
         layer_name = _default_layer_name(result)
 
-    doc.layers.add(layer_name, color=7)  # 白色
+    doc.layers.add(layer_name, color=7)
+    doc.layers.add("點雲", color=30)      # 淺藍
+    doc.layers.add("標註", color=1)       # 紅
+    doc.layers.add("網格", color=8)       # 灰
 
     # 繪製輪廓線
     for contour in result.contours:
         if len(contour) < 2:
             continue
         scaled = [(x * scale, y * scale) for x, y in contour]
-        msp.add_lwpolyline(scaled, dxfattribs={"layer": layer_name})
+        msp.add_lwpolyline(scaled, dxfattribs={"layer": layer_name, "lineweight": 35})
 
-    # 加入標註文字
+    # 繪製散點
+    if show_points and result.n_points > 0:
+        pts = result.points_2d
+        # 限制散點數量避免 DXF 過大
+        max_pts = min(len(pts), 5000)
+        if len(pts) > max_pts:
+            idx = np.random.choice(len(pts), max_pts, replace=False)
+            pts = pts[idx]
+        for p in pts:
+            msp.add_point((p[0] * scale, p[1] * scale),
+                          dxfattribs={"layer": "點雲"})
+
     bounds = result.bounds
+
+    # 座標網格
+    if show_grid and bounds:
+        add_grid_to_dxf(msp, bounds, spacing=grid_spacing, scale=scale)
+
+    # 尺寸標註
+    if show_dimensions and bounds:
+        dims = auto_dimensions(bounds, result.contours, result.section_type.value)
+        add_dimensions_to_dxf(msp, dims, scale=scale)
+
+    # 標題
     if bounds:
         cx = (bounds["min_x"] + bounds["max_x"]) / 2 * scale
-        cy = bounds["max_y"] * scale + 1.0
+        cy = bounds["max_y"] * scale + 2.0
         label = _section_label(result)
         msp.add_text(
             label,
             dxfattribs={
                 "layer": layer_name,
-                "height": 0.3 * scale,
+                "height": 0.5 * scale,
                 "insert": (cx, cy),
-                "halign": 1,  # center
-            }
-        )
-
-    # 加入尺寸標註
-    if bounds:
-        width = (bounds["max_x"] - bounds["min_x"]) * scale
-        height = (bounds["max_y"] - bounds["min_y"]) * scale
-        # 底部寬度標註
-        msp.add_text(
-            f"{width:.2f}m",
-            dxfattribs={
-                "layer": layer_name,
-                "height": 0.2 * scale,
-                "insert": (cx, bounds["min_y"] * scale - 0.5),
+                "halign": 1,
             }
         )
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     doc.saveas(output_path)
-    logger.info(f"DXF 匯出: {output_path} ({len(result.contours)} 輪廓)")
+    logger.info(f"DXF 匯出: {output_path} ({len(result.contours)} 輪廓, {result.n_points} 點)")
     return output_path
 
 
